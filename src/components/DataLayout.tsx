@@ -1,6 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Outlet, useParams } from "react-router-dom";
-import { useAppDispatch, setContext, clearContext } from "@/store";
+import {
+  useAppDispatch,
+  setContext,
+  clearContext,
+  clearProjectionState,
+  clearERState,
+  clearCommitHistory,
+  clearClusteringError,
+  clearError,
+  baseApi,
+} from "@/store";
 import { IconRail } from "./IconRail";
 import { StatusBar } from "./StatusBar";
 import { ErrorBanner } from "./ErrorBanner";
@@ -12,11 +22,29 @@ export const DataLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
 
+  const prevDataProductKey = useRef<string | null>(null);
+
   useEffect(() => {
     const org = params.org;
     const team = params.team;
     const branch = params.branch;
     const commitId = params.commitId;
+
+    const refType = branch ? "branch" : commitId ? "commit" : null;
+    const refName = branch ?? commitId ?? null;
+    const dataProductKey = org && team && refType && refName
+      ? `${org}/${team}/${refType}/${refName}`
+      : null;
+
+    if (prevDataProductKey.current !== null && prevDataProductKey.current !== dataProductKey) {
+      dispatch(clearProjectionState());
+      dispatch(clearERState());
+      dispatch(clearCommitHistory());
+      dispatch(clearClusteringError());
+      dispatch(clearError());
+      dispatch(baseApi.util.resetApiState());
+    }
+    prevDataProductKey.current = dataProductKey;
 
     if (org && team) {
       if (branch) {

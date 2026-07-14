@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "@/store";
 import { useRouteParams, PageShell, PageHeader } from "@/components";
 
@@ -16,7 +17,7 @@ function formatTimestamp(ts: string): string {
   return ts;
 }
 
-function ChangeBadge({ label, items, color }: { label: string; items: string[]; color: string }) {
+function ChangeBadge({ label, items, color, onNavigate }: { label: string; items: string[]; color: string; onNavigate: (uri: string) => void }) {
   if (items.length === 0) return null;
   return (
     <div className="flex items-start gap-1.5">
@@ -25,9 +26,15 @@ function ChangeBadge({ label, items, color }: { label: string; items: string[]; 
       </span>
       <div className="flex flex-wrap gap-1">
         {items.map((uri, i) => (
-          <code key={i} className="rounded bg-gray-50 px-1 py-0.5 text-xs text-gray-600">
+          <button
+            key={i}
+            type="button"
+            onClick={() => onNavigate(uri)}
+            className="rounded bg-gray-50 px-1 py-0.5 text-xs text-gray-600 hover:bg-dfrntBlue-50 hover:text-dfrntBlue-700"
+            title={`Open ${shortenUri(uri)}`}
+          >
             {shortenUri(uri)}
-          </code>
+          </button>
         ))}
       </div>
     </div>
@@ -36,6 +43,7 @@ function ChangeBadge({ label, items, color }: { label: string; items: string[]; 
 
 export const BranchHistoryPage: React.FC = () => {
   const routeParams = useRouteParams();
+  const navigate = useNavigate();
   const connectionStatus = useAppSelector((state) => state.commitStream.connectionStatus);
   const error = useAppSelector((state) => state.commitStream.error);
   const history = useAppSelector((state) => state.commitStream.history);
@@ -45,6 +53,12 @@ export const BranchHistoryPage: React.FC = () => {
   const branch = routeParams?.refType === "branch" ? routeParams.refName : "main";
 
   // Commit stream is connected globally in DataLayout — no local connection needed.
+
+  const navigateToDoc = (uri: string) => {
+    if (!routeParams) return;
+    const docId = shortenUri(uri);
+    navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(docId)}`);
+  };
 
   const statusColor =
     connectionStatus === "connected"
@@ -125,9 +139,9 @@ export const BranchHistoryPage: React.FC = () => {
                     </div>
                     {changes && totalChanges > 0 && (
                       <div className="mt-2 space-y-1.5 rounded-lg bg-gray-50 px-3 py-2">
-                        <ChangeBadge label="Added" items={changes.added} color="bg-green-100 text-green-700" />
-                        <ChangeBadge label="Changed" items={changes.changed} color="bg-blue-100 text-blue-700" />
-                        <ChangeBadge label="Deleted" items={changes.deleted} color="bg-red-100 text-red-700" />
+                        <ChangeBadge label="Added" items={changes.added} color="bg-green-100 text-green-700" onNavigate={navigateToDoc} />
+                        <ChangeBadge label="Changed" items={changes.changed} color="bg-blue-100 text-blue-700" onNavigate={navigateToDoc} />
+                        <ChangeBadge label="Deleted" items={changes.deleted} color="bg-red-100 text-red-700" onNavigate={navigateToDoc} />
                       </div>
                     )}
                   </div>

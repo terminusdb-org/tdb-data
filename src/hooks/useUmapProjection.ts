@@ -20,10 +20,12 @@ export interface UseUmapProjectionParams {
   readonly minDist?: number;
   readonly spread?: number;
   readonly enabled?: boolean;
+  readonly cachedPoints?: ReadonlyArray<UmapProjectionPoint> | null;
+  readonly onResult?: (points: ReadonlyArray<UmapProjectionPoint>, nComponents: 2 | 3) => void;
 }
 
 export function useUmapProjection(params: UseUmapProjectionParams): UseUmapProjectionResult {
-  const { embeddings, nComponents, enabled = true } = params;
+  const { embeddings, nComponents, enabled = true, cachedPoints = null, onResult } = params;
   const nNeighbors = params.nNeighbors ?? 15;
   const minDist = params.minDist ?? 0.1;
   const spread = params.spread ?? 1.0;
@@ -39,6 +41,11 @@ export function useUmapProjection(params: UseUmapProjectionParams): UseUmapProje
   useEffect(() => {
     embeddingsRef.current = embeddings;
   }, [embeddings]);
+
+  const onResultRef = useRef(onResult);
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   const runProjection = useCallback(() => {
     const entries = Object.entries(embeddingsRef.current);
@@ -79,6 +86,7 @@ export function useUmapProjection(params: UseUmapProjectionParams): UseUmapProje
       setIsRunning(false);
       worker.removeEventListener("message", handler);
       handlerRef.current = null;
+      onResultRef.current?.(newPoints, nComponents);
     };
 
     handlerRef.current = handler;
@@ -101,10 +109,14 @@ export function useUmapProjection(params: UseUmapProjectionParams): UseUmapProje
   }, [nComponents, nNeighbors, minDist, spread]);
 
   useEffect(() => {
-    if (enabled) {
-      runProjection();
+    if (!enabled) return;
+    if (cachedPoints && cachedPoints.length > 0) {
+      setPoints(cachedPoints);
+      setIsRunning(false);
+      return;
     }
-  }, [enabled, runProjection, embeddings]);
+    runProjection();
+  }, [enabled, runProjection, embeddings, cachedPoints]);
 
   const reproject = useCallback(() => {
     runProjection();

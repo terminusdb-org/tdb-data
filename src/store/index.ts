@@ -68,9 +68,13 @@ export type { CommitEntry } from "./commitStreamSlice";
 export {
   toggleType, setSelectedTypes, setFilterMode, setSelectedId, setHighlightedIds,
   toggleShowDuplicates, setShowDuplicates, setLoadedTypes,
-  toggleMultiSelectId, addMultiSelectIds, setMultiSelectIds, clearMultiSelectIds,
-  toggleProjectSelectionOnly, setProjectSelectionOnly, clearProjectionState,
+  toggleProjectionSelectionId, setProjectionSelectionIds, clearProjectionSelection,
+  addToWorkingSet, removeFromWorkingSet, setWorkingSetIds, clearWorkingSet,
+  toggleWorkingSetVisible, setWorkingSetVisible,
+  toggleProjectSelectionOnly, setProjectSelectionOnly, toggleProjectWorkingSet, setProjectWorkingSet, setDimensions, setEmbeddingRole, setProjectionResult, clearProjectionCache, clearProjectionState,
   selectSelectedTypes, selectFilterMode, selectSelectedId, selectHighlightedIds,
-  selectShowDuplicates, selectLoadedTypes, selectMultiSelectIds, selectProjectSelectionOnly,
+  selectShowDuplicates, selectLoadedTypes,
+  selectWorkingSetIds, selectWorkingSetVisible, selectProjectionSelectionIds, selectProjectSelectionOnly, selectProjectWorkingSet,
+  selectDimensions, selectEmbeddingRole, selectProjectionCacheKey, selectProjectionPoints2d, selectProjectionPoints3d,
 } from "./projectionSlice";
-export type { FilterMode } from "./projectionSlice";
+export type { FilterMode, EmbeddingRole, CachedProjectionPoint } from "./projectionSlice";

@@ -12,5 +12,4 @@ export { EmbeddingsPage } from "./EmbeddingsPage";
 export { IndexStatsPage } from "./IndexStatsPage";
 export { EntityResolutionPage } from "./EntityResolutionPage";
 export { BranchHistoryPage } from "./BranchHistoryPage";
-export { Projection2DPage } from "./ProjectionPage";
-export { Projection3DPage } from "./ProjectionPage";
+export { ProjectionPage } from "./ProjectionPage";

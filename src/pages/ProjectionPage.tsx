@@ -32,31 +32,45 @@ import {
   setHighlightedIds,
   toggleShowDuplicates,
   setLoadedTypes,
-  toggleMultiSelectId,
-  addMultiSelectIds,
-  setMultiSelectIds,
-  clearMultiSelectIds,
+  toggleProjectionSelectionId,
+  setProjectionSelectionIds,
+  clearProjectionSelection,
+  addToWorkingSet,
+  removeFromWorkingSet,
+  setWorkingSetIds,
+  clearWorkingSet,
+  toggleWorkingSetVisible,
   toggleProjectSelectionOnly,
   setProjectSelectionOnly,
+  toggleProjectWorkingSet,
+  setDimensions,
+  setEmbeddingRole,
+  setProjectionResult,
   selectSelectedTypes,
   selectFilterMode,
   selectSelectedId,
   selectHighlightedIds,
   selectShowDuplicates,
   selectLoadedTypes,
-  selectMultiSelectIds,
+  selectWorkingSetIds,
+  selectWorkingSetVisible,
+  selectProjectionSelectionIds,
   selectProjectSelectionOnly,
+  selectProjectWorkingSet,
+  selectDimensions,
+  selectEmbeddingRole,
+  selectProjectionCacheKey,
+  selectProjectionPoints2d,
+  selectProjectionPoints3d,
 } from "@/store";
 import { buildApiPath } from "@/utils/routes";
 import { generateTypeColors } from "@/utils/typeColors";
-import { useUmapProjection } from "@/hooks/useUmapProjection";
+import { useUmapProjection, type UmapProjectionPoint } from "@/hooks/useUmapProjection";
 
-interface ProjectionPageProps {
-  readonly dimensions: 2 | 3;
-}
-
-export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) => {
+export const ProjectionPage: React.FC = () => {
   const routeParams = useRouteParams();
+  const dimensions = useAppSelector(selectDimensions);
+  const embeddingRole = useAppSelector(selectEmbeddingRole);
 
   const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
   const embeddingsPath = routeParams
@@ -98,29 +112,45 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
   const highlightedIdsArr = useAppSelector(selectHighlightedIds);
   const showDuplicates = useAppSelector(selectShowDuplicates);
   const loadedTypesArr = useAppSelector(selectLoadedTypes);
-  const multiSelectIdsArr = useAppSelector(selectMultiSelectIds);
+  const workingSetIdsArr = useAppSelector(selectWorkingSetIds);
+  const workingSetVisible = useAppSelector(selectWorkingSetVisible);
+  const projectionSelectionIdsArr = useAppSelector(selectProjectionSelectionIds);
   const projectSelectionOnly = useAppSelector(selectProjectSelectionOnly);
+  const projectWorkingSet = useAppSelector(selectProjectWorkingSet);
+  const projectionCacheKey = useAppSelector(selectProjectionCacheKey);
+  const projectionPoints2d = useAppSelector(selectProjectionPoints2d);
+  const projectionPoints3d = useAppSelector(selectProjectionPoints3d);
 
   const selectedTypes = useMemo(() => new Set(selectedTypesArr), [selectedTypesArr]);
   const highlightedIds = useMemo(() => new Set(highlightedIdsArr), [highlightedIdsArr]);
   const loadedTypes = useMemo(() => new Set(loadedTypesArr), [loadedTypesArr]);
-  const multiSelectIds = useMemo(() => new Set(multiSelectIdsArr), [multiSelectIdsArr]);
+  const workingSetIds = useMemo(() => new Set(workingSetIdsArr), [workingSetIdsArr]);
+  const projectionSelectionIds = useMemo(() => new Set(projectionSelectionIdsArr), [projectionSelectionIdsArr]);
 
   const docTypesForQuery = useMemo(() => {
     return [...selectedTypes];
   }, [selectedTypes]);
 
+  const workingSetDocIds = useMemo(() => {
+    if (projectWorkingSet && workingSetIds.size > 0) {
+      return [...workingSetIds];
+    }
+    return [];
+  }, [projectWorkingSet, workingSetIds]);
+
+  const hasActiveQuery = selectedTypes.size > 0 || (projectWorkingSet && workingSetDocIds.length > 0);
+
   const { data: embeddingsData, isLoading: embeddingsLoading } =
     useGetEmbeddingsByTypeQuery(
-      { path: embeddingsPath, docTypes: docTypesForQuery },
-      { skip: !routeParams || !embeddingsPath || selectedTypes.size === 0 }
+      { path: embeddingsPath, docTypes: docTypesForQuery, docIds: workingSetDocIds },
+      { skip: !routeParams || !embeddingsPath || !hasActiveQuery }
     );
 
   useEffect(() => {
-    if (!embeddingsLoading && embeddingsData && selectedTypes.size > 0) {
+    if (!embeddingsLoading && embeddingsData && hasActiveQuery) {
       dispatch(setLoadedTypes([...selectedTypes]));
     }
-  }, [embeddingsLoading, embeddingsData, selectedTypes, dispatch]);
+  }, [embeddingsLoading, embeddingsData, selectedTypes, hasActiveQuery, dispatch]);
 
   const { data: duplicatesData, isFetching: duplicatesLoading } = useDuplicatesQuery(
     { path: duplicatesPath, count: 50 },
@@ -132,37 +162,76 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
     { skip: !routeParams || !indexPath }
   );
 
-  const allEmbeddings = embeddingsData?.doc_embeddings ?? {};
+  const allEmbeddings = embeddingsData
+    ? embeddingRole === "clustering"
+      ? embeddingsData.clustering_embeddings
+      : embeddingsData.doc_embeddings
+    : {};
 
   const embeddings = useMemo(() => {
-    if (projectSelectionOnly && multiSelectIds.size > 0) {
+    if (projectSelectionOnly && projectionSelectionIds.size > 0) {
       const filtered: Record<string, number[]> = {};
       for (const [id, emb] of Object.entries(allEmbeddings)) {
-        if (multiSelectIds.has(id)) {
+        if (projectionSelectionIds.has(id)) {
           filtered[id] = [...emb];
         }
       }
       return filtered;
     }
     return allEmbeddings;
-  }, [allEmbeddings, projectSelectionOnly, multiSelectIds]);
+  }, [allEmbeddings, projectSelectionOnly, projectionSelectionIds]);
+
+  const cacheKey = useMemo(() => {
+    const typesKey = [...selectedTypes].sort().join(",");
+    const wsKey = projectWorkingSet && workingSetIds.size > 0 ? `ws:${[...workingSetIds].sort().join(",")}` : "no-ws";
+    const selectKey = projectSelectionOnly ? `sel:${[...projectionSelectionIds].sort().join(",")}` : "all";
+    return `${embeddingRole}|${typesKey}|${wsKey}|${selectKey}`;
+  }, [selectedTypes, embeddingRole, projectSelectionOnly, projectionSelectionIds, projectWorkingSet, workingSetIds]);
+
+  const cacheValid = projectionCacheKey === cacheKey;
+  const cachedPointsForCurrentDim = cacheValid
+    ? (dimensions === 2 ? projectionPoints2d : projectionPoints3d)
+    : null;
+  const cachedPointsForOtherDim = cacheValid
+    ? (dimensions === 2 ? projectionPoints3d : projectionPoints2d)
+    : null;
+  const otherDimension: 2 | 3 = dimensions === 2 ? 3 : 2;
+
+  const handleProjectionResult = useCallback((pts: ReadonlyArray<UmapProjectionPoint>, dim: 2 | 3) => {
+    dispatch(setProjectionResult({
+      dimension: dim,
+      points: pts.map((p) => ({ id: p.id, position: [...p.position] })),
+      cacheKey,
+    }));
+  }, [dispatch, cacheKey]);
 
   const { points, isRunning: isProjecting, reproject } = useUmapProjection({
     embeddings,
     nComponents: dimensions,
     enabled: !embeddingsLoading && Object.keys(embeddings).length > 0,
+    cachedPoints: cachedPointsForCurrentDim,
+    onResult: handleProjectionResult,
+  });
+
+  const otherDimHasCache = cachedPointsForOtherDim !== null && cachedPointsForOtherDim.length > 0;
+
+  const { isRunning: isBackgroundProjecting } = useUmapProjection({
+    embeddings,
+    nComponents: otherDimension,
+    enabled: !embeddingsLoading && Object.keys(embeddings).length > 0 && !otherDimHasCache && !isProjecting,
+    cachedPoints: cachedPointsForOtherDim,
+    onResult: handleProjectionResult,
   });
 
   const docToTypeMap = useMemo(() => {
     const map: Record<string, string> = {};
-    if (!embeddingsData) return map;
-    for (const id of Object.keys(embeddingsData.doc_embeddings)) {
+    for (const id of Object.keys(allEmbeddings)) {
       const parts = id.split("/");
       const typePart = parts.at(-2);
       if (typePart) map[id] = typePart;
     }
     return map;
-  }, [embeddingsData]);
+  }, [allEmbeddings]);
 
   const scatterPoints = useMemo(() => {
     return points.map((p) => {
@@ -245,35 +314,56 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
     };
   }, []);
 
+  const handleToggleProjectWorkingSet = useCallback(() => {
+    dispatch(toggleProjectWorkingSet());
+  }, [dispatch]);
+
   const handleSelect = useCallback((id: string | null) => {
     if (id === null) {
       dispatch(setSelectedId(null));
       return;
     }
     if (shiftPressedRef.current) {
-      dispatch(toggleMultiSelectId(id));
+      dispatch(toggleProjectionSelectionId(id));
     } else {
       dispatch(setSelectedId(id));
     }
   }, [dispatch]);
 
   const handleProjectSelection = useCallback(() => {
-    if (multiSelectIds.size > 0) {
+    if (projectionSelectionIds.size > 0) {
       dispatch(toggleProjectSelectionOnly());
     }
-  }, [multiSelectIds, dispatch]);
+  }, [projectionSelectionIds, dispatch]);
 
   const handleClearSelection = useCallback(() => {
-    dispatch(clearMultiSelectIds());
+    dispatch(clearProjectionSelection());
+  }, [dispatch]);
+
+  const handleClearWorkingSet = useCallback(() => {
+    dispatch(clearWorkingSet());
+  }, [dispatch]);
+
+  const handleToggleWorkingSetVisible = useCallback(() => {
+    dispatch(toggleWorkingSetVisible());
+  }, [dispatch]);
+
+  const handleRemoveFromWorkingSet = useCallback((id: string) => {
+    dispatch(removeFromWorkingSet(id));
   }, [dispatch]);
 
   const handleAddToWorkingSet = useCallback((ids: string[]) => {
-    dispatch(addMultiSelectIds(ids));
+    dispatch(addToWorkingSet(ids));
   }, [dispatch]);
 
   const handleLoadSet = useCallback((ids: string[]) => {
-    dispatch(setMultiSelectIds(ids));
+    dispatch(setWorkingSetIds(ids));
     dispatch(setProjectSelectionOnly(false));
+  }, [dispatch]);
+
+  const handleProjectSet = useCallback((ids: string[]) => {
+    dispatch(setProjectionSelectionIds(ids));
+    dispatch(setProjectSelectionOnly(true));
   }, [dispatch]);
 
   const scatterPointIdSet = useMemo(
@@ -283,9 +373,17 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
 
   const combinedHighlightedIds = useMemo(() => {
     const combined = new Set(highlightedIds);
-    for (const id of multiSelectIds) combined.add(id);
+    for (const id of projectionSelectionIds) combined.add(id);
     return combined;
-  }, [highlightedIds, multiSelectIds]);
+  }, [highlightedIds, projectionSelectionIds]);
+
+  const toggleDimensions = useCallback(() => {
+    dispatch(setDimensions(dimensions === 2 ? 3 : 2));
+  }, [dispatch, dimensions]);
+
+  const toggleEmbeddingRole = useCallback(() => {
+    dispatch(setEmbeddingRole(embeddingRole === "document" ? "clustering" : "document"));
+  }, [dispatch, embeddingRole]);
 
   if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
   if (schemaLoading) return <PagePlaceholder>Loading schema…</PagePlaceholder>;
@@ -302,6 +400,7 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
               <p className="mt-0.5 text-sm text-gray-500">
                 UMAP dimension reduction of document embeddings
                 {isProjecting && " — projecting…"}
+                {!isProjecting && isBackgroundProjecting && " — computing other view…"}
               </p>
               {embeddingsData && (
                 <p className="mt-0.5 text-xs text-gray-400">
@@ -316,11 +415,41 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
                 </p>
               )}
             </div>
-            {embeddingsData && (
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                {scatterPoints.length} points
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {embeddingsData && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                  {scatterPoints.length} points
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={toggleDimensions}
+                className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                title="Toggle 2D/3D view"
+              >
+                {dimensions === 2 ? "2D" : "3D"}
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5 5-5" />
+                </svg>
+              </button>
+              {embeddingsData?.store_clustering && (
+                <button
+                  type="button"
+                  onClick={toggleEmbeddingRole}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50 ${
+                    embeddingRole === "clustering"
+                      ? "border-dfrntBlue-300 bg-dfrntBlue-50 text-dfrntBlue-700"
+                      : "border-gray-300 text-gray-600"
+                  }`}
+                  title="Toggle document/clustering embeddings"
+                >
+                  {embeddingRole === "clustering" ? "Clustering" : "Document"}
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5 5-5" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </PageHeader>
       }
@@ -336,8 +465,8 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
             />
           )}
           <div className="relative flex-1">
-            {selectedTypes.size === 0 ? (
-              <PagePlaceholder>Select a document type to load embeddings.</PagePlaceholder>
+            {selectedTypes.size === 0 && !(projectWorkingSet && workingSetDocIds.length > 0) ? (
+              <PagePlaceholder>Select a document type or enable Working Set union to load embeddings.</PagePlaceholder>
             ) : embeddingsLoading ? (
               <PagePlaceholder>Loading embeddings…</PagePlaceholder>
             ) : isProjecting ? (
@@ -348,6 +477,9 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
                   points={scatterPoints as unknown as Point3D[]}
                   selectedId={selectedId}
                   highlightedIds={combinedHighlightedIds}
+                  selectionIds={projectionSelectionIds}
+                  workingSetIds={workingSetIds}
+                  workingSetVisible={workingSetVisible}
                   dimmedTypes={dimmedTypes}
                   onSelect={handleSelect}
                   width={800}
@@ -358,6 +490,9 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
                   points={scatterPoints as unknown as ScatterPoint[]}
                   selectedId={selectedId}
                   highlightedIds={combinedHighlightedIds}
+                  selectionIds={projectionSelectionIds}
+                  workingSetIds={workingSetIds}
+                  workingSetVisible={workingSetVisible}
                   dimmedTypes={dimmedTypes}
                   onSelect={handleSelect}
                   width={800}
@@ -369,10 +504,10 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
             )}
           </div>
 
-          {multiSelectIds.size > 0 && (
+          {projectionSelectionIds.size > 0 && (
             <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2 text-sm">
               <span className="text-gray-600">
-                {multiSelectIds.size} selected
+                {projectionSelectionIds.size} selected
                 {projectSelectionOnly && " (projecting only selection)"}
               </span>
               <button
@@ -393,7 +528,7 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
               </button>
             </div>
           )}
-          {multiSelectIds.size === 0 && scatterPoints.length > 0 && (
+          {projectionSelectionIds.size === 0 && scatterPoints.length > 0 && (
             <div className="border-t border-gray-100 px-4 py-1.5 text-xs text-gray-400">
               Tip: Shift+click points to multi-select, then "Project Selection" to re-run UMAP on a subset.
             </div>
@@ -430,6 +565,9 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
                   onReproject={reproject}
                   isProjecting={isProjecting}
                   isLoading={embeddingsLoading}
+                  projectWorkingSet={projectWorkingSet}
+                  workingSetCount={workingSetIds.size}
+                  onToggleProjectWorkingSet={handleToggleProjectWorkingSet}
                 />
               ),
             },
@@ -457,7 +595,7 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
             {
               id: "working-set",
               title: "Working Set",
-              badge: multiSelectIds.size > 0 ? multiSelectIds.size : undefined,
+              badge: workingSetIds.size > 0 ? workingSetIds.size : undefined,
               icon: (
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.171.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
@@ -466,10 +604,14 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
               content: (
                 <WorkingSetPanel
                   docPath={docPath}
-                  workingSetIds={multiSelectIds}
+                  workingSetIds={workingSetIds}
+                  workingSetVisible={workingSetVisible}
                   onLoadSet={handleLoadSet}
                   onAddIds={handleAddToWorkingSet}
-                  onClear={handleClearSelection}
+                  onClear={handleClearWorkingSet}
+                  onToggleVisible={handleToggleWorkingSetVisible}
+                  onProjectSet={handleProjectSet}
+                  onRemoveItem={handleRemoveFromWorkingSet}
                 />
               ),
             },
@@ -480,8 +622,6 @@ export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) =>
   );
 };
 
-export const Projection2DPage: React.FC = () => <ProjectionPage dimensions={2} />;
-export const Projection3DPage: React.FC = () => <ProjectionPage dimensions={3} />;
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16);

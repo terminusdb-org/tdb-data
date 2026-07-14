@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { ProtectedRoute, DataLayout } from "@/components";
-import { LoginPage, DataProductPickerPage, MainPage, DoctypesPage, RawJsonPage, DocumentsPage, GraphQLPage, SchemaPage, ContextPage, VectorSearchPage, EmbeddingsPage, IndexStatsPage, EntityResolutionPage, BranchHistoryPage, Projection2DPage, Projection3DPage } from "@/pages";
+import { LoginPage, DataProductPickerPage, MainPage, DoctypesPage, RawJsonPage, DocumentsPage, GraphQLPage, SchemaPage, ContextPage, VectorSearchPage, EmbeddingsPage, IndexStatsPage, EntityResolutionPage, BranchHistoryPage, ProjectionPage } from "@/pages";
 import { config } from "@/config";
 
 export const App: React.FC = () => {
@@ -36,8 +36,7 @@ export const App: React.FC = () => {
             <Route path=":org/:team/local/branch/:branch/index-stats" element={<IndexStatsPage />} />
             <Route path=":org/:team/local/branch/:branch/vector-search" element={<VectorSearchPage />} />
             <Route path=":org/:team/local/branch/:branch/entity-resolution" element={<EntityResolutionPage />} />
-            <Route path=":org/:team/local/branch/:branch/projection-2d" element={<Projection2DPage />} />
-            <Route path=":org/:team/local/branch/:branch/projection-3d" element={<Projection3DPage />} />
+            <Route path=":org/:team/local/branch/:branch/projection" element={<ProjectionPage />} />
             <Route path=":org/:team/local/branch/:branch/history" element={<BranchHistoryPage />} />
 
             {/* Commit-scoped routes */}
@@ -53,8 +52,7 @@ export const App: React.FC = () => {
             <Route path=":org/:team/local/commit/:commitId/index-stats" element={<IndexStatsPage />} />
             <Route path=":org/:team/local/commit/:commitId/vector-search" element={<VectorSearchPage />} />
             <Route path=":org/:team/local/commit/:commitId/entity-resolution" element={<EntityResolutionPage />} />
-            <Route path=":org/:team/local/commit/:commitId/projection-2d" element={<Projection2DPage />} />
-            <Route path=":org/:team/local/commit/:commitId/projection-3d" element={<Projection3DPage />} />
+            <Route path=":org/:team/local/commit/:commitId/projection" element={<ProjectionPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

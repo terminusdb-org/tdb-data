@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 export interface PanelSection {
   readonly id: string;
@@ -11,27 +11,50 @@ export interface PanelSection {
 export interface PanelDockProps {
   readonly sections: ReadonlyArray<PanelSection>;
   readonly side?: "left" | "right";
-  readonly defaultActiveId?: string;
+  readonly defaultActiveIds?: ReadonlyArray<string>;
 }
 
 export const PanelDock: React.FC<PanelDockProps> = ({
   sections,
   side = "right",
-  defaultActiveId,
+  defaultActiveIds,
 }) => {
-  const [activeId, setActiveId] = useState<string | null>(
-    defaultActiveId ?? sections[0]?.id ?? null,
+  const [activePanelIds, setActivePanelIds] = useState<string[]>(
+    defaultActiveIds ? [...defaultActiveIds] : [],
   );
+  const [focusedPanelId, setFocusedPanelId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (defaultActiveId) {
-      setActiveId(defaultActiveId);
+    if (defaultActiveIds && defaultActiveIds.length > 0) {
+      setActivePanelIds([...defaultActiveIds]);
+      setFocusedPanelId(defaultActiveIds[0] ?? null);
     }
-  }, [defaultActiveId]);
+  }, [defaultActiveIds]);
 
-  const activeSection = sections.find((s) => s.id === activeId) ?? null;
+  const togglePanel = useCallback((id: string) => {
+    setActivePanelIds((prev) => {
+      const idx = prev.indexOf(id);
+      if (idx < 0) {
+        setFocusedPanelId(id);
+        return [...prev, id];
+      }
+      if (idx === prev.length - 1) {
+        setFocusedPanelId((f) => (f === id ? null : f));
+        return prev.filter((p) => p !== id);
+      }
+      const next = prev.filter((p) => p !== id);
+      next.push(id);
+      setFocusedPanelId(id);
+      return next;
+    });
+  }, []);
+
+  const activeSections = activePanelIds
+    .map((id) => sections.find((s) => s.id === id))
+    .filter((s): s is PanelSection => s !== undefined);
+
   const borderSide = side === "right" ? "border-l" : "border-r";
   const iconBarOrder = side === "right" ? "flex-row" : "flex-row-reverse";
 
@@ -40,23 +63,24 @@ export const PanelDock: React.FC<PanelDockProps> = ({
       className={`flex ${collapsed ? "flex-col" : iconBarOrder} items-center gap-0.5 border-b border-gray-100 px-1 py-1`}
     >
       {sections.map((s) => {
-        const isActive = s.id === activeId && !collapsed;
+        const isActive = activePanelIds.includes(s.id) && !collapsed;
+        const isFocused = s.id === focusedPanelId && !collapsed;
         return (
           <button
             key={s.id}
             type="button"
             title={s.title}
             onClick={() => {
-              if (isActive) {
-                setCollapsed(true);
-              } else {
-                setActiveId(s.id);
+              if (collapsed) {
                 setCollapsed(false);
               }
+              togglePanel(s.id);
             }}
             className={`relative flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
               isActive
-                ? "bg-dfrntBlue-50 text-dfrntBlue-700"
+                ? isFocused
+                  ? "bg-dfrntBlue-100 text-dfrntBlue-700 ring-1 ring-dfrntBlue-300"
+                  : "bg-dfrntBlue-50 text-dfrntBlue-700"
                 : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
             }`}
           >
@@ -114,45 +138,64 @@ export const PanelDock: React.FC<PanelDockProps> = ({
     </div>
   );
 
-  const panelContent = activeSection && !collapsed && (
+  const panelContent = !collapsed && activeSections.length > 0 && (
     <div
-      className="flex flex-col overflow-hidden"
+      className="flex flex-col overflow-y-auto"
       style={{ maxHeight: "calc(100vh - 3.5rem - 2rem)" }}
     >
-      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          {activeSection.title}
-        </span>
-        <button
-          type="button"
-          onClick={() => setCollapsed(true)}
-          className="text-gray-400 hover:text-gray-600"
-          title="Collapse"
-        >
-          <svg
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-          >
-            {side === "right" ? (
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 5l7 7-7 7"
-              />
+      {activeSections.map((section) => {
+        const isFocused = section.id === focusedPanelId;
+        return (
+          <div key={section.id} className="flex flex-col border-b border-gray-100">
+            <div className="flex items-center justify-between px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setFocusedPanelId(isFocused ? null : section.id)}
+                className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700"
+              >
+                <svg
+                  className={`h-3 w-3 transition-transform ${isFocused ? "rotate-90" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                {section.title}
+                {section.badge !== undefined && section.badge !== 0 && (
+                  <span className="ml-1 rounded-full bg-dfrntBlue-100 px-1.5 py-0.5 text-[9px] font-bold text-dfrntBlue-700">
+                    {section.badge}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => togglePanel(section.id)}
+                className="text-gray-300 hover:text-gray-500"
+                title="Remove panel"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {isFocused ? (
+              <div className="flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 8rem)" }}>
+                {section.content}
+              </div>
             ) : (
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
+              <div className="max-h-32 overflow-y-auto">{section.content}</div>
             )}
-          </svg>
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto">{activeSection.content}</div>
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -199,13 +242,13 @@ export const PanelDock: React.FC<PanelDockProps> = ({
             {/* Mobile top icon bar */}
             <div className="flex items-center gap-0.5 border-b border-gray-200 px-1 py-1">
               {sections.map((s) => {
-                const isActive = s.id === activeId;
+                const isActive = activePanelIds.includes(s.id);
                 return (
                   <button
                     key={s.id}
                     type="button"
                     title={s.title}
-                    onClick={() => setActiveId(s.id)}
+                    onClick={() => togglePanel(s.id)}
                     className={`relative flex h-9 w-9 items-center justify-center rounded-md transition-colors ${
                       isActive
                         ? "bg-dfrntBlue-50 text-dfrntBlue-700"
@@ -242,10 +285,17 @@ export const PanelDock: React.FC<PanelDockProps> = ({
                 </svg>
               </button>
             </div>
-            {/* Mobile panel content */}
-            {activeSection && (
-              <div className="flex-1 overflow-y-auto">{activeSection.content}</div>
-            )}
+            {/* Mobile panel content — stacked */}
+            <div className="flex-1 overflow-y-auto">
+              {activeSections.map((section) => (
+                <div key={section.id} className="border-b border-gray-100">
+                  <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {section.title}
+                  </div>
+                  <div>{section.content}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}

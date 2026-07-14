@@ -110,8 +110,7 @@ const navSections: ReadonlyArray<NavSection> = [
   {
     title: "Visualization",
     items: [
-      { label: "2D Projection", segment: "projection-2d", icon: embeddingsIcon },
-      { label: "3D Projection", segment: "projection-3d", icon: embeddingsIcon },
+      { label: "Projection", segment: "projection", icon: embeddingsIcon },
     ],
   },
 ];

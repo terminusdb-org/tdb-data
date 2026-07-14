@@ -47,7 +47,7 @@ export const ProjectionUnderpanel: React.FC<ProjectionUnderpanelProps> = ({
           </span>
         )}
       </div>
-      <pre className="overflow-auto text-xs text-gray-600">
+      <pre className="overflow-auto break-all whitespace-pre-wrap text-xs text-gray-600" style={{ overflowWrap: "break-word", wordBreak: "break-all" }}>
         {JSON.stringify(document, null, 2)}
       </pre>
     </div>

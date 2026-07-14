@@ -89,8 +89,7 @@ const allItems: ReadonlyArray<RailItem> = [
   { label: "GraphQL", segment: "graphql", icon: graphqlIcon },
   { label: "Vector Search", segment: "vector-search", icon: vectorSearchIcon },
   { label: "Entity Resolution", segment: "entity-resolution", icon: entityResolutionIcon },
-  { label: "2D Projection", segment: "projection-2d", icon: embeddingsIcon },
-  { label: "3D Projection", segment: "projection-3d", icon: embeddingsIcon },
+  { label: "Projection", segment: "projection", icon: embeddingsIcon },
   { label: "Context", segment: "context", icon: contextIcon },
   { label: "History", segment: "history", icon: historyIcon },
 ];

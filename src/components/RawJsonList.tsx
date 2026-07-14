@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector } from "@/store";
+import { useNavigate } from "react-router-dom";
+import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly } from "@/store";
 import { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { TerminusDBDocument, PageSizes } from "@/types/terminusdb";
@@ -13,6 +14,8 @@ interface RawJsonListProps {
 
 export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   const username = useAppSelector((state) => state.auth.username ?? "admin");
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const [idFilter, setIdFilter] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<PageSizes>(50);
@@ -28,6 +31,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   const [editValid, setEditValid] = useState(true);
   const [editError, setEditError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [insertRawJson] = useInsertRawJsonDocumentMutation();
   const [replaceRawJson] = useReplaceRawJsonDocumentMutation();
   const [deleteDoc] = useDeleteDocumentMutation();
@@ -149,6 +153,27 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
     }
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAddToWorkingSet = () => {
+    if (selectedIds.size === 0) return;
+    dispatch(addToWorkingSet(Array.from(selectedIds)));
+  };
+
+  const handleProjectSelection = () => {
+    if (selectedIds.size === 0) return;
+    dispatch(setProjectionSelectionIds(Array.from(selectedIds)));
+    dispatch(setProjectSelectionOnly(true));
+    navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/projection`);
+  };
+
   return (
     <PageShell
       header={
@@ -156,6 +181,25 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Raw JSON Documents</h2>
             <div className="flex gap-2">
+              {selectedIds.size > 0 && (
+                <>
+                  <span className="text-sm text-gray-500">{selectedIds.size} selected</span>
+                  <button
+                    type="button"
+                    onClick={handleAddToWorkingSet}
+                    className="rounded-md border border-dfrntBlue-300 px-3 py-1.5 text-xs font-medium text-dfrntBlue-600 hover:bg-dfrntBlue-50"
+                  >
+                    Add to Working Set
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleProjectSelection}
+                    className="rounded-md border border-green-300 px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50"
+                  >
+                    Project Selection
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => setShowNewDoc(!showNewDoc)}
@@ -274,16 +318,24 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
             {documents.map((doc) => (
               <li key={doc["@id"]} className="px-4 py-3">
                 <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(expandedId === doc["@id"] ? null : doc["@id"])}
-                    className="flex flex-1 items-center justify-between text-left"
-                  >
-                    <span className="font-data text-sm font-medium text-gray-900">{doc["@id"]}</span>
-                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${expandedId === doc["@id"] ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(doc["@id"])}
+                      onChange={() => toggleSelect(doc["@id"])}
+                      className="rounded border-gray-300 text-dfrntBlue-600 focus:ring-dfrntBlue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expandedId === doc["@id"] ? null : doc["@id"])}
+                      className="flex flex-1 items-center justify-between text-left"
+                    >
+                      <span className="font-data text-sm font-medium text-gray-900">{doc["@id"]}</span>
+                      <svg className={`h-4 w-4 text-gray-400 transition-transform ${expandedId === doc["@id"] ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleDelete(doc["@id"])}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useGetDocumentsQuery, useGetDocumentQuery, useReplaceDocumentMutation, useInsertDocumentMutation, useDeleteDocumentMutation, useGetSchemaQuery, useAppSelector } from "@/store";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { useGetDocumentsQuery, useGetDocumentQuery, useReplaceDocumentMutation, useInsertDocumentMutation, useDeleteDocumentMutation, useGetSchemaQuery, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly } from "@/store";
 import { DocumentEditor, PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, useRouteParams } from "@/components";
 import { buildApiPath } from "@/utils/routes";
 import type { TerminusDBDocument, PageSizes } from "@/types/terminusdb";
@@ -9,6 +9,8 @@ import { truncate } from "@/utils/validation";
 
 export const DocumentsPage: React.FC = () => {
   const routeParams = useRouteParams();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const editId = searchParams.get("edit");
   const initialType = searchParams.get("type") ?? "";
@@ -141,6 +143,20 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
+  const handleAddToWorkingSet = () => {
+    if (selectedIds.size === 0) return;
+    dispatch(addToWorkingSet(Array.from(selectedIds)));
+  };
+
+  const handleProjectSelection = () => {
+    if (selectedIds.size === 0) return;
+    dispatch(setProjectionSelectionIds(Array.from(selectedIds)));
+    dispatch(setProjectSelectionOnly(true));
+    if (routeParams) {
+      navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/projection`);
+    }
+  };
+
   const closeEditor = () => {
     setSearchParams({}, { replace: false });
   };
@@ -197,6 +213,20 @@ export const DocumentsPage: React.FC = () => {
             {selectedIds.size > 0 && (
               <>
                 <span className="text-sm text-gray-500">{selectedIds.size} selected</span>
+                <button
+                  type="button"
+                  onClick={handleAddToWorkingSet}
+                  className="rounded-md border border-dfrntBlue-300 px-3 py-1.5 text-xs font-medium text-dfrntBlue-600 hover:bg-dfrntBlue-50"
+                >
+                  Add to Working Set
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProjectSelection}
+                  className="rounded-md border border-green-300 px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50"
+                >
+                  Project Selection
+                </button>
                 <button
                   type="button"
                   onClick={handleDeleteSelected}

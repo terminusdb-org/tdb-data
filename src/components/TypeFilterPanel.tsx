@@ -19,6 +19,9 @@ export interface TypeFilterPanelProps {
   readonly onReproject: () => void;
   readonly isProjecting: boolean;
   readonly isLoading: boolean;
+  readonly projectWorkingSet?: boolean;
+  readonly workingSetCount?: number;
+  readonly onToggleProjectWorkingSet?: () => void;
 }
 
 export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
@@ -31,6 +34,9 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
   onReproject,
   isProjecting,
   isLoading,
+  projectWorkingSet = false,
+  workingSetCount = 0,
+  onToggleProjectWorkingSet,
 }) => {
   return (
     <div className="p-3">
@@ -90,6 +96,28 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
         <div className="py-4 text-center text-xs text-gray-400">
           No types available
         </div>
+      )}
+
+      {onToggleProjectWorkingSet && (
+        <>
+          <div className="my-2 border-t border-gray-100" />
+          <label
+            className={`flex cursor-pointer items-center gap-2 text-sm ${
+              workingSetCount > 0 ? "text-gray-700" : "text-gray-400"
+            }`}
+            title="Include working set documents in the projection (union with selected types)"
+          >
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 rounded border-gray-300 text-dfrntBlue-500 focus:ring-dfrntBlue-200"
+              checked={projectWorkingSet}
+              onChange={onToggleProjectWorkingSet}
+              disabled={workingSetCount === 0}
+            />
+            <span className="flex-1 truncate">Working Set (union)</span>
+            <span className="text-xs text-gray-400 tabular-nums">{workingSetCount}</span>
+          </label>
+        </>
       )}
 
       <div className="my-3 border-t border-gray-100" />

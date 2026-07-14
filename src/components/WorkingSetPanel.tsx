@@ -1,18 +1,24 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   useGetDocumentsQuery,
   useInsertRawJsonDocumentMutation,
   useDeleteDocumentMutation,
   useAppSelector,
 } from "@/store";
+import { useRouteParams } from "@/components";
 import type { TerminusDBDocument } from "@/types/terminusdb";
 
 export interface WorkingSetPanelProps {
   readonly docPath: string;
   readonly workingSetIds: ReadonlySet<string>;
+  readonly workingSetVisible?: boolean;
   readonly onLoadSet: (ids: string[]) => void;
   readonly onAddIds: (ids: string[]) => void;
   readonly onClear: () => void;
+  readonly onToggleVisible?: () => void;
+  readonly onProjectSet?: (ids: string[]) => void;
+  readonly onRemoveItem?: (id: string) => void;
 }
 
 interface NamedSet {
@@ -36,13 +42,21 @@ function isNamedSet(doc: TerminusDBDocument): doc is TerminusDBDocument & {
 export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
   docPath,
   workingSetIds,
+  workingSetVisible = true,
   onLoadSet,
   onAddIds,
   onClear,
+  onToggleVisible,
+  onProjectSet,
+  onRemoveItem,
 }) => {
   const username = useAppSelector((state) => state.auth.username ?? "admin");
+  const routeParams = useRouteParams();
+  const navigate = useNavigate();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [setName, setSetName] = useState("");
+  const [showItems, setShowItems] = useState(false);
+  const [itemFilter, setItemFilter] = useState("");
   const [insertRawJson] = useInsertRawJsonDocumentMutation();
   const [deleteDoc] = useDeleteDocumentMutation();
 
@@ -60,16 +74,22 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
   const namedSets: NamedSet[] = useMemo(() => {
     if (!documentsData) return [];
     const docs = Array.isArray(documentsData) ? documentsData : [documentsData];
-    return docs.filter(isNamedSet).map((doc) => ({
-      id: (doc["@id"] as string) ?? "",
-      name: doc.name,
-      documentIds: doc.document_ids,
-    }));
+    const result: NamedSet[] = [];
+    for (const doc of docs) {
+      const id = (doc["@id"] as string) ?? "";
+      if (id.startsWith("WorkingSet/") && isNamedSet(doc)) {
+        result.push({ id, name: doc.name, documentIds: doc.document_ids });
+      }
+    }
+    return result;
   }, [documentsData]);
 
   const handleSave = useCallback(async () => {
     if (!setName.trim() || workingSetIds.size === 0) return;
+    const guid = crypto.randomUUID();
     const doc: Record<string, unknown> = {
+      "@id": `WorkingSet/${guid}`,
+      "@type": "sys:JSONDocument",
       name: setName.trim(),
       document_ids: Array.from(workingSetIds),
     };
@@ -98,6 +118,13 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
     [onAddIds]
   );
 
+  const handleProjectSet = useCallback(
+    (set: NamedSet) => {
+      onProjectSet?.(set.documentIds);
+    },
+    [onProjectSet]
+  );
+
   const handleDeleteSet = useCallback(
     async (id: string) => {
       if (!id) return;
@@ -107,12 +134,38 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
     [deleteDoc, docPath, refetch]
   );
 
+  const filteredItems = useMemo(() => {
+    const ids = Array.from(workingSetIds);
+    if (!itemFilter.trim()) return ids;
+    const lower = itemFilter.toLowerCase();
+    return ids.filter((id) => id.toLowerCase().includes(lower));
+  }, [workingSetIds, itemFilter]);
+
+  const navigateToDoc = useCallback(
+    (id: string) => {
+      if (routeParams) {
+        navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(id)}`);
+      }
+    },
+    [routeParams, navigate]
+  );
+
   return (
     <div className="p-3">
       <div className="mb-2 flex items-center gap-2">
         <span className="text-xs text-gray-500">
           {workingSetIds.size} item{workingSetIds.size !== 1 ? "s" : ""} in working set
         </span>
+        {onToggleVisible && workingSetIds.size > 0 && (
+          <button
+            type="button"
+            onClick={onToggleVisible}
+            className="text-xs text-gray-400 hover:text-dfrntBlue-600"
+            title={workingSetVisible ? "Hide working set in projection" : "Show working set in projection"}
+          >
+            {workingSetVisible ? "👁" : "🚫"}
+          </button>
+        )}
         {workingSetIds.size > 0 && (
           <button
             type="button"
@@ -170,6 +223,63 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
         </div>
       )}
 
+      {workingSetIds.size > 0 && (
+        <div className="border-t border-gray-100 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setShowItems(!showItems)}
+            className="flex w-full items-center gap-1 text-xs font-medium text-gray-500"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+            Items
+            <span className="ml-1 rounded bg-gray-100 px-1.5 text-gray-400">{workingSetIds.size}</span>
+          </button>
+          {showItems && (
+            <div className="mt-2">
+              <input
+                type="text"
+                value={itemFilter}
+                onChange={(e) => setItemFilter(e.target.value)}
+                placeholder="Filter by ID…"
+                className="mb-2 w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-dfrntBlue-500 focus:outline-none"
+              />
+              <div className="max-h-48 space-y-0.5 overflow-y-auto">
+                {filteredItems.map((id) => (
+                  <div
+                    key={id}
+                    className="group flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-dfrntBlue-50"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigateToDoc(id)}
+                      className="flex-1 truncate text-left hover:text-dfrntBlue-700"
+                      title={id}
+                    >
+                      {id}
+                    </button>
+                    {onRemoveItem && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveItem(id)}
+                        className="hidden text-gray-400 hover:text-red-500 group-hover:inline"
+                        title="Remove from working set"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {filteredItems.length === 0 && (
+                  <p className="px-2 py-1 text-xs text-gray-400">No matching items</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {namedSets.length > 0 && (
         <div className="border-t border-gray-100 px-3 py-2">
           <p className="mb-1.5 text-xs font-medium text-gray-500">Saved Sets</p>
@@ -196,6 +306,16 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
                 >
                   +
                 </button>
+                {onProjectSet && (
+                  <button
+                    type="button"
+                    onClick={() => handleProjectSet(set)}
+                    className="hidden text-gray-400 hover:text-green-500 group-hover:inline"
+                    title="Project this set"
+                  >
+                    ◎
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleDeleteSet(set.id)}

@@ -157,3 +157,10 @@ export interface CandidatesResult {
     readonly target_to_set_edges: number;
   };
 }
+
+export interface EmbeddingsByTypeResponse {
+  readonly doc_embeddings: Readonly<Record<string, ReadonlyArray<number>>>;
+  readonly clustering_embeddings: Readonly<Record<string, ReadonlyArray<number>>>;
+  readonly store_clustering: boolean;
+  readonly served_commit: string;
+}

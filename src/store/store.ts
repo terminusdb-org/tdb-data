@@ -6,6 +6,7 @@ import errorReducer from "./errorSlice";
 import erReducer from "./erSlice";
 import clusteringReducer from "./clusteringSlice";
 import commitStreamReducer from "./commitStreamSlice";
+import projectionReducer from "./projectionSlice";
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +16,7 @@ export const store = configureStore({
     entityResolution: erReducer,
     clustering: clusteringReducer,
     commitStream: commitStreamReducer,
+    projection: projectionReducer,
     [baseApi.reducerPath]: baseApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>

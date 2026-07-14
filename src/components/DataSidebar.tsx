@@ -107,6 +107,13 @@ const navSections: ReadonlyArray<NavSection> = [
       { label: "Entity Resolution", segment: "entity-resolution", icon: entityResolutionIcon },
     ],
   },
+  {
+    title: "Visualization",
+    items: [
+      { label: "2D Projection", segment: "projection-2d", icon: embeddingsIcon },
+      { label: "3D Projection", segment: "projection-3d", icon: embeddingsIcon },
+    ],
+  },
 ];
 
 const bottomItems: ReadonlyArray<NavItem> = [

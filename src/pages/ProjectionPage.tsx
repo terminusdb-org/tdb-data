@@ -1,0 +1,491 @@
+import React, { useMemo, useCallback, useEffect, useRef } from "react";
+import {
+  PageShell,
+  PageHeader,
+  PagePlaceholder,
+  Scatter2D,
+  Scatter3D,
+  TypeFilterPanel,
+  ProjectionUnderpanel,
+  DuplicateHighlightPanel,
+  ProjectionSearchBar,
+  WorkingSetPanel,
+  PanelDock,
+  useRouteParams,
+  type TypeFilterEntry,
+  type DupPanelGroup,
+  type ScatterPoint,
+  type Point3D,
+} from "@/components";
+import {
+  useGetSchemaQuery,
+  useGetEmbeddingsByTypeQuery,
+  useGetDocumentQuery,
+  useDuplicatesQuery,
+  useGetIndexStatusQuery,
+  useAppDispatch,
+  useAppSelector,
+  toggleType,
+  setSelectedTypes,
+  setFilterMode,
+  setSelectedId,
+  setHighlightedIds,
+  toggleShowDuplicates,
+  setLoadedTypes,
+  toggleMultiSelectId,
+  addMultiSelectIds,
+  setMultiSelectIds,
+  clearMultiSelectIds,
+  toggleProjectSelectionOnly,
+  setProjectSelectionOnly,
+  selectSelectedTypes,
+  selectFilterMode,
+  selectSelectedId,
+  selectHighlightedIds,
+  selectShowDuplicates,
+  selectLoadedTypes,
+  selectMultiSelectIds,
+  selectProjectSelectionOnly,
+} from "@/store";
+import { buildApiPath } from "@/utils/routes";
+import { generateTypeColors } from "@/utils/typeColors";
+import { useUmapProjection } from "@/hooks/useUmapProjection";
+
+interface ProjectionPageProps {
+  readonly dimensions: 2 | 3;
+}
+
+export const ProjectionPage: React.FC<ProjectionPageProps> = ({ dimensions }) => {
+  const routeParams = useRouteParams();
+
+  const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
+  const embeddingsPath = routeParams
+    ? buildApiPath(routeParams, "plugin/search-embeddings")
+    : "";
+  const duplicatesPath = routeParams
+    ? buildApiPath(routeParams, "duplicates")
+    : "";
+  const searchPath = routeParams
+    ? buildApiPath(routeParams, "search")
+    : "";
+  const indexPath = routeParams
+    ? buildApiPath(routeParams, "index")
+    : "";
+
+  const { data: schemaClasses, isLoading: schemaLoading } = useGetSchemaQuery(
+    { path: schemaPath, asList: true },
+    { skip: !routeParams }
+  );
+
+  const allTypes = useMemo(() => {
+    if (!schemaClasses) return [];
+    return schemaClasses
+      .filter((c) => {
+        const t = c["@type"];
+        return t === "Class" || t === "Enum";
+      })
+      .map((c) => c["@id"])
+      .filter((id): id is string => typeof id === "string");
+  }, [schemaClasses]);
+
+  const typeColors = useMemo(() => generateTypeColors(allTypes), [allTypes]);
+
+  const dispatch = useAppDispatch();
+
+  const selectedTypesArr = useAppSelector(selectSelectedTypes);
+  const filterMode = useAppSelector(selectFilterMode);
+  const selectedId = useAppSelector(selectSelectedId);
+  const highlightedIdsArr = useAppSelector(selectHighlightedIds);
+  const showDuplicates = useAppSelector(selectShowDuplicates);
+  const loadedTypesArr = useAppSelector(selectLoadedTypes);
+  const multiSelectIdsArr = useAppSelector(selectMultiSelectIds);
+  const projectSelectionOnly = useAppSelector(selectProjectSelectionOnly);
+
+  const selectedTypes = useMemo(() => new Set(selectedTypesArr), [selectedTypesArr]);
+  const highlightedIds = useMemo(() => new Set(highlightedIdsArr), [highlightedIdsArr]);
+  const loadedTypes = useMemo(() => new Set(loadedTypesArr), [loadedTypesArr]);
+  const multiSelectIds = useMemo(() => new Set(multiSelectIdsArr), [multiSelectIdsArr]);
+
+  const docTypesForQuery = useMemo(() => {
+    return [...selectedTypes];
+  }, [selectedTypes]);
+
+  const { data: embeddingsData, isLoading: embeddingsLoading } =
+    useGetEmbeddingsByTypeQuery(
+      { path: embeddingsPath, docTypes: docTypesForQuery },
+      { skip: !routeParams || !embeddingsPath || selectedTypes.size === 0 }
+    );
+
+  useEffect(() => {
+    if (!embeddingsLoading && embeddingsData && selectedTypes.size > 0) {
+      dispatch(setLoadedTypes([...selectedTypes]));
+    }
+  }, [embeddingsLoading, embeddingsData, selectedTypes, dispatch]);
+
+  const { data: duplicatesData, isFetching: duplicatesLoading } = useDuplicatesQuery(
+    { path: duplicatesPath, count: 50 },
+    { skip: !routeParams || !duplicatesPath || !showDuplicates }
+  );
+
+  const { data: indexStatus } = useGetIndexStatusQuery(
+    { path: indexPath },
+    { skip: !routeParams || !indexPath }
+  );
+
+  const allEmbeddings = embeddingsData?.doc_embeddings ?? {};
+
+  const embeddings = useMemo(() => {
+    if (projectSelectionOnly && multiSelectIds.size > 0) {
+      const filtered: Record<string, number[]> = {};
+      for (const [id, emb] of Object.entries(allEmbeddings)) {
+        if (multiSelectIds.has(id)) {
+          filtered[id] = [...emb];
+        }
+      }
+      return filtered;
+    }
+    return allEmbeddings;
+  }, [allEmbeddings, projectSelectionOnly, multiSelectIds]);
+
+  const { points, isRunning: isProjecting, reproject } = useUmapProjection({
+    embeddings,
+    nComponents: dimensions,
+    enabled: !embeddingsLoading && Object.keys(embeddings).length > 0,
+  });
+
+  const docToTypeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!embeddingsData) return map;
+    for (const id of Object.keys(embeddingsData.doc_embeddings)) {
+      const parts = id.split("/");
+      const typePart = parts.at(-2);
+      if (typePart) map[id] = typePart;
+    }
+    return map;
+  }, [embeddingsData]);
+
+  const scatterPoints = useMemo(() => {
+    return points.map((p) => {
+      const docType = docToTypeMap[p.id] ?? "Unknown";
+      const color = typeColors[docType];
+      const rgb: [number, number, number] = color
+        ? hexToRgb(color.hex)
+        : [128, 128, 128];
+      const position: [number, number] | [number, number, number] =
+        dimensions === 3
+          ? [p.position[0], p.position[1], p.position[2] ?? 0]
+          : [p.position[0], p.position[1]];
+      return {
+        id: p.id,
+        position,
+        color: rgb,
+        radius: 5,
+        docType,
+      };
+    });
+  }, [points, docToTypeMap, typeColors, dimensions]);
+
+  const dimmedTypes = useMemo(() => {
+    if (filterMode !== "visual") return new Set<string>();
+    const dimmed = new Set<string>();
+    for (const t of allTypes) {
+      if (!selectedTypes.has(t)) dimmed.add(t);
+    }
+    return dimmed;
+  }, [filterMode, selectedTypes, allTypes]);
+
+  const typeFilterEntries: TypeFilterEntry[] = useMemo(() => {
+    return allTypes.map((type) => ({
+      type,
+      count: scatterPoints.filter((p) => p.docType === type).length,
+      color: typeColors[type] ?? { hex: "#808080", hsl: "hsl(0, 0%, 50%)" },
+      checked: selectedTypes.has(type),
+      loading: selectedTypes.has(type) && !loadedTypes.has(type),
+    }));
+  }, [allTypes, scatterPoints, typeColors, selectedTypes, loadedTypes]);
+
+  const duplicateGroups: DupPanelGroup[] = useMemo(() => {
+    if (!duplicatesData) return [];
+    return duplicatesData.slice(0, 20).map((g) => ({
+      distance: g.distance,
+      members: g.group.map((m) => m.id),
+    }));
+  }, [duplicatesData]);
+
+  const docPath = routeParams
+    ? buildApiPath(routeParams, "document")
+    : "";
+  const { data: selectedDoc, isLoading: docLoading } = useGetDocumentQuery(
+    { path: docPath, id: selectedId ?? "" },
+    { skip: !selectedId || !docPath }
+  );
+
+  const handleToggleType = useCallback((type: string) => {
+    dispatch(toggleType(type));
+  }, [dispatch]);
+
+  const handleSelectAll = useCallback(() => {
+    dispatch(setSelectedTypes(allTypes));
+  }, [allTypes, dispatch]);
+
+  const handleSelectNone = useCallback(() => {
+    dispatch(setSelectedTypes([]));
+  }, [dispatch]);
+
+  const shiftPressedRef = useRef(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Shift") shiftPressedRef.current = true; };
+    const onKeyUp = (e: KeyboardEvent) => { if (e.key === "Shift") shiftPressedRef.current = false; };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, []);
+
+  const handleSelect = useCallback((id: string | null) => {
+    if (id === null) {
+      dispatch(setSelectedId(null));
+      return;
+    }
+    if (shiftPressedRef.current) {
+      dispatch(toggleMultiSelectId(id));
+    } else {
+      dispatch(setSelectedId(id));
+    }
+  }, [dispatch]);
+
+  const handleProjectSelection = useCallback(() => {
+    if (multiSelectIds.size > 0) {
+      dispatch(toggleProjectSelectionOnly());
+    }
+  }, [multiSelectIds, dispatch]);
+
+  const handleClearSelection = useCallback(() => {
+    dispatch(clearMultiSelectIds());
+  }, [dispatch]);
+
+  const handleAddToWorkingSet = useCallback((ids: string[]) => {
+    dispatch(addMultiSelectIds(ids));
+  }, [dispatch]);
+
+  const handleLoadSet = useCallback((ids: string[]) => {
+    dispatch(setMultiSelectIds(ids));
+    dispatch(setProjectSelectionOnly(false));
+  }, [dispatch]);
+
+  const scatterPointIdSet = useMemo(
+    () => new Set(scatterPoints.map((p) => p.id)),
+    [scatterPoints]
+  );
+
+  const combinedHighlightedIds = useMemo(() => {
+    const combined = new Set(highlightedIds);
+    for (const id of multiSelectIds) combined.add(id);
+    return combined;
+  }, [highlightedIds, multiSelectIds]);
+
+  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+  if (schemaLoading) return <PagePlaceholder>Loading schema…</PagePlaceholder>;
+
+  const title = dimensions === 2 ? "2D Projection" : "3D Projection";
+
+  return (
+    <PageShell
+      header={
+        <PageHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+              <p className="mt-0.5 text-sm text-gray-500">
+                UMAP dimension reduction of document embeddings
+                {isProjecting && " — projecting…"}
+              </p>
+              {embeddingsData && (
+                <p className="mt-0.5 text-xs text-gray-400">
+                  Data from commit:{" "}
+                  <span className="font-mono">{embeddingsData.served_commit.slice(0, 12)}</span>
+                  {indexStatus?.last_indexed_commit &&
+                    indexStatus.last_indexed_commit !== embeddingsData.served_commit && (
+                      <span className="ml-2 text-amber-600">
+                        ⚠ Newer commit available: {indexStatus.last_indexed_commit.slice(0, 12)}
+                      </span>
+                    )}
+                </p>
+              )}
+            </div>
+            {embeddingsData && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                {scatterPoints.length} points
+              </span>
+            )}
+          </div>
+        </PageHeader>
+      }
+    >
+      <div className="flex h-full">
+        <div className="flex flex-1 flex-col">
+          {scatterPoints.length > 0 && (
+            <ProjectionSearchBar
+              searchPath={searchPath}
+              scatterPointIds={scatterPointIdSet}
+              onHighlightIds={(ids) => dispatch(setHighlightedIds([...ids]))}
+              onAddToWorkingSet={handleAddToWorkingSet}
+            />
+          )}
+          <div className="relative flex-1">
+            {selectedTypes.size === 0 ? (
+              <PagePlaceholder>Select a document type to load embeddings.</PagePlaceholder>
+            ) : embeddingsLoading ? (
+              <PagePlaceholder>Loading embeddings…</PagePlaceholder>
+            ) : isProjecting ? (
+              <PagePlaceholder>Running UMAP projection…</PagePlaceholder>
+            ) : scatterPoints.length > 0 ? (
+              dimensions === 3 ? (
+                <Scatter3D
+                  points={scatterPoints as unknown as Point3D[]}
+                  selectedId={selectedId}
+                  highlightedIds={combinedHighlightedIds}
+                  dimmedTypes={dimmedTypes}
+                  onSelect={handleSelect}
+                  width={800}
+                  height={500}
+                />
+              ) : (
+                <Scatter2D
+                  points={scatterPoints as unknown as ScatterPoint[]}
+                  selectedId={selectedId}
+                  highlightedIds={combinedHighlightedIds}
+                  dimmedTypes={dimmedTypes}
+                  onSelect={handleSelect}
+                  width={800}
+                  height={500}
+                />
+              )
+            ) : (
+              <PagePlaceholder>No embeddings found. Index your documents first.</PagePlaceholder>
+            )}
+          </div>
+
+          {multiSelectIds.size > 0 && (
+            <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2 text-sm">
+              <span className="text-gray-600">
+                {multiSelectIds.size} selected
+                {projectSelectionOnly && " (projecting only selection)"}
+              </span>
+              <button
+                className={
+                  projectSelectionOnly
+                    ? "rounded bg-dfrntBlue-500 px-2 py-1 text-xs font-medium text-white"
+                    : "rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600"
+                }
+                onClick={handleProjectSelection}
+              >
+                {projectSelectionOnly ? "Project All" : "Project Selection"}
+              </button>
+              <button
+                className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600"
+                onClick={handleClearSelection}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+          {multiSelectIds.size === 0 && scatterPoints.length > 0 && (
+            <div className="border-t border-gray-100 px-4 py-1.5 text-xs text-gray-400">
+              Tip: Shift+click points to multi-select, then "Project Selection" to re-run UMAP on a subset.
+            </div>
+          )}
+
+          <ProjectionUnderpanel
+            selectedId={selectedId}
+            docType={selectedId ? docToTypeMap[selectedId] ?? null : null}
+            document={selectedDoc as Record<string, unknown> | null}
+            isLoading={docLoading}
+          />
+        </div>
+
+        <PanelDock
+          side="right"
+          sections={[
+            {
+              id: "types",
+              title: "Document Types",
+              icon: (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75h16.5v16.5H3.75z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h9M7.5 12h9M7.5 16.5h5" />
+                </svg>
+              ),
+              content: (
+                <TypeFilterPanel
+                  types={typeFilterEntries}
+                  filterMode={filterMode}
+                  onToggleType={handleToggleType}
+                  onSelectAll={handleSelectAll}
+                  onSelectNone={handleSelectNone}
+                  onFilterModeChange={setFilterMode}
+                  onReproject={reproject}
+                  isProjecting={isProjecting}
+                  isLoading={embeddingsLoading}
+                />
+              ),
+            },
+            {
+              id: "duplicates",
+              title: "Duplicates",
+              badge: showDuplicates && duplicateGroups.length > 0 ? duplicateGroups.length : undefined,
+              icon: (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <circle cx="9" cy="12" r="5" />
+                  <circle cx="15" cy="12" r="5" />
+                </svg>
+              ),
+              content: (
+                <DuplicateHighlightPanel
+                  groups={duplicateGroups}
+                  onHighlight={(ids) => dispatch(setHighlightedIds([...ids]))}
+                  onAddToWorkingSet={handleAddToWorkingSet}
+                  showDuplicates={showDuplicates}
+                  onToggleLoadDuplicates={() => dispatch(toggleShowDuplicates())}
+                  duplicatesLoading={duplicatesLoading}
+                />
+              ),
+            },
+            {
+              id: "working-set",
+              title: "Working Set",
+              badge: multiSelectIds.size > 0 ? multiSelectIds.size : undefined,
+              icon: (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.171.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                </svg>
+              ),
+              content: (
+                <WorkingSetPanel
+                  docPath={docPath}
+                  workingSetIds={multiSelectIds}
+                  onLoadSet={handleLoadSet}
+                  onAddIds={handleAddToWorkingSet}
+                  onClear={handleClearSelection}
+                />
+              ),
+            },
+          ]}
+        />
+      </div>
+    </PageShell>
+  );
+};
+
+export const Projection2DPage: React.FC = () => <ProjectionPage dimensions={2} />;
+export const Projection3DPage: React.FC = () => <ProjectionPage dimensions={3} />;
+
+function hexToRgb(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}

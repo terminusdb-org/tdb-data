@@ -52,7 +52,7 @@ export {
 } from "./api/searchApi";
 
 export { useRunWoqlMutation } from "./api/woqlApi";
-export { useRunGraphqlMutation } from "./api/graphqlApi";
+export { useRunGraphqlMutation, useGraphqlDocumentCountQuery } from "./api/graphqlApi";
 export { useGetDatabasesQuery } from "./api/dbApi";
 export type { DatabaseEntry } from "./api/dbApi";
 export { useGetIndexStatusQuery, useTriggerIndexMutation, useDeleteIndexMutation } from "./api/indexApi";
@@ -62,18 +62,21 @@ export { useGetEmbeddingsByTypeQuery } from "./api/projectionApi";
 export type { EmbeddingsByTypeParams } from "./api/projectionApi";
 export {
   setConnectionStatus, setCommitStreamError, addCommitEntry, clearCommitHistory,
+  startCommitStream, stopCommitStream,
   selectLatestCommitId, selectConnectionStatus, selectCommitHistory, selectCommitStreamError,
 } from "./commitStreamSlice";
 export type { CommitEntry } from "./commitStreamSlice";
 export {
   toggleType, setSelectedTypes, setFilterMode, setSelectedId, setHighlightedIds,
   toggleShowDuplicates, setShowDuplicates, setLoadedTypes,
+  addLoadedEmbeddings, clearLoadedEmbeddings,
   toggleProjectionSelectionId, setProjectionSelectionIds, clearProjectionSelection,
   addToWorkingSet, removeFromWorkingSet, setWorkingSetIds, clearWorkingSet,
   toggleWorkingSetVisible, setWorkingSetVisible,
   toggleProjectSelectionOnly, setProjectSelectionOnly, toggleProjectWorkingSet, setProjectWorkingSet, setDimensions, setEmbeddingRole, setProjectionResult, clearProjectionCache, clearProjectionState,
   selectSelectedTypes, selectFilterMode, selectSelectedId, selectHighlightedIds,
   selectShowDuplicates, selectLoadedTypes,
+  selectLoadedEmbeddings, selectServedCommit, selectStoreClustering,
   selectWorkingSetIds, selectWorkingSetVisible, selectProjectionSelectionIds, selectProjectSelectionOnly, selectProjectWorkingSet,
   selectDimensions, selectEmbeddingRole, selectProjectionCacheKey, selectProjectionPoints2d, selectProjectionPoints3d,
 } from "./projectionSlice";

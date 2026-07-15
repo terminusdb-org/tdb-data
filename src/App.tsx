@@ -53,6 +53,7 @@ export const App: React.FC = () => {
             <Route path=":org/:team/local/commit/:commitId/vector-search" element={<VectorSearchPage />} />
             <Route path=":org/:team/local/commit/:commitId/entity-resolution" element={<EntityResolutionPage />} />
             <Route path=":org/:team/local/commit/:commitId/projection" element={<ProjectionPage />} />
+            <Route path=":org/:team/local/commit/:commitId/history" element={<BranchHistoryPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

@@ -7,7 +7,6 @@ import {
   clearProjectionState,
   clearERState,
   clearCommitHistory,
-  clearClusteringError,
   clearError,
   baseApi,
 } from "@/store";
@@ -40,7 +39,6 @@ export const DataLayout: React.FC = () => {
       dispatch(clearProjectionState());
       dispatch(clearERState());
       dispatch(clearCommitHistory());
-      dispatch(clearClusteringError());
       dispatch(clearError());
       dispatch(baseApi.util.resetApiState());
     }
@@ -124,6 +122,16 @@ export const DataLayout: React.FC = () => {
           </div>
         )}
         <main className="flex-1 overflow-auto p-6">
+          {params.commitId && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.852l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <span>
+                Viewing commit <code className="font-mono text-xs">{params.commitId.slice(0, 12)}</code> — read-only snapshot for information.
+              </span>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

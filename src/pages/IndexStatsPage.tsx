@@ -1,10 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   useGetSchemaQuery, useGetIndexStatusQuery, useTriggerIndexMutation, useDeleteIndexMutation,
   useGetClusteringQuery, useToggleClusteringMutation,
-  useAppSelector, useAppDispatch, baseApi,
-  setClusteringToggling, setClusteringError, clearClusteringError,
-  selectClusteringToggling, selectClusteringError,
+  useGraphqlDocumentCountQuery,
 } from "@/store";
 import { PageShell, PageHeader, PagePlaceholder, btnSecondary, useRouteParams } from "@/components";
 import { buildApiPath } from "@/utils/routes";
@@ -42,40 +40,30 @@ function truncateId(id: string | null | undefined, maxLen = 24): string {
 
 export const IndexStatsPage: React.FC = () => {
   const routeParams = useRouteParams();
-  const credentials = useAppSelector((state) => state.auth.credentials);
-  const [typeCounts, setTypeCounts] = useState<TypeCount[]>([]);
-  const [totalDocs, setTotalDocs] = useState<number | null>(null);
-  const [loadingCounts, setLoadingCounts] = useState(false);
-  const [countError, setCountError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [triggerIndex] = useTriggerIndexMutation();
   const [deleteIndex] = useDeleteIndexMutation();
   const [triggerStatus, setTriggerStatus] = useState<"" | "indexing" | "success" | "error">("");
   const [reindexStatus, setReindexStatus] = useState<"" | "deleting" | "indexing" | "success" | "error">("");
 
-  const dispatch = useAppDispatch();
-  const clusteringToggling = useAppSelector(selectClusteringToggling);
-  const clusteringError = useAppSelector(selectClusteringError);
-
   const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
   const indexPath = routeParams ? buildApiPath(routeParams, "index") : "";
-  const docPath = routeParams ? buildApiPath(routeParams, "document") : "";
+  const graphqlPath = routeParams ? buildApiPath(routeParams, "graphql") : "";
 
   const { data: clusteringData, isError: clusteringIsError, refetch: refetchClustering } = useGetClusteringQuery(
     { path: schemaPath },
     { skip: !routeParams },
   );
-  const [toggleClustering] = useToggleClusteringMutation();
+  const [toggleClustering, { isLoading: clusteringToggling }] = useToggleClusteringMutation();
+  const [clusteringError, setClusteringError] = useState<string | null>(null);
 
   const handleToggleClustering = useCallback(async () => {
     if (!routeParams) return;
-    dispatch(clearClusteringError());
+    setClusteringError(null);
     const current = clusteringData?.storeClustering ?? false;
     const action = current ? "disable" : "enable";
     if (!window.confirm(`${action === "enable" ? "Enable" : "Disable"} clustering for ${routeParams.org}/${routeParams.team}? This will modify the schema metadata on main.`)) {
       return;
     }
-    dispatch(setClusteringToggling(true));
     try {
       await toggleClustering({
         org: routeParams.org,
@@ -86,15 +74,13 @@ export const IndexStatsPage: React.FC = () => {
     } catch (err) {
       const errData = (err as { data?: Record<string, unknown> }).data;
       const msg = String(errData?.["api:message"] ?? errData?.["api:status"] ?? `Failed to ${action} clustering`);
-      dispatch(setClusteringError(msg));
-    } finally {
-      dispatch(setClusteringToggling(false));
+      setClusteringError(msg);
     }
-  }, [routeParams, clusteringData, toggleClustering, refetchClustering, dispatch]);
+  }, [routeParams, clusteringData, toggleClustering, refetchClustering]);
 
-  const { data: schemaClasses } = useGetSchemaQuery(
+  const { data: schemaClasses, refetch: refetchSchema } = useGetSchemaQuery(
     { path: schemaPath, asList: true },
-    { skip: !routeParams, refetchOnMountOrArgChange: true },
+    { skip: !routeParams },
   );
 
   const { data: indexStatus, isLoading: indexLoading, error: indexError, refetch: refetchIndex } = useGetIndexStatusQuery(
@@ -110,35 +96,25 @@ export const IndexStatsPage: React.FC = () => {
       .sort();
   }, [schemaClasses]);
 
-  const fetchTypeCounts = useCallback(async () => {
-    if (!docPath || docTypes.length === 0) return;
-    setLoadingCounts(true);
-    setCountError(null);
-    try {
-      const counts: TypeCount[] = [];
-      for (const type of docTypes) {
-        const url = `${docPath}?type=${encodeURIComponent(type)}&count=100000&as_list=true&compress_ids=true`;
-        const resp = await fetch(url, {
-          headers: credentials ? { Authorization: `Basic ${credentials}` } : {},
-        });
-        if (!resp.ok) continue;
-        const arr = await resp.json();
-        counts.push({ type, count: Array.isArray(arr) ? arr.length : 0 });
-      }
-      setTypeCounts(counts);
-      setTotalDocs(counts.reduce((s, c) => s + c.count, 0));
-    } catch (err) {
-      setCountError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoadingCounts(false);
-    }
-  }, [docPath, docTypes, credentials]);
+  const { data: graphqlCounts, isLoading: countsLoading, error: countErrorObj, refetch: refetchCounts } = useGraphqlDocumentCountQuery(
+    { path: graphqlPath, types: docTypes },
+    { skip: !routeParams || docTypes.length === 0 },
+  );
 
-  useEffect(() => {
-    if (routeParams && docTypes.length > 0) {
-      fetchTypeCounts();
-    }
-  }, [routeParams, docTypes, fetchTypeCounts, refreshKey]);
+  const typeCounts = useMemo<TypeCount[]>(() => {
+    if (!graphqlCounts || docTypes.length === 0) return [];
+    return docTypes.map((type, i) => ({ type, count: graphqlCounts[`t${i}`] ?? 0 }));
+  }, [graphqlCounts, docTypes]);
+
+  const totalDocs = useMemo(() => {
+    if (typeCounts.length === 0) return null;
+    return typeCounts.reduce((s, c) => s + c.count, 0);
+  }, [typeCounts]);
+
+  const loadingCounts = countsLoading;
+  const countError = countErrorObj
+    ? (countErrorObj as { data?: Record<string, unknown> }).data?.["api:message"] as string ?? undefined
+    : null;
 
   const handleTriggerIndex = useCallback(async () => {
     if (!indexPath) return;
@@ -147,13 +123,13 @@ export const IndexStatsPage: React.FC = () => {
       await triggerIndex({ path: indexPath }).unwrap();
       setTriggerStatus("success");
       refetchIndex();
-      fetchTypeCounts();
+      refetchCounts();
       setTimeout(() => setTriggerStatus(""), 5000);
     } catch {
       setTriggerStatus("error");
       setTimeout(() => setTriggerStatus(""), 5000);
     }
-  }, [indexPath, triggerIndex, refetchIndex, fetchTypeCounts]);
+  }, [indexPath, triggerIndex, refetchIndex, refetchCounts]);
 
   const handleReindex = useCallback(async () => {
     if (!indexPath) return;
@@ -164,22 +140,20 @@ export const IndexStatsPage: React.FC = () => {
       await triggerIndex({ path: indexPath }).unwrap();
       setReindexStatus("success");
       refetchIndex();
-      fetchTypeCounts();
+      refetchCounts();
       setTimeout(() => setReindexStatus(""), 5000);
     } catch {
       setReindexStatus("error");
       setTimeout(() => setReindexStatus(""), 5000);
     }
-  }, [indexPath, deleteIndex, triggerIndex, refetchIndex, fetchTypeCounts]);
+  }, [indexPath, deleteIndex, triggerIndex, refetchIndex, refetchCounts]);
 
   const handleRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
     refetchIndex();
-    if (baseApi.util) {
-      baseApi.util.invalidateTags(["Document", "Schema"]);
-    }
-    fetchTypeCounts();
-  }, [refetchIndex, fetchTypeCounts]);
+    refetchCounts();
+    refetchSchema();
+    refetchClustering();
+  }, [refetchIndex, refetchCounts, refetchSchema, refetchClustering]);
 
   if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
 

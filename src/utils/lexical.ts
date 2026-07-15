@@ -36,7 +36,7 @@ function tokenize(content: string): Set<string> {
   return new Set(
     content
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/[^\w\s-]/g, " ")
       .split(/\s+/)
       .filter((t) => t.length > 1),
   );

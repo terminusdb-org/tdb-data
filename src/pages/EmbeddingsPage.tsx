@@ -7,6 +7,7 @@ import {
   useGetEmbeddingTextQuery,
   useReplaceSchemaDocumentMutation,
   useRunGraphqlMutation,
+  useGraphqlDocumentCountQuery,
   useAppSelector,
 } from "@/store";
 import {
@@ -182,6 +183,12 @@ export const EmbeddingsPage: React.FC = () => {
     { path: docPath, type: selectedType, count: 100, asList: true },
     { skip: !routeParams || !selectedType },
   );
+
+  const { data: totalCountData } = useGraphqlDocumentCountQuery(
+    { path: graphqlPath, types: selectedType ? [selectedType] : [] },
+    { skip: !routeParams || !selectedType },
+  );
+  const totalDocCount = selectedType ? (totalCountData?.["t0"] ?? null) : null;
 
   const [replaceSchemaDocument] = useReplaceSchemaDocumentMutation();
   const [runGraphql] = useRunGraphqlMutation();
@@ -517,7 +524,14 @@ export const EmbeddingsPage: React.FC = () => {
             <div className="flex flex-col gap-3">
               {/* Document picker */}
               <div className="flex flex-col gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Select Document</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Select Document
+                  {totalDocCount !== null && totalDocCount > 0 && (
+                    <span className="ml-2 font-normal text-gray-400">
+                      ({filteredDocs.length} shown{totalDocCount > 100 ? ` of ${totalDocCount.toLocaleString()}` : ""})
+                    </span>
+                  )}
+                </h3>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"

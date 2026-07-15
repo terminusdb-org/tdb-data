@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { DeckGL } from "@deck.gl/react";
 import { OrthographicView } from "@deck.gl/core";
 import { ScatterplotLayer, TextLayer } from "@deck.gl/layers";
@@ -20,6 +20,7 @@ export interface Scatter2DProps {
   readonly workingSetVisible?: boolean;
   readonly dimmedTypes: ReadonlySet<string>;
   readonly onSelect: (id: string | null) => void;
+  readonly onHover?: (id: string | null) => void;
   readonly width: number;
   readonly height: number;
 }
@@ -33,17 +34,20 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
   workingSetVisible = true,
   dimmedTypes,
   onSelect,
+  onHover,
   width,
   height,
 }) => {
   const selectionSet = selectionIds ?? new Set<string>();
   const wsSet = workingSetIds ?? new Set<string>();
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const layers = useMemo(() => {
     const selectedPoints = (points as ScatterPoint[]).filter((d) => selectionSet.has(d.id));
     const labeledPoints = (points as ScatterPoint[]).filter(
-      (d) => selectionSet.has(d.id) || highlightedIds.has(d.id) || selectedId === d.id
+      (d) => selectionSet.has(d.id) || highlightedIds.has(d.id) || selectedId === d.id || hoveredId === d.id
     );
     const wsPoints = workingSetVisible ? (points as ScatterPoint[]).filter((d) => wsSet.has(d.id) && !selectionSet.has(d.id)) : [];
+    const hoveredPoints = (points as ScatterPoint[]).filter((d) => hoveredId === d.id);
     return [
       // Working set marker layer — blue ring for working set members (not selected)
       new ScatterplotLayer({
@@ -106,6 +110,17 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
           return 0;
         },
         pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 80],
+        onHover: (info: { object?: ScatterPoint; x: number; y: number }) => {
+          if (info.object) {
+            setHoveredId(info.object.id);
+            onHover?.(info.object.id);
+          } else {
+            setHoveredId(null);
+            onHover?.(null);
+          }
+        },
         onClick: (info: { object?: ScatterPoint }) => {
           if (info.object) {
             onSelect(info.object.id);
@@ -116,22 +131,46 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
         radiusUnits: "pixels",
         lineWidthUnits: "pixels",
       }),
-      // Text labels for selected/highlighted points only
+      // Golden hover halo — rendered on top of main layer
+      new ScatterplotLayer({
+        id: "scatter-2d-hover-halo",
+        data: hoveredPoints,
+        getPosition: (d: ScatterPoint) => d.position,
+        getFillColor: [255, 215, 0, 100],
+        getRadius: (d: ScatterPoint) => d.radius * 3,
+        stroked: true,
+        getLineColor: [255, 193, 7, 255],
+        getLineWidth: 2,
+        pickable: false,
+        radiusUnits: "pixels",
+        lineWidthUnits: "pixels",
+      }),
+      // Text labels for selected/highlighted/hovered points only
+      // Uses pixelOffset to position above the point in screen space,
+      // not world coordinates which would be tiny in UMAP space.
       new TextLayer({
         id: "scatter-2d-labels",
         data: labeledPoints,
-        getPosition: (d: ScatterPoint) => [d.position[0], d.position[1] + d.radius * 2.5],
+        getPosition: (d: ScatterPoint) => d.position,
         getText: (d: ScatterPoint) => d.id,
-        getColor: [30, 30, 30, 220],
-        getSize: 11,
-        getAnchor: "start",
-        getAlignmentBaseline: "top",
-        getTextAnchor: "start",
+        getColor: (d: ScatterPoint) => {
+          if (selectionSet.has(d.id)) return [180, 83, 9, 255];
+          if (highlightedIds.has(d.id)) return [255, 99, 71, 255];
+          if (selectedId === d.id) return [30, 58, 138, 255];
+          return [60, 60, 60, 200];
+        },
+        getSize: 12,
+        getAnchor: "middle",
+        getAlignmentBaseline: "bottom",
+        getTextAnchor: "middle",
+        pixelOffset: [0, -12],
         pickable: false,
         sizeUnits: "pixels",
+        outlineWidth: 2,
+        outlineColor: [255, 255, 255, 200],
       }),
     ];
-  }, [points, selectedId, highlightedIds, selectionSet, wsSet, workingSetVisible, dimmedTypes, onSelect]);
+  }, [points, selectedId, highlightedIds, selectionSet, wsSet, workingSetVisible, dimmedTypes, onSelect, onHover, hoveredId]);
 
   const views = useMemo(() => [new OrthographicView({ id: "main", controller: true })], []);
 
@@ -146,7 +185,11 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
   }) as any, []);
 
   return (
-    <div style={{ width, height, background: "#fafafa", cursor: "pointer" }}>
+    <div className={hoveredId ? "scatter-cursor-pointer" : "scatter-cursor-grab"} style={{ width, height, background: "#fafafa" }}>
+      <style>{`
+        .scatter-cursor-pointer canvas { cursor: pointer !important; }
+        .scatter-cursor-grab canvas { cursor: grab !important; }
+      `}</style>
       <DeckGL
         layers={layers}
         views={views}

@@ -20,6 +20,7 @@ interface CommitStreamState {
   connectionStatus: "disconnected" | "connecting" | "connected" | "error";
   error: string | null;
   history: CommitEntry[];
+  activeParams: { org: string; team: string; branch: string } | null;
 }
 
 const initialState: CommitStreamState = {
@@ -27,6 +28,7 @@ const initialState: CommitStreamState = {
   connectionStatus: "disconnected",
   error: null,
   history: [],
+  activeParams: null,
 };
 
 export const commitStreamSlice = createSlice({
@@ -54,6 +56,15 @@ export const commitStreamSlice = createSlice({
       state.history = [];
       state.latestCommitId = null;
     },
+    startCommitStream(state, action: PayloadAction<{ org: string; team: string; branch: string }>) {
+      state.activeParams = action.payload;
+      state.connectionStatus = "connecting";
+      state.error = null;
+    },
+    stopCommitStream(state) {
+      state.activeParams = null;
+      state.connectionStatus = "disconnected";
+    },
   },
 });
 
@@ -62,6 +73,8 @@ export const {
   setCommitStreamError,
   addCommitEntry,
   clearCommitHistory,
+  startCommitStream,
+  stopCommitStream,
 } = commitStreamSlice.actions;
 
 export default commitStreamSlice.reducer;

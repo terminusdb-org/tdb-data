@@ -1,6 +1,10 @@
 import { normalizeId } from "./lexical";
 import type { CandidateEntry, LexicalScore } from "./lexical";
 
+function compactId(id: string): string {
+  return id.replace(/^terminusdb:\/\/\/data\//, "");
+}
+
 export type Stage = "core" | "set_extra" | "target_extra";
 
 export interface ResolvedMatch {
@@ -218,8 +222,8 @@ export function resolve(
   for (const e of targetExtraPairs) addToMatched(e, "target_extra");
 
   const matched = [...matchedMap.values()].map(({ edge, stage }) => ({
-    set_id: edge.setId,
-    target_id: edge.targetId,
+    set_id: compactId(edge.setId),
+    target_id: compactId(edge.targetId),
     distance: edge.blendedDist,
     effectiveDistance: edge.effectiveDist,
     stage,

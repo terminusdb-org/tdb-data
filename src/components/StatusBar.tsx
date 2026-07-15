@@ -44,19 +44,35 @@ export const StatusBar: React.FC = () => {
         const woqlPath = buildApiPath(routeParams, "woql");
 
         const tripleQuery = {
-          "@type": "And",
-          and: [
-            {
-              "@type": "Triple",
-              subject: { "@type": "NodeValue", variable: "Subject" },
-              predicate: { "@type": "NodeValue", node: "rdf:type" },
-              object: { "@type": "Value", variable: "Type" },
-            },
-          ],
+          "@type": "Count",
+          query: {
+            "@type": "And",
+            and: [
+              {
+                "@type": "Triple",
+                subject: { "@type": "NodeValue", variable: "Subject" },
+                predicate: { "@type": "NodeValue", node: "rdf:type" },
+                object: { "@type": "Value", variable: "Type" },
+              },
+            ],
+          },
+          count: { "@type": "Value", variable: "Count" },
         };
 
         const tripleResult = await runWoql({ path: woqlPath, query: tripleQuery }).unwrap();
-        const tripleCount = tripleResult?.bindings?.length ?? 0;
+        const countVal = tripleResult?.bindings?.[0]?.Count;
+        let tripleCount: number | null = null;
+        if (typeof countVal === "number") {
+          tripleCount = countVal;
+        } else if (countVal && typeof countVal === "object" && "@value" in countVal) {
+          const v = (countVal as Record<string, unknown>)["@value"];
+          if (typeof v === "number") {
+            tripleCount = v;
+          } else if (typeof v === "string") {
+            const parsed = Number.parseInt(v, 10);
+            tripleCount = Number.isNaN(parsed) ? null : parsed;
+          }
+        }
 
         const typeQuery = {
           "@type": "And",

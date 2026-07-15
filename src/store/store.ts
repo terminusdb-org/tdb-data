@@ -7,6 +7,7 @@ import erReducer from "./erSlice";
 import clusteringReducer from "./clusteringSlice";
 import commitStreamReducer from "./commitStreamSlice";
 import projectionReducer from "./projectionSlice";
+import { commitStreamListenerMiddleware } from "./commitStreamMiddleware";
 
 export const store = configureStore({
   reducer: {
@@ -20,7 +21,9 @@ export const store = configureStore({
     [baseApi.reducerPath]: baseApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(baseApi.middleware),
+    getDefaultMiddleware()
+      .prepend(commitStreamListenerMiddleware.middleware)
+      .concat(baseApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

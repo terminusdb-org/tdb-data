@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import {
   PageShell,
   PageHeader,
@@ -6,9 +6,7 @@ import {
   Scatter2D,
   Scatter3D,
   TypeFilterPanel,
-  ProjectionUnderpanel,
   DuplicateHighlightPanel,
-  ProjectionSearchBar,
   WorkingSetPanel,
   PanelDock,
   useRouteParams,
@@ -19,7 +17,6 @@ import {
 } from "@/components";
 import {
   useGetSchemaQuery,
-  useGetEmbeddingsByTypeQuery,
   useGetDocumentQuery,
   useDuplicatesQuery,
   useGetIndexStatusQuery,
@@ -31,7 +28,9 @@ import {
   setSelectedId,
   setHighlightedIds,
   toggleShowDuplicates,
-  setLoadedTypes,
+  addLoadedEmbeddings,
+  clearLoadedEmbeddings,
+  clearProjectionCache,
   toggleProjectionSelectionId,
   setProjectionSelectionIds,
   clearProjectionSelection,
@@ -62,10 +61,15 @@ import {
   selectProjectionCacheKey,
   selectProjectionPoints2d,
   selectProjectionPoints3d,
+  selectLoadedEmbeddings,
+  selectServedCommit,
+  selectStoreClustering,
 } from "@/store";
 import { buildApiPath } from "@/utils/routes";
 import { generateTypeColors } from "@/utils/typeColors";
+import { filterEmbeddings } from "@/utils/filterEmbeddings";
 import { useUmapProjection, type UmapProjectionPoint } from "@/hooks/useUmapProjection";
+import { useStreamingEmbeddings } from "@/hooks/useStreamingEmbeddings";
 
 export const ProjectionPage: React.FC = () => {
   const routeParams = useRouteParams();
@@ -120,6 +124,9 @@ export const ProjectionPage: React.FC = () => {
   const projectionCacheKey = useAppSelector(selectProjectionCacheKey);
   const projectionPoints2d = useAppSelector(selectProjectionPoints2d);
   const projectionPoints3d = useAppSelector(selectProjectionPoints3d);
+  const loadedEmbeddings = useAppSelector(selectLoadedEmbeddings);
+  const servedCommit = useAppSelector(selectServedCommit);
+  const storeClustering = useAppSelector(selectStoreClustering);
 
   const selectedTypes = useMemo(() => new Set(selectedTypesArr), [selectedTypesArr]);
   const highlightedIds = useMemo(() => new Set(highlightedIdsArr), [highlightedIdsArr]);
@@ -127,30 +134,79 @@ export const ProjectionPage: React.FC = () => {
   const workingSetIds = useMemo(() => new Set(workingSetIdsArr), [workingSetIdsArr]);
   const projectionSelectionIds = useMemo(() => new Set(projectionSelectionIdsArr), [projectionSelectionIdsArr]);
 
-  const docTypesForQuery = useMemo(() => {
-    return [...selectedTypes];
-  }, [selectedTypes]);
-
-  const workingSetDocIds = useMemo(() => {
-    if (projectWorkingSet && workingSetIds.size > 0) {
-      return [...workingSetIds];
-    }
-    return [];
-  }, [projectWorkingSet, workingSetIds]);
-
-  const hasActiveQuery = selectedTypes.size > 0 || (projectWorkingSet && workingSetDocIds.length > 0);
-
-  const { data: embeddingsData, isLoading: embeddingsLoading } =
-    useGetEmbeddingsByTypeQuery(
-      { path: embeddingsPath, docTypes: docTypesForQuery, docIds: workingSetDocIds },
-      { skip: !routeParams || !embeddingsPath || !hasActiveQuery }
-    );
+  const allEmbeddings = loadedEmbeddings as Record<string, number[]>;
 
   useEffect(() => {
-    if (!embeddingsLoading && embeddingsData && hasActiveQuery) {
-      dispatch(setLoadedTypes([...selectedTypes]));
+    dispatch(clearLoadedEmbeddings());
+    dispatch(clearProjectionCache());
+  }, [dispatch, embeddingsPath]);
+
+  const typesToLoad = useMemo(() => {
+    if (projectSelectionOnly && projectionSelectionIds.size > 0) {
+      return [];
     }
-  }, [embeddingsLoading, embeddingsData, selectedTypes, hasActiveQuery, dispatch]);
+    return [...selectedTypes].filter((t) => !loadedTypes.has(t));
+  }, [selectedTypes, loadedTypes, projectSelectionOnly, projectionSelectionIds]);
+
+  const docIdsToFetch = useMemo(() => {
+    const ids = new Set<string>();
+    if (projectWorkingSet && workingSetIds.size > 0) {
+      for (const id of workingSetIds) ids.add(id);
+    }
+    if (projectSelectionOnly && projectionSelectionIds.size > 0) {
+      for (const id of projectionSelectionIds) ids.add(id);
+    }
+    const result: string[] = [];
+    for (const id of ids) {
+      if (!allEmbeddings[id]) result.push(id);
+    }
+    return result;
+  }, [projectWorkingSet, workingSetIds, projectSelectionOnly, projectionSelectionIds, allEmbeddings]);
+
+  const hasTypesToLoad = typesToLoad.length > 0;
+  const hasDocIdsToFetch = docIdsToFetch.length > 0;
+  const hasActiveQuery = hasTypesToLoad || hasDocIdsToFetch;
+
+  const streamingParams = useMemo(() => ({
+    path: embeddingsPath,
+    docTypes: typesToLoad,
+    docIds: docIdsToFetch,
+    skip: !routeParams || !embeddingsPath || !hasActiveQuery,
+  }), [embeddingsPath, typesToLoad, docIdsToFetch, routeParams, hasActiveQuery]);
+
+  const { stream: streamEmbeddings, state: streamState } = useStreamingEmbeddings(
+    streamingParams,
+    {
+      onComplete: (result) => {
+        const roleEmbeddings = embeddingRole === "clustering"
+          ? (Object.keys(result.clusteringEmbeddings).length > 0
+            ? result.clusteringEmbeddings
+            : result.docEmbeddings)
+          : result.docEmbeddings;
+        const embeddingsRecord: Record<string, number[]> = {};
+        for (const [id, emb] of Object.entries(roleEmbeddings)) {
+          embeddingsRecord[id] = [...emb];
+        }
+        dispatch(addLoadedEmbeddings({
+          embeddings: embeddingsRecord,
+          types: typesToLoad,
+          servedCommit: result.servedCommit,
+          storeClustering: result.storeClustering,
+        }));
+      },
+      onError: (err) => {
+        console.error("Streaming embeddings error:", err);
+      },
+    },
+  );
+
+  useEffect(() => {
+    if (!streamingParams.skip && hasActiveQuery) {
+      streamEmbeddings();
+    }
+  }, [streamingParams.skip, hasActiveQuery, streamEmbeddings]);
+
+  const embeddingsLoading = streamState.isStreaming;
 
   const { data: duplicatesData, isFetching: duplicatesLoading } = useDuplicatesQuery(
     { path: duplicatesPath, count: 50 },
@@ -162,31 +218,34 @@ export const ProjectionPage: React.FC = () => {
     { skip: !routeParams || !indexPath }
   );
 
-  const allEmbeddings = embeddingsData
-    ? embeddingRole === "clustering"
-      ? embeddingsData.clustering_embeddings
-      : embeddingsData.doc_embeddings
-    : {};
+  const docToTypeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const id of Object.keys(allEmbeddings)) {
+      const parts = id.split("/");
+      const typePart = parts.at(-2);
+      if (typePart) map[id] = typePart;
+    }
+    return map;
+  }, [allEmbeddings]);
 
   const embeddings = useMemo(() => {
-    if (projectSelectionOnly && projectionSelectionIds.size > 0) {
-      const filtered: Record<string, number[]> = {};
-      for (const [id, emb] of Object.entries(allEmbeddings)) {
-        if (projectionSelectionIds.has(id)) {
-          filtered[id] = [...emb];
-        }
-      }
-      return filtered;
-    }
-    return allEmbeddings;
-  }, [allEmbeddings, projectSelectionOnly, projectionSelectionIds]);
+    return filterEmbeddings(allEmbeddings, {
+      projectSelectionOnly,
+      projectionSelectionIds,
+      projectWorkingSet,
+      workingSetIds,
+      selectedTypes,
+      docToTypeMap,
+    });
+  }, [allEmbeddings, projectSelectionOnly, projectionSelectionIds, projectWorkingSet, workingSetIds, selectedTypes, docToTypeMap]);
 
   const cacheKey = useMemo(() => {
-    const typesKey = [...selectedTypes].sort().join(",");
+    const loadedKey = [...loadedTypes].sort().join(",");
+    const selectedKey = [...selectedTypes].sort().join(",");
     const wsKey = projectWorkingSet && workingSetIds.size > 0 ? `ws:${[...workingSetIds].sort().join(",")}` : "no-ws";
     const selectKey = projectSelectionOnly ? `sel:${[...projectionSelectionIds].sort().join(",")}` : "all";
-    return `${embeddingRole}|${typesKey}|${wsKey}|${selectKey}`;
-  }, [selectedTypes, embeddingRole, projectSelectionOnly, projectionSelectionIds, projectWorkingSet, workingSetIds]);
+    return `${embeddingRole}|${loadedKey}|sel:${selectedKey}|${wsKey}|${selectKey}`;
+  }, [loadedTypes, selectedTypes, embeddingRole, projectSelectionOnly, projectionSelectionIds, projectWorkingSet, workingSetIds]);
 
   const cacheValid = projectionCacheKey === cacheKey;
   const cachedPointsForCurrentDim = cacheValid
@@ -223,36 +282,35 @@ export const ProjectionPage: React.FC = () => {
     onResult: handleProjectionResult,
   });
 
-  const docToTypeMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const id of Object.keys(allEmbeddings)) {
-      const parts = id.split("/");
-      const typePart = parts.at(-2);
-      if (typePart) map[id] = typePart;
-    }
-    return map;
-  }, [allEmbeddings]);
-
   const scatterPoints = useMemo(() => {
-    return points.map((p) => {
-      const docType = docToTypeMap[p.id] ?? "Unknown";
-      const color = typeColors[docType];
-      const rgb: [number, number, number] = color
-        ? hexToRgb(color.hex)
-        : [128, 128, 128];
-      const position: [number, number] | [number, number, number] =
-        dimensions === 3
-          ? [p.position[0], p.position[1], p.position[2] ?? 0]
-          : [p.position[0], p.position[1]];
-      return {
-        id: p.id,
-        position,
-        color: rgb,
-        radius: 5,
-        docType,
-      };
-    });
-  }, [points, docToTypeMap, typeColors, dimensions]);
+    const skipTypeFilter = projectSelectionOnly && projectionSelectionIds.size > 0;
+    return points
+      .filter((p) => {
+        if (skipTypeFilter) return true;
+        const docType = docToTypeMap[p.id] ?? "Unknown";
+        if (selectedTypes.has(docType)) return true;
+        if (projectWorkingSet && workingSetIds.has(p.id)) return true;
+        return false;
+      })
+      .map((p) => {
+        const docType = docToTypeMap[p.id] ?? "Unknown";
+        const color = typeColors[docType];
+        const rgb: [number, number, number] = color
+          ? hexToRgb(color.hex)
+          : [128, 128, 128];
+        const position: [number, number] | [number, number, number] =
+          dimensions === 3
+            ? [p.position[0], p.position[1], p.position[2] ?? 0]
+            : [p.position[0], p.position[1]];
+        return {
+          id: p.id,
+          position,
+          color: rgb,
+          radius: 5,
+          docType,
+        };
+      });
+  }, [points, docToTypeMap, typeColors, dimensions, selectedTypes, projectWorkingSet, projectSelectionOnly, workingSetIds, projectionSelectionIds]);
 
   const dimmedTypes = useMemo(() => {
     if (filterMode !== "visual") return new Set<string>();
@@ -288,6 +346,16 @@ export const ProjectionPage: React.FC = () => {
     { path: docPath, id: selectedId ?? "" },
     { skip: !selectedId || !docPath }
   );
+
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const { data: hoveredDoc, isLoading: hoveredDocLoading } = useGetDocumentQuery(
+    { path: docPath, id: hoveredId ?? "" },
+    { skip: !hoveredId || !docPath }
+  );
+
+  const handleHover = useCallback((id: string | null) => {
+    setHoveredId(id);
+  }, []);
 
   const handleToggleType = useCallback((type: string) => {
     dispatch(toggleType(type));
@@ -402,12 +470,12 @@ export const ProjectionPage: React.FC = () => {
                 {isProjecting && " — projecting…"}
                 {!isProjecting && isBackgroundProjecting && " — computing other view…"}
               </p>
-              {embeddingsData && (
+              {servedCommit && (
                 <p className="mt-0.5 text-xs text-gray-400">
                   Data from commit:{" "}
-                  <span className="font-mono">{embeddingsData.served_commit.slice(0, 12)}</span>
+                  <span className="font-mono">{servedCommit.slice(0, 12)}</span>
                   {indexStatus?.last_indexed_commit &&
-                    indexStatus.last_indexed_commit !== embeddingsData.served_commit && (
+                    indexStatus.last_indexed_commit !== servedCommit && (
                       <span className="ml-2 text-amber-600">
                         ⚠ Newer commit available: {indexStatus.last_indexed_commit.slice(0, 12)}
                       </span>
@@ -416,7 +484,7 @@ export const ProjectionPage: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {embeddingsData && (
+              {Object.keys(loadedEmbeddings).length > 0 && (
                 <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
                   {scatterPoints.length} points
                 </span>
@@ -432,7 +500,7 @@ export const ProjectionPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5 5-5" />
                 </svg>
               </button>
-              {embeddingsData?.store_clustering && (
+              {storeClustering && (
                 <button
                   type="button"
                   onClick={toggleEmbeddingRole}
@@ -456,19 +524,26 @@ export const ProjectionPage: React.FC = () => {
     >
       <div className="flex h-full">
         <div className="flex flex-1 flex-col">
-          {scatterPoints.length > 0 && (
-            <ProjectionSearchBar
-              searchPath={searchPath}
-              scatterPointIds={scatterPointIdSet}
-              onHighlightIds={(ids) => dispatch(setHighlightedIds([...ids]))}
-              onAddToWorkingSet={handleAddToWorkingSet}
-            />
-          )}
           <div className="relative flex-1">
-            {selectedTypes.size === 0 && !(projectWorkingSet && workingSetDocIds.length > 0) ? (
+            {selectedTypes.size === 0 && !((projectWorkingSet && workingSetIds.size > 0) || (projectSelectionOnly && projectionSelectionIds.size > 0)) ? (
               <PagePlaceholder>Select a document type or enable Working Set union to load embeddings.</PagePlaceholder>
             ) : embeddingsLoading ? (
-              <PagePlaceholder>Loading embeddings…</PagePlaceholder>
+              <div className="flex h-full items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="text-sm text-base-content/60">
+                    Loading embeddings… {streamState.loadedCount}/{streamState.totalCount || "?"}
+                  </div>
+                  {streamState.totalCount > 0 && (
+                    <progress
+                      className="progress progress-primary w-64"
+                      value={streamState.loadedCount}
+                      max={streamState.totalCount}
+                    />
+                  )}
+                </div>
+              </div>
+            ) : Object.keys(loadedEmbeddings).length === 0 ? (
+              <PagePlaceholder>No embeddings found. Index your documents first.</PagePlaceholder>
             ) : isProjecting ? (
               <PagePlaceholder>Running UMAP projection…</PagePlaceholder>
             ) : scatterPoints.length > 0 ? (
@@ -482,6 +557,7 @@ export const ProjectionPage: React.FC = () => {
                   workingSetVisible={workingSetVisible}
                   dimmedTypes={dimmedTypes}
                   onSelect={handleSelect}
+                  onHover={handleHover}
                   width={800}
                   height={500}
                 />
@@ -495,13 +571,72 @@ export const ProjectionPage: React.FC = () => {
                   workingSetVisible={workingSetVisible}
                   dimmedTypes={dimmedTypes}
                   onSelect={handleSelect}
+                  onHover={handleHover}
                   width={800}
                   height={500}
                 />
               )
             ) : (
-              <PagePlaceholder>No embeddings found. Index your documents first.</PagePlaceholder>
+              <PagePlaceholder>No visible points. Select at least one document type.</PagePlaceholder>
             )}
+
+            {(() => {
+              const displayId = hoveredId ?? selectedId;
+              const displayDoc = hoveredId ? (hoveredDoc as Record<string, unknown> | undefined) : (selectedDoc as Record<string, unknown> | undefined);
+              const displayLoading = hoveredId ? hoveredDocLoading : docLoading;
+              const docType = displayId ? docToTypeMap[displayId] ?? null : null;
+
+              if (projectionSelectionIds.size > 1) {
+                return (
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-700 backdrop-blur-sm border-t border-gray-200">
+                    {projectionSelectionIds.size} selected
+                    {projectSelectionOnly && " (projecting only selection)"}
+                  </div>
+                );
+              }
+
+              if (!displayId) {
+                return (
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-400 backdrop-blur-sm border-t border-gray-200">
+                    Click a point to view document details
+                  </div>
+                );
+              }
+
+              if (displayLoading) {
+                return (
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-400 backdrop-blur-sm border-t border-gray-200">
+                    Loading {displayId}…
+                  </div>
+                );
+              }
+
+              if (!displayDoc) {
+                return (
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-400 backdrop-blur-sm border-t border-gray-200">
+                    No document found for {displayId}
+                  </div>
+                );
+              }
+
+              const name = displayDoc.name as string | undefined;
+              const description = displayDoc.description as string | undefined;
+              return (
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 backdrop-blur-sm border-t border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900">{displayId}</span>
+                    {docType && (
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{docType}</span>
+                    )}
+                    {hoveredId && hoveredId !== selectedId && (
+                      <span className="text-xs text-gray-400">(hovering)</span>
+                    )}
+                  </div>
+                  {name && <div className="truncate text-xs text-gray-700">{name}</div>}
+                  {description && <div className="line-clamp-2 text-xs text-gray-500">{description}</div>}
+                </div>
+              );
+            })()}
           </div>
 
           {projectionSelectionIds.size > 0 && (
@@ -533,17 +668,11 @@ export const ProjectionPage: React.FC = () => {
               Tip: Shift+click points to multi-select, then "Project Selection" to re-run UMAP on a subset.
             </div>
           )}
-
-          <ProjectionUnderpanel
-            selectedId={selectedId}
-            docType={selectedId ? docToTypeMap[selectedId] ?? null : null}
-            document={selectedDoc as Record<string, unknown> | null}
-            isLoading={docLoading}
-          />
         </div>
 
         <PanelDock
           side="right"
+          defaultActiveIds={["types"]}
           sections={[
             {
               id: "types",
@@ -568,6 +697,10 @@ export const ProjectionPage: React.FC = () => {
                   projectWorkingSet={projectWorkingSet}
                   workingSetCount={workingSetIds.size}
                   onToggleProjectWorkingSet={handleToggleProjectWorkingSet}
+                  searchPath={scatterPoints.length > 0 ? searchPath : undefined}
+                  scatterPointIds={scatterPoints.length > 0 ? scatterPointIdSet : undefined}
+                  onHighlightIds={(ids) => dispatch(setHighlightedIds([...ids]))}
+                  onAddToWorkingSet={handleAddToWorkingSet}
                 />
               ),
             },

@@ -13,7 +13,29 @@ export const graphqlApi = baseApi.injectEndpoints({
         },
       }),
     }),
+
+    graphqlDocumentCount: builder.query<
+      Record<string, number>,
+      { path: string; types: string[] }
+    >({
+      query: (params) => {
+        const fields = params.types
+          .map(
+            (type, i) =>
+              `t${i}: _count(${type}:{})`
+          )
+          .join(" ");
+        return {
+          url: params.path,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: { query: `{ ${fields} }` },
+        };
+      },
+      transformResponse: (response: { data?: Record<string, number> }) =>
+        response.data ?? {},
+    }),
   }),
 });
 
-export const { useRunGraphqlMutation } = graphqlApi;
+export const { useRunGraphqlMutation, useGraphqlDocumentCountQuery } = graphqlApi;

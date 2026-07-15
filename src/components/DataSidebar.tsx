@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAppDispatch, logout, useAppSelector, selectLatestCommitId, selectConnectionStatus } from "@/store";
 
 interface NavItem {
@@ -127,9 +127,11 @@ export const DataSidebar: React.FC = () => {
   const username = useAppSelector((state) => state.auth.username);
   const latestCommitId = useAppSelector(selectLatestCommitId);
   const connectionStatus = useAppSelector(selectConnectionStatus);
+  const [searchParams] = useSearchParams();
 
   const { org, team, branch, commitId } = params;
   const hasContext = !!(org && team && (branch || commitId));
+  const fromBranch = searchParams.get("from-branch");
 
   const buildPath = (segment: string): string => {
     if (!org || !team) return "/";
@@ -176,6 +178,9 @@ export const DataSidebar: React.FC = () => {
               onClick={() => {
                 if (branch) {
                   navigate(`/${org}/${team}/local/branch/${branch}/history`);
+                } else if (commitId) {
+                  const branchParam = fromBranch ? `?from-branch=${fromBranch}` : "";
+                  navigate(`/${org}/${team}/local/commit/${commitId}/history${branchParam}`);
                 }
               }}
               className="mt-1 inline-flex items-center gap-1 rounded text-xs font-mono text-dfrntBlue-600 hover:underline"

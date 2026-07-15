@@ -18,7 +18,7 @@ import { PageShell, PageHeader, PagePlaceholder, useRouteParams, DocumentPreview
 import { buildApiPath } from "@/utils/routes";
 import type { CandidatesResult } from "@/types/terminusdb";
 import { resolve, computeMatchStats, type ResolveResult, type MatchStats } from "@/utils/resolve";
-import { computeLexicalScores, type CandidateEntry as LexCandidateEntry } from "@/utils/lexical";
+import { computeLexicalScores, normalizeId, type CandidateEntry as LexCandidateEntry } from "@/utils/lexical";
 import { parsePerfectMatchCSV } from "@/utils/csv";
 import { buildTrialDocument, buildTrialEntry, trialsFromDocument, TRIAL_DOC_ID, type ERTrial } from "@/utils/erTrial";
 
@@ -211,12 +211,12 @@ export const EntityResolutionPage: React.FC = () => {
 
   const setDocType = urlSearchParams.get("setType") ?? "";
   const targetDocType = urlSearchParams.get("targetType") ?? "";
-  const k = Number(urlSearchParams.get("k") ?? "5");
-  const threshold = Number(urlSearchParams.get("threshold") ?? "0.5");
+  const k = Number(urlSearchParams.get("k") ?? "3");
+  const threshold = Number(urlSearchParams.get("threshold") ?? "0.8");
   const tauOneToOne = Number(urlSearchParams.get("tau1to1") ?? "0.3");
-  const tauOneToMany = Number(urlSearchParams.get("tau1toN") ?? "0.3");
-  const tauManyToOne = Number(urlSearchParams.get("tauNto1") ?? "0.3");
-  const blendAlpha = Number(urlSearchParams.get("blend") ?? "1.0");
+  const tauOneToMany = Number(urlSearchParams.get("tau1toN") ?? "0");
+  const tauManyToOne = Number(urlSearchParams.get("tauNto1") ?? "0");
+  const blendAlpha = Number(urlSearchParams.get("blend") ?? "0.3");
   const jaccardWeight = Number(urlSearchParams.get("jaccard") ?? "0.0");
   const rareTokenWeight = Number(urlSearchParams.get("rareToken") ?? "0.0");
 
@@ -359,8 +359,8 @@ export const EntityResolutionPage: React.FC = () => {
       else if (sortBy === "setId") cmp = a.set_id.localeCompare(b.set_id);
       else if (sortBy === "targetId") cmp = a.target_id.localeCompare(b.target_id);
       else if (sortBy === "lexical") {
-        const la = lexicalScores?.get(`${a.set_id}\u0000${a.target_id}`);
-        const lb = lexicalScores?.get(`${b.set_id}\u0000${b.target_id}`);
+        const la = lexicalScores?.get(`${normalizeId(a.set_id)}\u0000${normalizeId(a.target_id)}`);
+        const lb = lexicalScores?.get(`${normalizeId(b.set_id)}\u0000${normalizeId(b.target_id)}`);
         cmp = (la?.jaccardWeighted ?? 0) - (lb?.jaccardWeighted ?? 0);
       }
       return sortDir === "asc" ? cmp : -cmp;
@@ -506,7 +506,7 @@ export const EntityResolutionPage: React.FC = () => {
   const histogramData = useMemo(() => {
     if (!resolveResult) return [];
     const buckets = new Array(10).fill(0).map(() => ({ matched: 0, unmatched: 0 }));
-    const matchedKeys = new Set(resolveResult.matched.map((m) => `${m.set_id}\u0000${m.target_id}`));
+    const matchedKeys = new Set(resolveResult.matched.map((m) => `${normalizeId(m.set_id)}\u0000${normalizeId(m.target_id)}`));
     if (candidates) {
       for (const [setId, neighbours] of Object.entries(candidates.set_to_target)) {
         for (const n of neighbours) {
@@ -514,7 +514,7 @@ export const EntityResolutionPage: React.FC = () => {
             ? blendAlpha * n.distance + (1 - blendAlpha) * n.clustering_distance
             : n.distance;
           const bucketIdx = Math.min(9, Math.floor(dist * 10));
-          const key = `${setId}\u0000${n.id}`;
+          const key = `${normalizeId(setId)}\u0000${normalizeId(n.id)}`;
           if (matchedKeys.has(key)) buckets[bucketIdx].matched++;
           else buckets[bucketIdx].unmatched++;
         }
@@ -867,7 +867,7 @@ export const EntityResolutionPage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredMatches.slice(0, 200).map((m, i) => {
-                          const lex = lexicalScores?.get(`${m.set_id}\u0000${m.target_id}`);
+                          const lex = lexicalScores?.get(`${normalizeId(m.set_id)}\u0000${normalizeId(m.target_id)}`);
                           const boosted = lex && (lex.jaccardWeighted > 0 || lex.rareTokenScore > 0) && (jaccardWeight > 0 || rareTokenWeight > 0);
                           return (
                             <tr key={i} className="hover:bg-gray-50">

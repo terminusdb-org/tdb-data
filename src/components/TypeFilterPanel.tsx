@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import type { TypeColor } from "@/utils/typeColors";
+import { ProjectionSearchBar } from "./ProjectionSearchBar";
 
 export interface TypeFilterEntry {
   readonly type: string;
@@ -22,6 +23,10 @@ export interface TypeFilterPanelProps {
   readonly projectWorkingSet?: boolean;
   readonly workingSetCount?: number;
   readonly onToggleProjectWorkingSet?: () => void;
+  readonly searchPath?: string;
+  readonly scatterPointIds?: ReadonlySet<string>;
+  readonly onHighlightIds?: (ids: Set<string>) => void;
+  readonly onAddToWorkingSet?: (ids: string[]) => void;
 }
 
 export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
@@ -37,7 +42,12 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
   projectWorkingSet = false,
   workingSetCount = 0,
   onToggleProjectWorkingSet,
+  searchPath,
+  scatterPointIds,
+  onHighlightIds,
+  onAddToWorkingSet,
 }) => {
+  const [searchExpanded, setSearchExpanded] = useState(false);
   return (
     <div className="p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -117,6 +127,38 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
             <span className="flex-1 truncate">Working Set (union)</span>
             <span className="text-xs text-gray-400 tabular-nums">{workingSetCount}</span>
           </label>
+        </>
+      )}
+
+      {searchPath && scatterPointIds && onHighlightIds && onAddToWorkingSet && (
+        <>
+          <div className="my-2 border-t border-gray-100" />
+          <button
+            className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-400 hover:text-gray-600"
+            onClick={() => setSearchExpanded((v) => !v)}
+          >
+            <span>Search</span>
+            <svg
+              className="h-3 w-3 transition-transform"
+              style={{ transform: searchExpanded ? "rotate(180deg)" : "none" }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5 5-5" />
+            </svg>
+          </button>
+          {searchExpanded && (
+            <div className="mt-1">
+              <ProjectionSearchBar
+                searchPath={searchPath}
+                scatterPointIds={scatterPointIds}
+                onHighlightIds={onHighlightIds}
+                onAddToWorkingSet={onAddToWorkingSet}
+              />
+            </div>
+          )}
         </>
       )}
 

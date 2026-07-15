@@ -73,7 +73,7 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
   }, [matchedInProjection, onAddToWorkingSet]);
 
   return (
-    <div className="border-b border-gray-100 bg-white">
+    <div className="rounded-md border border-gray-200">
       <div className="flex items-center gap-2 px-4 py-2">
         <div className="relative flex-1">
           <input

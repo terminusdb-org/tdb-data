@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchQuery } from "@/store";
 import type { SearchHit } from "@/types/terminusdb";
 
@@ -15,14 +16,15 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
   onHighlightIds,
   onAddToWorkingSet,
 }) => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set());
 
   React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
   }, [query]);
 
   const { data: searchResults, isFetching } = useSearchQuery(
@@ -84,7 +86,7 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
               if (e.key === "Enter") handleSearch();
               if (e.key === "Escape") handleClear();
             }}
-            placeholder="Search documents to highlight in projection…"
+            placeholder={t("projectionSearchBar.placeholder")}
             className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-dfrntBlue-500 focus:outline-none focus:ring-1 focus:ring-dfrntBlue-500"
           />
           {isFetching && (
@@ -97,7 +99,7 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
           disabled={!query.trim()}
           className="rounded-md bg-dfrntBlue-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
         >
-          Search
+          {t("common.search")}
         </button>
         {query && (
           <button
@@ -105,7 +107,7 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
             onClick={handleClear}
             className="rounded-md border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-600"
           >
-            Clear
+            {t("common.clear")}
           </button>
         )}
       </div>
@@ -114,8 +116,8 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
         <div className="border-t border-gray-100 px-4 py-2">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-xs font-medium text-gray-600">
-              {matchedInProjection.length} match{matchedInProjection.length !== 1 ? "es" : ""} in projection
-              {selectedResultIds.size > 0 && ` · ${selectedResultIds.size} selected`}
+              {matchedInProjection.length} {t("common.match")}{matchedInProjection.length !== 1 ? "es" : ""} {t("common.inProjection")}
+              {selectedResultIds.size > 0 && ` · ${selectedResultIds.size} ${t("projectionSearchBar.selected")}`}
             </span>
             <div className="flex gap-2">
               <button
@@ -124,14 +126,14 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
                 disabled={selectedResultIds.size === 0}
                 className="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 disabled:opacity-40"
               >
-                Add Selected to Working Set
+                {t("projectionSearchBar.addSelectedToWorkingSet")}
               </button>
               <button
                 type="button"
                 onClick={handleAddAllToWorkingSet}
                 className="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600"
               >
-                Add All to Working Set
+                {t("projectionSearchBar.addAllToWorkingSet")}
               </button>
             </div>
           </div>
@@ -161,7 +163,7 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
             ))}
             {matchedInProjection.length > 20 && (
               <p className="px-2 py-1 text-xs text-gray-400">
-                +{matchedInProjection.length - 20} more matches…
+                +{matchedInProjection.length - 20} {t("projectionSearchBar.moreMatches")}
               </p>
             )}
           </div>
@@ -170,7 +172,7 @@ export const ProjectionSearchBar: React.FC<ProjectionSearchBarProps> = ({
 
       {showResults && matchedInProjection.length === 0 && !isFetching && (
         <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">
-          No matches found in the current projection.
+          {t("projectionSearchBar.noMatches")}
         </div>
       )}
     </div>

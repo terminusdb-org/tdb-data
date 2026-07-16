@@ -1,5 +1,6 @@
 import React from "react";
 import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, logout, useAppSelector, selectLatestCommitId, selectConnectionStatus } from "@/store";
 
 interface NavItem {
@@ -85,42 +86,43 @@ const historyIcon = (
 );
 
 const topItems: ReadonlyArray<NavItem> = [
-  { label: "Search", segment: "", icon: searchIcon },
+  { label: "nav.search", segment: "", icon: searchIcon },
 ];
 
 const navSections: ReadonlyArray<NavSection> = [
   {
-    title: "Types",
+    title: "nav.types",
     items: [
-      { label: "Explore", segment: "doctypes", icon: exploreIcon },
-      { label: "Schema", segment: "schema", icon: schemaIcon },
-      { label: "Embeddings", segment: "embeddings", icon: embeddingsIcon },
+      { label: "nav.explore", segment: "doctypes", icon: exploreIcon },
+      { label: "nav.schema", segment: "schema", icon: schemaIcon },
+      { label: "nav.embeddings", segment: "embeddings", icon: embeddingsIcon },
     ],
   },
   {
-    title: "Records",
+    title: "nav.records",
     items: [
-      { label: "Documents", segment: "documents", icon: documentsIcon },
-      { label: "Raw JSON", segment: "raw", icon: rawJsonIcon },
-      { label: "GraphQL", segment: "graphql", icon: graphqlIcon },
-      { label: "Vector Search", segment: "vector-search", icon: vectorSearchIcon },
-      { label: "Entity Resolution", segment: "entity-resolution", icon: entityResolutionIcon },
+      { label: "nav.documents", segment: "documents", icon: documentsIcon },
+      { label: "nav.rawJson", segment: "raw", icon: rawJsonIcon },
+      { label: "nav.graphql", segment: "graphql", icon: graphqlIcon },
+      { label: "nav.vectorSearch", segment: "vector-search", icon: vectorSearchIcon },
+      { label: "nav.entityResolution", segment: "entity-resolution", icon: entityResolutionIcon },
     ],
   },
   {
-    title: "Visualization",
+    title: "nav.visualization",
     items: [
-      { label: "Projection", segment: "projection", icon: embeddingsIcon },
+      { label: "nav.projection", segment: "projection", icon: embeddingsIcon },
     ],
   },
 ];
 
 const bottomItems: ReadonlyArray<NavItem> = [
-  { label: "Context", segment: "context", icon: contextIcon },
-  { label: "History", segment: "history", icon: historyIcon },
+  { label: "nav.context", segment: "context", icon: contextIcon },
+  { label: "nav.history", segment: "history", icon: historyIcon },
 ];
 
 export const DataSidebar: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -165,17 +167,17 @@ export const DataSidebar: React.FC = () => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
           </svg>
         </div>
-        <span className="font-headline text-sm font-bold text-gray-900">Data Explorer</span>
+        <span className="font-headline text-sm font-bold text-gray-900">{t("nav.dataExplorer")}</span>
       </div>
 
       {hasContext && (
         <div className="border-b border-gray-200 px-4 py-3">
-          <p className="text-xs font-medium text-gray-500">Data Product</p>
+          <p className="text-xs font-medium text-gray-500">{t("nav.dataProduct")}</p>
           <p className="mt-0.5 truncate text-sm font-semibold text-gray-900">
             {org}/{team}
           </p>
           <p className="mt-0.5 truncate text-xs text-gray-500">
-            {branch ? `branch: ${branch}` : commitId ? `commit: ${commitId}` : ""}
+            {branch ? `${t("common.branch")}: ${branch}` : commitId ? `${t("common.commit")}: ${commitId}` : ""}
           </p>
           {latestCommitId && (
             <button
@@ -227,7 +229,7 @@ export const DataSidebar: React.FC = () => {
               }`}
             >
               {item.icon}
-              {item.label}
+              {t(item.label)}
             </button>
           );
         })}
@@ -235,7 +237,7 @@ export const DataSidebar: React.FC = () => {
         {navSections.map((section) => (
           <div key={section.title} className="mt-3">
             <div className="mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              {section.title}
+              {t(section.title)}
             </div>
             {section.items.map((item) => {
               const isActive = currentSegment === item.segment;
@@ -297,7 +299,7 @@ export const DataSidebar: React.FC = () => {
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
           </svg>
-          All data products
+          {t("nav.allDataProducts")}
         </button>
         <div className="flex items-center justify-between">
           <span className="truncate text-xs text-gray-400">{username}</span>
@@ -309,7 +311,7 @@ export const DataSidebar: React.FC = () => {
             }}
             className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
           >
-            Sign out
+            {t("nav.signOut")}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 interface DocumentPreviewModalProps {
   readonly documentId: string;
@@ -13,6 +14,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   onClose,
   onOpenFull,
 }) => {
+  const { t } = useTranslation();
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -32,18 +34,18 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
       role="button"
       tabIndex={-1}
-      aria-label="Close preview"
+      aria-label={t("documentPreviewModal.closePreview")}
     >
       <div
         className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
-        aria-label="Document preview"
+        aria-label={t("documentPreviewModal.title")}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-900">Document Preview</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t("documentPreviewModal.title")}</h3>
             <span className="font-data text-xs text-gray-400">{documentId}</span>
           </div>
           <button
@@ -80,14 +82,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             onClick={handleCopyId}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
           >
-            Copy ID
+            {t("documentPreviewModal.copyId")}
           </button>
           <button
             type="button"
             onClick={onOpenFull}
             className="rounded-md bg-dfrntBlue-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-dfrntBlue-400"
           >
-            Open Full Page
+            {t("documentPreviewModal.openFullPage")}
           </button>
         </div>
       </div>

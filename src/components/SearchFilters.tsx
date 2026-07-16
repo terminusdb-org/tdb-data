@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export interface SearchFiltersState {
   readonly types: ReadonlySet<string>;
@@ -22,6 +23,7 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
   totalResults,
   filteredResults,
 }) => {
+  const { t } = useTranslation();
   const toggleType = (type: string) => {
     const next = new Set(filters.types);
     if (next.has(type)) {
@@ -39,22 +41,22 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
       {/* Result count */}
       <div className="text-xs text-gray-500">
         {filteredResults !== totalResults
-          ? `${filteredResults} of ${totalResults} results`
-          : `${totalResults} results`}
+          ? `${filteredResults} ${t("common.of")} ${totalResults} ${t("common.results")}`
+          : `${totalResults} ${t("common.results")}`}
       </div>
 
       {/* Document type filter */}
       {allTypes.length > 0 && (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Document Types</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t("search.documentTypes")}</h4>
             <div className="flex gap-1">
               <button
                 type="button"
                 onClick={() => onChange({ ...filters, types: new Set() })}
                 className="text-xs text-gray-400 hover:text-gray-600"
               >
-                All
+                {t("search.all")}
               </button>
               <span className="text-gray-300">|</span>
               <button
@@ -62,7 +64,7 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
                 onClick={() => onChange({ ...filters, types: new Set(allTypes) })}
                 className="text-xs text-gray-400 hover:text-gray-600"
               >
-                None
+                {t("search.none")}
               </button>
             </div>
           </div>
@@ -84,7 +86,7 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
 
       {/* Distance threshold */}
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Max Distance</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("search.maxDistance")}</h4>
         <input
           type="range"
           min="0"
@@ -103,20 +105,20 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
 
       {/* Sort */}
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Sort By</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("search.sortBy")}</h4>
         <select
           value={filters.sort}
           onChange={(e) => onChange({ ...filters, sort: e.target.value as "match" | "id" })}
           className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
         >
-          <option value="match">Best match</option>
-          <option value="id">Document ID</option>
+          <option value="match">{t("search.sortBy")}</option>
+          <option value="id">{t("search.id")}</option>
         </select>
       </div>
 
       {/* Results per page */}
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Results Per Page</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("search.resultsPerPage")}</h4>
         <select
           value={filters.count}
           onChange={(e) => onChange({ ...filters, count: Number(e.target.value) })}

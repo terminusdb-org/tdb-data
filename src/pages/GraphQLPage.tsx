@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
+import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/store";
 import { PagePlaceholder, useRouteParams } from "@/components";
 import { buildApiPath } from "@/utils/routes";
@@ -7,6 +8,7 @@ import { config } from "@/config";
 import "graphiql/style.css";
 
 export const GraphQLPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const credentials = useAppSelector((state) => state.auth.credentials);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,9 +34,9 @@ export const GraphQLPage: React.FC = () => {
         root = ReactDOM.createRoot(containerRef.current!);
         root.render(React.createElement(GraphiQL, { fetcher }));
       } catch (err: unknown) {
-        console.error("Failed to load GraphiQL:", err);
+        console.error(t("graphql.failedToLoad"), err);
         if (containerRef.current) {
-          containerRef.current.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">Failed to load GraphiQL. Make sure the package is installed.</div>';
+          containerRef.current.innerHTML = `<div class="p-8 text-center text-sm text-gray-500">${t("graphql.loadFailedMsg")}</div>`;
         }
       }
     };
@@ -48,7 +50,7 @@ export const GraphQLPage: React.FC = () => {
     };
   }, [routeParams, graphqlUrl, credentials]);
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
 
   return (
     <div className="h-full">

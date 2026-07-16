@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly } from "@/store";
 import { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, ConfirmDialog } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
@@ -13,6 +14,7 @@ interface RawJsonListProps {
 }
 
 export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
+  const { t } = useTranslation();
   const username = useAppSelector((state) => state.auth.username ?? "admin");
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -75,7 +77,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
         path: docPath,
         document: doc,
         author: username,
-        message: "Created via Raw JSON",
+        message: t("rawJson.createdViaRawJson"),
       }).unwrap();
       setShowNewDoc(false);
       setNewDocText("{}");
@@ -86,13 +88,13 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
         if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? "Insert failed";
+          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("rawJson.insertFailed");
           setNewDocError(String(msg));
         } else {
-          setNewDocError(String(data ?? "Insert failed"));
+          setNewDocError(t("rawJson.insertFailed"));
         }
       } else {
-        setNewDocError("Insert failed");
+        setNewDocError(t("rawJson.insertFailed"));
       }
     }
   };
@@ -119,20 +121,20 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
         id,
         document: parsed,
         author: username,
-        message: "Updated via Raw JSON",
+        message: t("rawJson.updatedViaRawJson"),
       }).unwrap();
       refetch();
     } catch (err) {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
         if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? "Save failed";
+          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("documentEditor.saveFailed");
           setEditError(String(msg));
         } else {
-          setEditError(String(data ?? "Save failed"));
+          setEditError(t("documentEditor.saveFailed"));
         }
       } else {
-        setEditError("Save failed");
+        setEditError(t("documentEditor.saveFailed"));
       }
     } finally {
       setSaving(false);
@@ -141,8 +143,8 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
 
   const handleDelete = (id: string) => {
     setConfirmState({
-      title: "Delete Document",
-      message: `Delete document "${id}"? This cannot be undone.`,
+      title: t("common.deleteDoc"),
+      message: t("common.deleteConfirmSingular", { id }),
       onConfirm: () => {
         setConfirmState(null);
         void doDelete(id);
@@ -153,20 +155,20 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   const doDelete = async (id: string) => {
     setDeleteError(null);
     try {
-      await deleteDoc({ path: docPath, id, author: username, message: "Deleted via Raw JSON" }).unwrap();
+      await deleteDoc({ path: docPath, id, author: username, message: t("rawJson.deletedViaRawJson") }).unwrap();
       if (expandedId === id) setExpandedId(null);
       refetch();
     } catch (err) {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
         if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? "Delete failed";
+          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("rawJson.deleteFailed");
           setDeleteError(String(msg));
         } else {
-          setDeleteError(String(data ?? "Delete failed"));
+          setDeleteError(t("rawJson.deleteFailed"));
         }
       } else {
-        setDeleteError("Delete failed");
+        setDeleteError(t("rawJson.deleteFailed"));
       }
     }
   };
@@ -198,24 +200,24 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
       header={
         <PageHeader>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Raw JSON Documents</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t("rawJson.title")}</h2>
             <div className="flex gap-2">
               {selectedIds.size > 0 && (
                 <>
-                  <span className="text-sm text-gray-500">{selectedIds.size} selected</span>
+                  <span className="text-sm text-gray-500">{selectedIds.size} {t("rawJson.selected")}</span>
                   <button
                     type="button"
                     onClick={handleAddToWorkingSet}
                     className="rounded-md border border-dfrntBlue-300 px-3 py-1.5 text-xs font-medium text-dfrntBlue-600 hover:bg-dfrntBlue-50"
                   >
-                    Add to Working Set
+                    {t("rawJson.addToWorkingSet")}
                   </button>
                   <button
                     type="button"
                     onClick={handleProjectSelection}
                     className="rounded-md border border-green-300 px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50"
                   >
-                    Project Selection
+                    {t("rawJson.projectSelection")}
                   </button>
                 </>
               )}
@@ -224,14 +226,14 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
                 onClick={() => setShowNewDoc(!showNewDoc)}
                 className={btnPrimary}
               >
-                {showNewDoc ? "Cancel" : "New Document"}
+                {showNewDoc ? t("common.cancel") : t("rawJson.newDocument")}
               </button>
               {!showNewDoc && (
                 <input
                   type="text"
                   value={idFilter}
                   onChange={(e) => { setIdFilter(e.target.value); setPage(0); }}
-                  placeholder="Filter by ID prefix…"
+                  placeholder={t("rawJson.filterPlaceholder")}
                   className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
                 />
               )}
@@ -240,14 +242,14 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
         {showNewDoc && (
           <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500">New JSON Document (sys#JSONDocument)</span>
+              <span className="text-xs font-medium text-gray-500">{t("rawJson.newJsonDocument")}</span>
               <button
                 type="button"
                 onClick={handleNewDocSave}
                 disabled={!newDocValid}
                 className={btnPrimary}
               >
-                Insert
+                {t("rawJson.insert")}
               </button>
             </div>
             <div className="mb-2 flex items-center gap-3">
@@ -258,16 +260,16 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
                   onChange={(e) => setUseCustomId(e.target.checked)}
                   className="rounded border-gray-300"
                 />
-                Custom ID
+                {t("rawJson.customId")}
               </label>
               {useCustomId && (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-gray-400">JSONDocument/</span>
+                  <span className="text-xs text-gray-400">{t("rawJson.jsonDocumentPrefix")}</span>
                   <input
                     type="text"
                     value={customId}
                     onChange={(e) => setCustomId(e.target.value)}
-                    placeholder="my-custom-id"
+                    placeholder={t("rawJson.idPlaceholder")}
                     className="w-48 rounded-md border border-gray-300 px-2 py-1 text-sm font-data"
                   />
                 </div>
@@ -283,7 +285,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
               />
             </div>
             {!newDocValid && (
-              <div className="mt-1 text-xs text-red-600">Invalid JSON — fix errors before inserting</div>
+              <div className="mt-1 text-xs text-red-600">{t("documentEditor.invalidJson")}</div>
             )}
             {newDocValid && newDocError && (
               <div className="mt-1 text-xs text-red-600">{newDocError}</div>
@@ -301,16 +303,16 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
               disabled={page === 0}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
-              Previous
+              {t("common.previous")}
             </button>
-            <span className="text-sm text-gray-500">Page {page + 1}</span>
+            <span className="text-sm text-gray-500">{t("common.page")} {page + 1}</span>
             <button
               type="button"
               onClick={() => setPage(page + 1)}
               disabled={documents.length < pageSize}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
-              Next
+              {t("common.next")}
             </button>
           </div>
           <select
@@ -319,7 +321,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
             className={selectClass}
           >
             {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>{size} / page</option>
+              <option key={size} value={size}>{size} / {t("rawJson.page")}</option>
             ))}
           </select>
         </PageFooter>
@@ -329,9 +331,9 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
           <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-600">{deleteError}</div>
         )}
         {loading ? (
-          <PagePlaceholder>Loading…</PagePlaceholder>
+          <PagePlaceholder>{t("common.loading")}</PagePlaceholder>
         ) : documents.length === 0 ? (
-          <PagePlaceholder>No documents found.</PagePlaceholder>
+          <PagePlaceholder>{t("rawJson.noDocuments")}</PagePlaceholder>
         ) : (
           <ul className="divide-y divide-gray-100">
             {documents.map((doc) => (
@@ -360,7 +362,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
                     onClick={() => handleDelete(doc["@id"])}
                     className="ml-2 rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                   >
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </div>
                 {expandedId === doc["@id"] && (
@@ -371,7 +373,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
                         onClick={() => setExpandedId(null)}
                         className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </button>
                       <button
                         type="button"
@@ -379,7 +381,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
                         disabled={!editValid || saving}
                         className="rounded-md bg-dfrntBlue-500 px-2 py-1 text-xs font-medium text-white hover:bg-dfrntBlue-400 disabled:cursor-not-allowed disabled:bg-gray-300"
                       >
-                        {saving ? "Saving…" : "Save"}
+                        {saving ? t("documentEditor.saving") : t("common.save")}
                       </button>
                     </div>
                     <div style={{ height: "300px" }}>
@@ -392,7 +394,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
                       />
                     </div>
                     {!editValid && (
-                      <div className="mt-1 text-xs text-red-600">Invalid JSON — fix errors before saving</div>
+                      <div className="mt-1 text-xs text-red-600">{t("documentEditor.invalidJson")}</div>
                     )}
                     {editValid && editError && (
                       <div className="mt-1 text-xs text-red-600">{editError}</div>
@@ -408,7 +410,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
       open={confirmState !== null}
       title={confirmState?.title ?? ""}
       message={confirmState?.message ?? ""}
-      confirmLabel="Delete"
+      confirmLabel={t("common.delete")}
       destructive
       onConfirm={() => confirmState?.onConfirm()}
       onCancel={() => setConfirmState(null)}

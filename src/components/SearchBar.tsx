@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSuggestQuery, useSearchQuery } from "@/store";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { SuggestResponse, SearchHit } from "@/types/terminusdb";
@@ -17,6 +18,7 @@ function defaultFilters(): SearchFiltersState {
 }
 
 export const SearchBar: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
@@ -241,16 +243,16 @@ export const SearchBar: React.FC = () => {
           onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); }}
           onFocus={() => setShowDropdown(true)}
           onKeyDown={handleKeyDown}
-          placeholder={routeParams ? "Search documents…" : "Select a data product first"}
+          placeholder={routeParams ? t("search.placeholder") : t("search.selectDataProductFirst")}
           disabled={!routeParams}
           className="w-full rounded-full border border-gray-300 bg-white py-3 pl-12 pr-10 text-sm text-gray-900 shadow-sm placeholder-gray-400 focus:border-dfrntBlue-400 focus:ring-2 focus:ring-dfrntBlue-100 disabled:bg-gray-50 disabled:text-gray-400"
-          aria-label="Search documents"
+          aria-label={t("search.ariaSearchDocuments")}
         />
         {query && (
           <button
             type="button"
             onClick={handleClearInput}
-            aria-label="Clear search"
+            aria-label={t("search.ariaClearSearch")}
             className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -270,7 +272,7 @@ export const SearchBar: React.FC = () => {
 
       {showDropdown && suggestErr && debouncedQuery.length >= 2 && (
         <div className="mx-auto mt-1 max-w-3xl rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 shadow-lg">
-          Suggest failed: {"status" in suggestErr ? String(suggestErr.status) : String(suggestErr.message ?? suggestErr)}
+          {t("search.suggestFailed")} {"status" in suggestErr ? String(suggestErr.status) : String(suggestErr.message ?? suggestErr)}
         </div>
       )}
 
@@ -284,7 +286,7 @@ export const SearchBar: React.FC = () => {
               aria-selected={activeIndex === 0}
               tabIndex={0}
             >
-              <span className="text-gray-400">Search for </span>
+              <span className="text-gray-400">{t("common.searchFor")} </span>
               <span className="font-medium text-gray-900">&ldquo;{debouncedQuery}&rdquo;</span>
             </div>
           )}
@@ -300,7 +302,7 @@ export const SearchBar: React.FC = () => {
                 tabIndex={0}
               >
                 <span className="font-medium text-gray-900">{c}</span>
-                <span className="ml-2 text-xs text-gray-400">completion</span>
+                <span className="ml-2 text-xs text-gray-400">{t("common.completion")}</span>
               </div>
             );
           })}
@@ -316,13 +318,13 @@ export const SearchBar: React.FC = () => {
                 tabIndex={0}
               >
                 <span className="font-medium text-gray-900">{h.id}</span>
-                <span className="ml-2 text-xs text-gray-400">doc</span>
+                <span className="ml-2 text-xs text-gray-400">{t("common.doc")}</span>
               </div>
             );
           })}
           {totalApprox > 0 && (
             <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">
-              ~{totalApprox} matching documents
+              ~{totalApprox} {t("common.matchingDocuments")}
             </div>
           )}
         </div>
@@ -342,22 +344,22 @@ export const SearchBar: React.FC = () => {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Searching…
+              {t("search.searching")}
             </div>
           )}
 
           {searchErr && !isSearching && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-              Search failed: {"status" in searchErr ? String(searchErr.status) : String(searchErr.message ?? searchErr)}
+              {t("search.searchFailed")} {"status" in searchErr ? String(searchErr.status) : String(searchErr.message ?? searchErr)}
             </div>
           )}
 
           {!isSearching && !searchErr && allResults.length === 0 && (
             <div className="py-8 text-center">
               <p className="text-sm text-gray-500">
-                No results found for <span className="font-medium text-gray-700">&ldquo;{urlQuery}&rdquo;</span>
+                {t("search.noResultsFor")} <span className="font-medium text-gray-700">&ldquo;{urlQuery}&rdquo;</span>
               </p>
-              <p className="mt-1 text-xs text-gray-400">Try different keywords or check your spelling</p>
+              <p className="mt-1 text-xs text-gray-400">{t("search.tryDifferent")}</p>
             </div>
           )}
 
@@ -374,12 +376,12 @@ export const SearchBar: React.FC = () => {
               </div>
               <div className="flex-1">
                 <div className="mb-3 text-sm text-gray-500">
-                  About {filteredResults.length} result{filteredResults.length !== 1 ? "s" : ""}
-                  {urlQuery && <> for <span className="font-medium text-gray-700">&ldquo;{urlQuery}&rdquo;</span></>}
+                  {t("common.about")} {filteredResults.length} {t("common.result")}{filteredResults.length !== 1 ? "s" : ""}
+                  {urlQuery && <> {t("common.for")} <span className="font-medium text-gray-700">&ldquo;{urlQuery}&rdquo;</span></>}
                 </div>
                 {filteredResults.length === 0 ? (
                   <div className="py-8 text-center text-sm text-gray-500">
-                    No results match your filters. Try adjusting them.
+                    {t("search.noResultsMatchFilters")}
                   </div>
                 ) : (
                   <>
@@ -402,7 +404,7 @@ export const SearchBar: React.FC = () => {
                           onClick={() => setVisibleCount((c) => c + filters.count)}
                           className="rounded-md border border-gray-300 px-6 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
                         >
-                          Load more
+                          {t("common.loadMore")}
                         </button>
                       </div>
                     )}

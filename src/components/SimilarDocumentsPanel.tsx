@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSimilarQuery } from "@/store";
 import type { SearchHit } from "@/types/terminusdb";
 import { SimilarityBadge } from "./SimilarityBadge";
@@ -10,6 +11,7 @@ interface SimilarDocumentsPanelProps {
 }
 
 export const SimilarDocumentsPanel: React.FC<SimilarDocumentsPanelProps> = ({ similarPath, documentId, onSelectDocument }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const { data: results, isFetching, error } = useSimilarQuery(
     { path: similarPath, id: documentId, count: 10, snippet: true },
@@ -29,7 +31,7 @@ export const SimilarDocumentsPanel: React.FC<SimilarDocumentsPanelProps> = ({ si
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
           </svg>
-          Similar Documents
+          {t("similarDocumentsPanel.title")}
           {hits.length > 0 && <span className="text-xs text-gray-400">({hits.length})</span>}
         </span>
         <svg className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -39,14 +41,14 @@ export const SimilarDocumentsPanel: React.FC<SimilarDocumentsPanelProps> = ({ si
 
       {expanded && (
         <div className="flex-1 overflow-y-auto px-4 pb-3">
-          {isFetching && <div className="py-2 text-center text-xs text-gray-500">Finding similar documents…</div>}
+          {isFetching && <div className="py-2 text-center text-xs text-gray-500">{t("similarDocumentsPanel.finding")}</div>}
           {error && !isFetching && (
             <div className="py-2 text-center text-xs text-red-600">
-              {"status" in error ? `Error: ${String(error.status)}` : "Failed to load similar documents"}
+              {"status" in error ? `${t("similarDocumentsPanel.error")} ${String(error.status)}` : t("similarDocumentsPanel.failedToLoad")}
             </div>
           )}
           {!isFetching && !error && hits.length === 0 && (
-            <div className="py-2 text-center text-xs text-gray-500">No similar documents found.</div>
+            <div className="py-2 text-center text-xs text-gray-500">{t("similarDocumentsPanel.none")}</div>
           )}
           {hits.length > 0 && (
             <div className="space-y-1.5">

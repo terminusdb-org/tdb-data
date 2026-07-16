@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useGetDocumentQuery, useGetEmbeddingTextQuery } from "@/store";
 import type { ResolveMatch } from "@/types/terminusdb";
 import { SimilarityBadge } from "./SimilarityBadge";
@@ -29,6 +30,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
   onClose,
   onOpenFull,
 }) => {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(initialIndex);
   const [viewTab, setViewTab] = useState<ViewTab>("document");
   const match = matches[index];
@@ -73,7 +75,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
       const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
       return <pre className="whitespace-pre-wrap text-xs text-gray-700">{text}</pre>;
     }
-    return <div className="py-8 text-center text-xs text-gray-400">No data</div>;
+    return <div className="py-8 text-center text-xs text-gray-400">{t("matchComparisonModal.noData")}</div>;
   };
 
   return (
@@ -83,19 +85,19 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
       onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
       role="button"
       tabIndex={-1}
-      aria-label="Close comparison"
+      aria-label={t("matchComparisonModal.closeComparison")}
     >
       <div
         className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
-        aria-label="Match comparison"
+        aria-label={t("matchComparisonModal.matchComparison")}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-gray-900">
-              Match {index + 1} of {matches.length}
+              {t("matchComparisonModal.match")} {index + 1} {t("common.of")} {matches.length}
             </h3>
             <SimilarityBadge distance={match.distance} size="sm" />
             <span className="text-xs text-gray-400">{match.stage}</span>
@@ -110,7 +112,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
                   viewTab === "document" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                Document
+                {t("matchComparisonModal.document")}
               </button>
               <button
                 type="button"
@@ -119,7 +121,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
                   viewTab === "embedding" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                Embedding
+                {t("matchComparisonModal.embedding")}
               </button>
             </div>
             <button
@@ -139,7 +141,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
           {/* Left: Source */}
           <div className="flex flex-1 flex-col">
             <div className="border-b border-gray-100 px-4 py-2">
-              <span className="text-xs font-medium text-gray-400">Source</span>
+              <span className="text-xs font-medium text-gray-400">{t("matchComparisonModal.source")}</span>
             </div>
             <div className="font-data text-xs text-gray-500 px-4 py-1 border-b border-gray-50">{match.set_id}</div>
             <div className="flex-1 overflow-auto p-4">
@@ -154,9 +156,9 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
                 type="button"
                 onClick={() => onOpenFull(match.set_id)}
                 className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
-                title="Open source document"
+                title={t("matchComparisonModal.openSource")}
               >
-                ← Source
+                {t("matchComparisonModal.prevSource")}
               </button>
               <div className="flex flex-col items-center text-gray-300">
                 <SimilarityBadge distance={match.distance} size="sm" />
@@ -165,9 +167,9 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
                 type="button"
                 onClick={() => onOpenFull(match.target_id)}
                 className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
-                title="Open target document"
+                title={t("matchComparisonModal.openTarget")}
               >
-                Target →
+                {t("matchComparisonModal.nextTarget")}
               </button>
             </div>
           </div>
@@ -175,7 +177,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
           {/* Right: Target */}
           <div className="flex flex-1 flex-col">
             <div className="border-b border-gray-100 px-4 py-2">
-              <span className="text-xs font-medium text-gray-400">Target</span>
+              <span className="text-xs font-medium text-gray-400">{t("matchComparisonModal.target")}</span>
             </div>
             <div className="font-data text-xs text-gray-500 px-4 py-1 border-b border-gray-50">{match.target_id}</div>
             <div className="flex-1 overflow-auto p-4">
@@ -193,7 +195,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
               disabled={index === 0}
               className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
             >
-              ← Prev
+              ← {t("matchComparisonModal.prev")}
             </button>
             <input
               type="range"
@@ -209,7 +211,7 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
               disabled={index === matches.length - 1}
               className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
             >
-              Next →
+              {t("matchComparisonModal.next")} →
             </button>
           </div>
         </div>

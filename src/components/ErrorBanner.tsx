@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector, clearError } from "@/store";
 import type { ErrorInfo } from "@/store";
 
 export const ErrorBanner: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const error: ErrorInfo | null = useAppSelector((state) => state.error.latestError);
   const [visible, setVisible] = useState(false);
 
@@ -51,7 +53,7 @@ export const ErrorBanner: React.FC = () => {
           type="button"
           onClick={handleDismiss}
           className="rounded p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
-          aria-label="Dismiss error"
+          aria-label={t("errorBanner.dismissError")}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useGetDocumentsQuery, useGetDocumentQuery, useReplaceDocumentMutation, useInsertDocumentMutation, useDeleteDocumentMutation, useGetSchemaQuery, useAppSelector, useAppDispatch, addToWorkingSet } from "@/store";
 import { DocumentEditor, PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, useRouteParams, ConfirmDialog } from "@/components";
 import { buildApiPath } from "@/utils/routes";
@@ -21,6 +22,7 @@ function extractErrorMessage(err: unknown): string {
 }
 
 export const DocumentsPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const dispatch = useAppDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -81,7 +83,7 @@ export const DocumentsPage: React.FC = () => {
     docList = [];
   }
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
 
   const handleSelectAll = () => {
     if (selectedIds.size === docList.length) {
@@ -107,7 +109,7 @@ export const DocumentsPage: React.FC = () => {
       id: doc["@id"],
       document: doc,
       author: username,
-      message: "Updated via Data Explorer",
+      message: t("common.updatedVia", { id: doc["@id"] }),
     }).unwrap();
     setSearchParams({}, { replace: true });
   };
@@ -117,7 +119,7 @@ export const DocumentsPage: React.FC = () => {
       path: docPath,
       document: doc,
       author: username,
-      message: "Created via Data Explorer",
+      message: t("common.createdVia", { id: doc["@id"] }),
     }).unwrap();
     setSearchParams({}, { replace: true });
   };
@@ -125,8 +127,8 @@ export const DocumentsPage: React.FC = () => {
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     setConfirmState({
-      title: "Delete Documents",
-      message: `Delete ${selectedIds.size} document(s)? This cannot be undone.`,
+      title: t("common.deleteDocs"),
+      message: t("common.deleteConfirmPlural", { count: selectedIds.size }),
       onConfirm: () => {
         setConfirmState(null);
         void doDeleteSelected();
@@ -138,7 +140,7 @@ export const DocumentsPage: React.FC = () => {
     setDeleteError(null);
     try {
       for (const id of selectedIds) {
-        await deleteDoc({ path: docPath, id, author: username, message: "Deleted via Data Explorer" }).unwrap();
+        await deleteDoc({ path: docPath, id, author: username, message: t("common.deletedVia", { id }) }).unwrap();
       }
       setSelectedIds(new Set());
     } catch (err) {
@@ -148,8 +150,8 @@ export const DocumentsPage: React.FC = () => {
 
   const handleDeleteSingle = (id: string) => {
     setConfirmState({
-      title: "Delete Document",
-      message: `Delete document "${id}"? This cannot be undone.`,
+      title: t("common.deleteDoc"),
+      message: t("common.deleteConfirmSingular", { id }),
       onConfirm: () => {
         setConfirmState(null);
         void doDeleteSingle(id);
@@ -160,7 +162,7 @@ export const DocumentsPage: React.FC = () => {
   const doDeleteSingle = async (id: string) => {
     setDeleteError(null);
     try {
-      await deleteDoc({ path: docPath, id, author: username, message: "Deleted via Data Explorer" }).unwrap();
+      await deleteDoc({ path: docPath, id, author: username, message: t("common.deletedVia", { id }) }).unwrap();
       setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
     } catch (err) {
       setDeleteError(extractErrorMessage(err));
@@ -181,9 +183,9 @@ export const DocumentsPage: React.FC = () => {
   };
 
   const renderContent = (): React.ReactNode => {
-    if (isLoading) return <PagePlaceholder>Loading…</PagePlaceholder>;
-    if (error) return <PagePlaceholder error>Failed to load documents.</PagePlaceholder>;
-    if (docList.length === 0) return <PagePlaceholder>No documents found.</PagePlaceholder>;
+    if (isLoading) return <PagePlaceholder>{t("common.loading")}</PagePlaceholder>;
+    if (error) return <PagePlaceholder error>{t("documents.failedToLoad")}</PagePlaceholder>;
+    if (docList.length === 0) return <PagePlaceholder>{t("documents.noDocuments")}</PagePlaceholder>;
     return (
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -195,13 +197,13 @@ export const DocumentsPage: React.FC = () => {
                 checked={selectedIds.size === docList.length && docList.length > 0}
                 onChange={handleSelectAll}
                 className="rounded border-gray-300"
-                aria-label="Select all"
+                aria-label={t("documents.selectAll")}
               />
             </th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">ID</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Type</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Preview</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t("documents.id")}</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t("documents.type")}</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t("documentPreviewModal.title")}</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t("common.actions")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -217,7 +219,7 @@ export const DocumentsPage: React.FC = () => {
                   checked={selectedIds.has(doc["@id"])}
                   onChange={() => handleSelect(doc["@id"])}
                   className="rounded border-gray-300"
-                  aria-label={`Select ${doc["@id"]}`}
+                  aria-label={t("documents.selectDocumentAria", { id: doc["@id"] })}
                 />
               </td>
               <td className="px-4 py-2 font-data text-sm font-medium text-gray-900">
@@ -233,7 +235,7 @@ export const DocumentsPage: React.FC = () => {
                   onClick={() => handleDeleteSingle(doc["@id"])}
                   className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
-                  Delete
+                  {t("common.delete")}
                 </button>
               </td>
             </tr>
@@ -260,8 +262,8 @@ export const DocumentsPage: React.FC = () => {
         </div>
       );
     }
-    if (isLoadingEdit) return <PagePlaceholder>Loading document…</PagePlaceholder>;
-    if (!editDoc) return <PagePlaceholder>Document not found.</PagePlaceholder>;
+    if (isLoadingEdit) return <PagePlaceholder>{t("documents.loadingDocument")}</PagePlaceholder>;
+    if (!editDoc) return <PagePlaceholder>{t("documents.documentNotFound")}</PagePlaceholder>;
     return (
       <div className="h-full">
         <DocumentEditor
@@ -278,33 +280,33 @@ export const DocumentsPage: React.FC = () => {
       header={
         <PageHeader>
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t("documents.title")}</h2>
             <select
               value={selectedType}
               onChange={(e) => { setSelectedType(e.target.value); setPage(0); }}
               className={selectClass}
             >
-              <option value="">All types</option>
+              <option value="">{t("common.allTypes")}</option>
               {docTypes.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
             {selectedIds.size > 0 && (
               <>
-                <span className="text-sm text-gray-500">{selectedIds.size} selected</span>
+                <span className="text-sm text-gray-500">{t("documents.selected", { count: selectedIds.size })}</span>
                 <button
                   type="button"
                   onClick={handleAddToWorkingSet}
                   className="rounded-md border border-dfrntBlue-300 px-3 py-1.5 text-xs font-medium text-dfrntBlue-600 hover:bg-dfrntBlue-50"
                 >
-                  Add to Working Set
+                  {t("documents.addToWorkingSet")}
                 </button>
                 <button
                   type="button"
                   onClick={handleDeleteSelected}
                   className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
-                  Delete Selected
+                  {t("documents.deleteSelected")}
                 </button>
               </>
             )}
@@ -313,7 +315,7 @@ export const DocumentsPage: React.FC = () => {
               onClick={handleNewDocument}
               className={`ml-auto w-full sm:w-auto ${btnPrimary}`}
             >
-              New Document
+              {t("documents.newDocument")}
             </button>
           </div>
         </PageHeader>
@@ -327,16 +329,16 @@ export const DocumentsPage: React.FC = () => {
               disabled={page === 0}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
-              Previous
+              {t("common.previous")}
             </button>
-            <span className="text-sm text-gray-500">Page {page + 1}</span>
+            <span className="text-sm text-gray-500">{t("documents.page", { page: page + 1 })}</span>
             <button
               type="button"
               onClick={() => setPage(page + 1)}
               disabled={docList.length < pageSize}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
-              Next
+              {t("common.next")}
             </button>
           </div>
           <select
@@ -345,7 +347,7 @@ export const DocumentsPage: React.FC = () => {
             className={selectClass}
           >
             {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>{size} / page</option>
+              <option key={size} value={size}>{size} / {t("documents.page", { page: "" })}</option>
             ))}
           </select>
         </PageFooter>
@@ -359,7 +361,7 @@ export const DocumentsPage: React.FC = () => {
         open={confirmState !== null}
         title={confirmState?.title ?? ""}
         message={confirmState?.message ?? ""}
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         destructive
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}

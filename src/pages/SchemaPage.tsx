@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Editor from "@monaco-editor/react";
 import { useGetSchemaQuery, useReplaceSchemaMutation, useReplaceSchemaDocumentMutation, useInsertSchemaDocumentMutation, useDeleteSchemaDocumentMutation, useAppSelector } from "@/store";
 import { PageShell, PageHeader, PagePlaceholder, btnPrimary, btnSecondary, selectClass, useRouteParams, ConfirmDialog } from "@/components";
@@ -18,6 +19,7 @@ const MONACO_OPTIONS = {
 };
 
 export const SchemaPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const { classId } = useParams<{ classId?: string }>();
   const navigate = useNavigate();
@@ -77,8 +79,8 @@ export const SchemaPage: React.FC = () => {
     }
   }, [isNewClass]);
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
-  if (isLoading) return <PagePlaceholder>Loading schema…</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
+  if (isLoading) return <PagePlaceholder>{t("schema.loadingSchema")}</PagePlaceholder>;
 
   const handleChange = (value: string | undefined) => {
     const newText = value ?? "";
@@ -102,7 +104,7 @@ export const SchemaPage: React.FC = () => {
             path: docPath,
             document: doc,
             author: username,
-            message: `Created ${docId} via Data Explorer`,
+            message: t("common.createdVia", { id: docId }),
           }).unwrap();
           navigate(`${routeBase}/schema/class/${encodeURIComponent(docId)}`);
         } else {
@@ -111,7 +113,7 @@ export const SchemaPage: React.FC = () => {
             id: docId,
             document: doc,
             author: username,
-            message: `Updated ${docId} via Data Explorer`,
+            message: t("common.updatedVia", { id: docId }),
           }).unwrap();
         }
       } else {
@@ -120,7 +122,7 @@ export const SchemaPage: React.FC = () => {
           path: schemaPath,
           schema: schemaArray,
           author: username,
-          message: "Updated schema via Data Explorer",
+          message: t("common.updatedSchemaVia"),
         }).unwrap();
       }
       setSaveStatus("saved");
@@ -130,13 +132,13 @@ export const SchemaPage: React.FC = () => {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
         if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? "Save failed";
+          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("schema.saveFailed");
           setSaveError(String(msg));
         } else {
-          setSaveError(String(data ?? "Save failed"));
+          setSaveError(t("schema.saveFailed"));
         }
       } else {
-        setSaveError("Save failed");
+        setSaveError(t("schema.saveFailed"));
       }
     }
   };
@@ -148,8 +150,8 @@ export const SchemaPage: React.FC = () => {
   const handleDeleteClass = () => {
     if (!selectedClassId) return;
     setConfirmState({
-      title: "Delete Class",
-      message: `Delete class "${selectedClassId}"? This cannot be undone.`,
+      title: t("common.deleteClass"),
+      message: t("common.deleteClassConfirm", { id: selectedClassId }),
       onConfirm: () => {
         setConfirmState(null);
         void doDeleteClass();
@@ -166,7 +168,7 @@ export const SchemaPage: React.FC = () => {
         path: docPath,
         id: selectedClassId,
         author: username,
-        message: `Deleted ${selectedClassId} via Data Explorer`,
+        message: t("common.deletedVia", { id: selectedClassId }),
       }).unwrap();
       navigate(`${routeBase}/schema`);
     } catch (err) {
@@ -174,13 +176,13 @@ export const SchemaPage: React.FC = () => {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
         if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? "Delete failed";
+          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("schema.deleteFailed");
           setSaveError(String(msg));
         } else {
-          setSaveError(String(data ?? "Delete failed"));
+          setSaveError(t("schema.deleteFailed"));
         }
       } else {
-        setSaveError("Delete failed");
+        setSaveError(t("schema.deleteFailed"));
       }
     }
   };
@@ -193,7 +195,7 @@ export const SchemaPage: React.FC = () => {
     }
   };
 
-  const saveLabel = saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Error" : "Save";
+  const saveLabel = saveStatus === "saving" ? t("common.saving") : saveStatus === "saved" ? t("common.saved") : saveStatus === "error" ? t("common.error") : t("common.save");
   const saveClass = saveStatus === "saved"
     ? "bg-green-500 text-white"
     : saveStatus === "error"
@@ -207,13 +209,13 @@ export const SchemaPage: React.FC = () => {
         <PageHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">Schema Editor</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t("schema.editor")}</h2>
               <select
                 value={selectedClassId}
                 onChange={(e) => handleClassSelect(e.target.value)}
                 className={selectClass}
               >
-                <option value="">All classes</option>
+                <option value="">{t("schema.allClasses")}</option>
                 {classes?.map((cls) => (
                   <option key={cls["@id"]} value={cls["@id"]}>{cls["@id"]}</option>
                 ))}
@@ -223,7 +225,7 @@ export const SchemaPage: React.FC = () => {
                 onClick={handleNewClass}
                 className={btnSecondary}
               >
-                New Class
+                {t("schema.newClass")}
               </button>
               {selectedClassId && (
                 <button
@@ -232,7 +234,7 @@ export const SchemaPage: React.FC = () => {
                   disabled={saveStatus === "saving"}
                   className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                 >
-                  Delete
+                  {t("common.delete")}
                 </button>
               )}
             </div>
@@ -258,7 +260,7 @@ export const SchemaPage: React.FC = () => {
         />
         {!valid && (
           <div className="absolute bottom-4 left-4 rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700">
-            Invalid JSON — fix errors before saving
+            {t("schema.invalidJson")}
           </div>
         )}
         {valid && saveError && (
@@ -272,7 +274,7 @@ export const SchemaPage: React.FC = () => {
       open={confirmState !== null}
       title={confirmState?.title ?? ""}
       message={confirmState?.message ?? ""}
-      confirmLabel="Delete"
+      confirmLabel={t("common.delete")}
       destructive
       onConfirm={() => confirmState?.onConfirm()}
       onCancel={() => setConfirmState(null)}

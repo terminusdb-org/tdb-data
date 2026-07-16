@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector, login } from "@/store";
 import { config } from "@/config";
 
 type LoginStatus = "idle" | "loading" | "error";
 
 export const LoginPage: React.FC = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,7 +40,7 @@ export const LoginPage: React.FC = () => {
     const trimmedUsername = username.trim();
 
     if (trimmedUsername.length === 0 || password.length === 0) {
-      setErrorMessage("Username and password are required.");
+      setErrorMessage(t("login.usernamePasswordRequired"));
       return;
     }
 
@@ -58,20 +60,16 @@ export const LoginPage: React.FC = () => {
         navigate(from, { replace: true });
       } else if (response.status === 401) {
         setStatus("error");
-        setErrorMessage("Invalid credentials. Check your username and password.");
+        setErrorMessage(t("login.invalidCredentials"));
         setPassword("");
         passwordRef.current?.focus();
       } else {
         setStatus("error");
-        setErrorMessage(
-          `Unexpected response from TerminusDB (HTTP ${response.status}). Is the server running?`
-        );
+        setErrorMessage(t("login.unexpectedResponse", { status: response.status }));
       }
     } catch {
       setStatus("error");
-      setErrorMessage(
-        "Cannot connect to TerminusDB. Check that the server is running and accessible."
-      );
+      setErrorMessage(t("login.cannotConnect"));
     }
   };
 
@@ -102,10 +100,10 @@ export const LoginPage: React.FC = () => {
             </svg>
           </div>
           <h1 className="font-headline text-2xl font-bold text-white">
-            Data Explorer
+            {t("login.title")}
           </h1>
           <p className="mt-1 text-sm text-dfrntBlue-200">
-            TerminusDB Data Product UI
+            {t("login.subtitle")}
           </p>
         </div>
 
@@ -118,7 +116,7 @@ export const LoginPage: React.FC = () => {
             id="login-heading"
             className="mb-4 text-lg font-semibold text-white"
           >
-            Sign in
+            {t("login.signIn")}
           </h2>
           {errorMessage && (
             <div
@@ -134,7 +132,7 @@ export const LoginPage: React.FC = () => {
               htmlFor="username"
               className="mb-1 block text-sm font-medium text-dfrntBlue-100"
             >
-              Username
+              {t("login.username")}
             </label>
             <input
               ref={usernameRef}
@@ -153,7 +151,7 @@ export const LoginPage: React.FC = () => {
               htmlFor="password"
               className="mb-1 block text-sm font-medium text-dfrntBlue-100"
             >
-              Password
+              {t("login.password")}
             </label>
             <input
               ref={passwordRef}
@@ -195,17 +193,17 @@ export const LoginPage: React.FC = () => {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Signing in…
+                {t("login.signingIn")}
               </>
             ) : (
-              "Sign in"
+              t("login.signIn")
             )}
           </button>
         </form>
         <p className="mt-4 text-center text-xs text-dfrntBlue-300">
-          Connecting to{" "}
+          {t("login.connectingTo")}{" "}
           <span className="font-data">
-            {config.apiUrl || "same-origin"}
+            {config.apiUrl || t("common.sameOrigin")}
           </span>
         </p>
       </div>

@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useGetDatabasesQuery, useAppSelector, useAppDispatch, logout } from "@/store";
 import { config } from "@/config";
 
 export const DataProductPickerPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const username = useAppSelector((state) => state.auth.username);
@@ -34,9 +36,9 @@ export const DataProductPickerPage: React.FC = () => {
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="font-headline text-2xl font-bold text-white">Data Products</h1>
+            <h1 className="font-headline text-2xl font-bold text-white">{t("dataProductPicker.title")}</h1>
             <p className="mt-1 text-sm text-dfrntBlue-200">
-              Signed in as <span className="font-data text-dfrntBlue-100">{username}</span>
+              {t("dataProductPicker.signedInAs")} <span className="font-data text-dfrntBlue-100">{username}</span>
             </p>
           </div>
           <button
@@ -44,14 +46,14 @@ export const DataProductPickerPage: React.FC = () => {
             onClick={handleLogout}
             className="rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-dfrntBlue-100 transition-colors hover:bg-white/10"
           >
-            Sign out
+            {t("dataProductPicker.signOut")}
           </button>
         </div>
 
         <div className="mb-6">
           <input
             type="text"
-            placeholder="Search data products…"
+            placeholder={t("dataProductPicker.placeholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="block w-full rounded-lg border-white/20 bg-white/10 text-white placeholder-dfrntBlue-300 shadow-sm focus:border-dfrntBlue-400 focus:ring-dfrntBlue-400 sm:text-sm"
@@ -59,19 +61,19 @@ export const DataProductPickerPage: React.FC = () => {
         </div>
 
         {isLoading && (
-          <div className="py-12 text-center text-sm text-dfrntBlue-200">Loading data products…</div>
+          <div className="py-12 text-center text-sm text-dfrntBlue-200">{t("dataProductPicker.loading")}</div>
         )}
 
         {error && (
           <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            Failed to load data products. Check that the server is running at{" "}
-            <span className="font-data">{config.apiUrl || "same-origin"}</span>.
+            {t("dataProductPicker.loadFailed")}{" "}
+            <span className="font-data">{config.apiUrl || t("common.sameOrigin")}</span>.
           </div>
         )}
 
         {!isLoading && !error && filtered.length === 0 && (
           <div className="py-12 text-center text-sm text-dfrntBlue-200">
-            No data products found{search ? ` matching "${search}"` : ""}.
+            {t("dataProductPicker.noProducts")}{search ? ` ${t("dataProductPicker.matching")} "${search}"` : ""}.
           </div>
         )}
 

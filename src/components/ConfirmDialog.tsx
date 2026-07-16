@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 interface ConfirmDialogProps {
   readonly open: boolean;
@@ -15,12 +16,13 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export function ConfirmDialog({
       onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
       role="button"
       tabIndex={-1}
-      aria-label="Close dialog"
+      aria-label={t("confirmDialog.closeDialog")}
     >
       <div
         className="max-w-md rounded-lg bg-white p-6 shadow-xl"
@@ -70,7 +72,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
           >
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </button>
           <button
             ref={confirmRef}
@@ -82,7 +84,7 @@ export function ConfirmDialog({
                 : "bg-dfrntBlue-600 hover:bg-dfrntBlue-700"
             }`}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("common.confirm")}
           </button>
         </div>
       </div>

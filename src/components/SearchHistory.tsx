@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 const STORAGE_KEY = "tdb-data:search-history";
 const MAX_HISTORY = 10;
@@ -40,18 +41,19 @@ interface SearchHistoryProps {
 }
 
 export const SearchHistory: React.FC<SearchHistoryProps> = ({ history, onSelect, onClear }) => {
+  const { t } = useTranslation();
   if (history.length === 0) return null;
 
   return (
     <div className="mt-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Recent Searches</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{t("searchHistory.title")}</span>
         <button
           type="button"
           onClick={onClear}
           className="text-xs text-gray-400 transition-colors hover:text-gray-600"
         >
-          Clear
+          {t("searchHistory.clear")}
         </button>
       </div>
       <div className="flex flex-wrap gap-2">

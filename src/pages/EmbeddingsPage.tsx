@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Editor from "@monaco-editor/react";
 import {
   useGetSchemaQuery,
@@ -41,6 +42,7 @@ const TypeCombobox: React.FC<{
   readonly value: string;
   readonly onSelect: (id: string) => void;
 }> = ({ items, value, onSelect }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +78,7 @@ const TypeCombobox: React.FC<{
         className={`${selectClass} flex w-full items-center justify-between gap-2 text-left`}
       >
         <span className={selectedItem ? "text-gray-900" : "text-gray-400"}>
-          {selectedItem ? selectedItem.id + (selectedItem.hasEmbedding ? " ✓" : "") : "Select a type…"}
+          {selectedItem ? selectedItem.id + (selectedItem.hasEmbedding ? " ✓" : "") : t("embeddings.selectTypePlaceholder")}
         </span>
         <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -90,13 +92,13 @@ const TypeCombobox: React.FC<{
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter types…"
+              placeholder={t("embeddings.filterTypes")}
               className="w-full rounded border border-gray-200 px-2 py-1 text-sm focus:border-dfrntBlue-400 focus:outline-none"
             />
           </div>
           <div className="max-h-48 overflow-y-auto">
             {filtered.length === 0 && (
-              <div className="px-3 py-2 text-xs text-gray-400">No types found.</div>
+              <div className="px-3 py-2 text-xs text-gray-400">{t("embeddings.noTypesFound")}</div>
             )}
             {filtered.map((item) => (
               <button
@@ -144,6 +146,7 @@ function shortId(fullId: string): string {
 }
 
 export const EmbeddingsPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeFromUrl = searchParams.get("type") ?? "";
@@ -300,13 +303,13 @@ export const EmbeddingsPage: React.FC = () => {
         id: selectedType,
         document: updatedDoc,
         author: username,
-        message: `Updated embedding ${field} for ${selectedType}`,
+        message: t("embeddings.updatedEmbedding", { field, type: selectedType }),
       }).unwrap();
       setStatus("saved");
       setSchemaVersion((v) => v + 1);
       setTimeout(() => setStatus(""), 3000);
     } catch (err: unknown) {
-      console.error("Failed to save embedding config:", err);
+      console.error(t("embeddings.failedToSaveConfig"), err);
       setStatus("error");
     }
   };
@@ -390,17 +393,17 @@ export const EmbeddingsPage: React.FC = () => {
     }
   };
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
-  if (schemaLoading) return <PagePlaceholder>Loading schema…</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
+  if (schemaLoading) return <PagePlaceholder>{t("embeddings.loadingSchema")}</PagePlaceholder>;
 
   return (
     <PageShell
       header={
         <PageHeader>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Embeddings</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t("embeddings.title")}</h2>
             <p className="mt-0.5 text-sm text-gray-500">
-              Edit GraphQL queries and Handlebars templates for document embeddings. Save each field to apply, then select a document to preview the embedding text.
+              {t("embeddings.description")}
             </p>
           </div>
         </PageHeader>
@@ -410,7 +413,7 @@ export const EmbeddingsPage: React.FC = () => {
         {/* Type selector */}
         <div className="flex items-end gap-3">
           <div>
-            <span className="block text-xs font-medium text-gray-500 mb-1">Document Type</span>
+            <span className="block text-xs font-medium text-gray-500 mb-1">{t("embeddings.typeSelector")}</span>
             <TypeCombobox
               items={docTypes}
               value={selectedType}
@@ -419,14 +422,14 @@ export const EmbeddingsPage: React.FC = () => {
           </div>
           {selectedType && (
             <span className="text-xs text-gray-400 pb-2">
-              {currentEmbedding ? "Has embedding metadata" : "No embedding metadata yet"}
+              {currentEmbedding ? t("embeddings.hasEmbeddingMetadata") : t("embeddings.noEmbeddingMetadata")}
             </span>
           )}
         </div>
 
         {!selectedType && (
           <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
-            Select a document type to begin editing embedding configuration.
+            {t("embeddings.selectTypeToBegin")}
           </div>
         )}
 
@@ -436,7 +439,7 @@ export const EmbeddingsPage: React.FC = () => {
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">GraphQL Query</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t("embeddings.graphqlQuery")}</h3>
                   <span className="text-xs text-gray-400">(metadata.embedding.query)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -446,7 +449,7 @@ export const EmbeddingsPage: React.FC = () => {
                     disabled={formatStatus === "formatting"}
                     className={btnSecondary + " text-xs px-2 py-1"}
                   >
-                    {formatStatus === "formatting" ? "Formatting…" : formatStatus === "error" ? "Error" : "Format"}
+                    {formatStatus === "formatting" ? t("common.formatting") : formatStatus === "error" ? t("common.error") : t("common.format")}
                   </button>
                   <button
                     type="button"
@@ -454,7 +457,7 @@ export const EmbeddingsPage: React.FC = () => {
                     disabled={graphqlSaveStatus === "saving"}
                     className={btnPrimary + " text-xs px-2 py-1"}
                   >
-                    {graphqlSaveStatus === "saving" ? "Saving…" : graphqlSaveStatus === "saved" ? "Saved!" : graphqlSaveStatus === "error" ? "Error" : "Save"}
+                    {graphqlSaveStatus === "saving" ? t("common.saving") : graphqlSaveStatus === "saved" ? t("common.saved") : graphqlSaveStatus === "error" ? t("common.error") : t("common.save")}
                   </button>
                 </div>
               </div>
@@ -481,7 +484,7 @@ export const EmbeddingsPage: React.FC = () => {
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Handlebars Template</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t("embeddings.handlebarsTemplate")}</h3>
                   <span className="text-xs text-gray-400">(metadata.embedding.template)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -491,7 +494,7 @@ export const EmbeddingsPage: React.FC = () => {
                     disabled={formatStatus === "formatting"}
                     className={btnSecondary + " text-xs px-2 py-1"}
                   >
-                    {formatStatus === "formatting" ? "Formatting…" : formatStatus === "error" ? "Error" : "Format"}
+                    {formatStatus === "formatting" ? t("common.formatting") : formatStatus === "error" ? t("common.error") : t("common.format")}
                   </button>
                   <button
                     type="button"
@@ -499,7 +502,7 @@ export const EmbeddingsPage: React.FC = () => {
                     disabled={templateSaveStatus === "saving"}
                     className={btnPrimary + " text-xs px-2 py-1"}
                   >
-                    {templateSaveStatus === "saving" ? "Saving…" : templateSaveStatus === "saved" ? "Saved!" : templateSaveStatus === "error" ? "Error" : "Save"}
+                    {templateSaveStatus === "saving" ? t("common.saving") : templateSaveStatus === "saved" ? t("common.saved") : templateSaveStatus === "error" ? t("common.error") : t("common.save")}
                   </button>
                 </div>
               </div>
@@ -527,10 +530,10 @@ export const EmbeddingsPage: React.FC = () => {
               {/* Document picker */}
               <div className="flex flex-col gap-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Select Document
+                  {t("embeddings.selectDocument")}
                   {totalDocCount !== null && totalDocCount > 0 && (
                     <span className="ml-2 font-normal text-gray-400">
-                      ({filteredDocs.length} shown{totalDocCount > 100 ? ` of ${totalDocCount.toLocaleString()}` : ""})
+                      ({t("embeddings.shownOfTotal", { shown: filteredDocs.length, total: totalDocCount > 100 ? totalDocCount.toLocaleString() : filteredDocs.length })})
                     </span>
                   )}
                 </h3>
@@ -539,17 +542,17 @@ export const EmbeddingsPage: React.FC = () => {
                     type="text"
                     value={docFilter}
                     onChange={(e) => setDocFilter(e.target.value)}
-                    placeholder="Filter by ID…"
+                    placeholder={t("embeddings.filterById")}
                     className={inputClass + " w-64"}
                   />
                   {selectedDocId && (
-                    <span className="text-xs text-gray-500">Selected: {shortId(selectedDocId)}</span>
+                    <span className="text-xs text-gray-500">{t("embeddings.selected")}: {shortId(selectedDocId)}</span>
                   )}
                 </div>
                 <div className="max-h-32 overflow-y-auto rounded-md border border-gray-200 bg-white">
-                  {docsLoading && <div className="p-2 text-xs text-gray-400">Loading documents…</div>}
+                  {docsLoading && <div className="p-2 text-xs text-gray-400">{t("embeddings.loadingDocuments")}</div>}
                   {!docsLoading && filteredDocs.length === 0 && (
-                    <div className="p-2 text-xs text-gray-400">No documents found.</div>
+                    <div className="p-2 text-xs text-gray-400">{t("embeddings.noDocuments")}</div>
                   )}
                   {filteredDocs.map((doc) => (
                     <button
@@ -576,10 +579,10 @@ export const EmbeddingsPage: React.FC = () => {
                   disabled={!graphqlQuery || !selectedDocId || previewLoading}
                   className={btnPrimary + " text-xs px-3 py-1.5"}
                 >
-                  {previewLoading ? "Previewing…" : "Preview"}
+                  {previewLoading ? t("embeddings.previewing") : t("embeddings.preview")}
                 </button>
                 <span className="text-xs text-gray-400">
-                  Runs the GraphQL query, then renders the Handlebars template in-browser.
+                  {t("embeddings.previewDescription")}
                 </span>
               </div>
 
@@ -588,14 +591,14 @@ export const EmbeddingsPage: React.FC = () => {
                 {/* GraphQL response */}
                 <div className="flex flex-col">
                   <div className="mb-1 flex items-center justify-between">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">GraphQL Response</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t("embeddings.graphqlResponse")}</h3>
                     <button
                       type="button"
                       onClick={handleRunGraphql}
                       disabled={!graphqlQuery || !selectedDocId}
                       className={btnSecondary + " text-xs"}
                     >
-                      Run Query
+                      {t("embeddings.runQuery")}
                     </button>
                   </div>
                   <div className="h-48 overflow-auto rounded-md border border-gray-200 bg-gray-900 p-3">
@@ -608,8 +611,8 @@ export const EmbeddingsPage: React.FC = () => {
                     {!graphqlResult && !graphqlError && (
                       <div className="text-xs text-gray-500">
                         {selectedDocId
-                          ? "Click 'Run Query' or 'Preview' to execute the GraphQL query for this document."
-                          : "Select a document first."}
+                          ? t("embeddings.clickRunQuery")
+                          : t("embeddings.selectDocumentFirst")}
                       </div>
                     )}
                   </div>
@@ -618,11 +621,11 @@ export const EmbeddingsPage: React.FC = () => {
                 {/* Embedding text preview */}
                 <div className="flex flex-col">
                   <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Embedding Text Preview <span className="font-normal text-gray-400">(in-browser render)</span>
+                    {t("embeddings.embeddingTextPreview")} <span className="font-normal text-gray-400">{t("embeddings.inBrowserRender")}</span>
                   </h3>
                   <div className="h-48 overflow-auto rounded-md border border-gray-200 bg-gray-900 p-3">
                     {previewLoading && (
-                      <div className="text-xs text-gray-400">Running preview…</div>
+                      <div className="text-xs text-gray-400">{t("embeddings.runningPreview")}</div>
                     )}
                     {previewError && !previewLoading && (
                       <pre className="text-xs text-red-400 whitespace-pre-wrap">{previewError}</pre>
@@ -633,8 +636,8 @@ export const EmbeddingsPage: React.FC = () => {
                     {!previewResult && !previewLoading && !previewError && (
                       <div className="text-xs text-gray-500">
                         {selectedDocId
-                          ? "Click 'Preview' to run the query and render the template in-browser."
-                          : "Select a document to preview embedding text."}
+                          ? t("embeddings.clickPreview")
+                          : t("embeddings.selectDocumentToPreview")}
                       </div>
                     )}
                   </div>
@@ -644,11 +647,11 @@ export const EmbeddingsPage: React.FC = () => {
               {/* Backend embedding text (format=embedding) */}
               <div className="flex flex-col">
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Backend Embedding Text <span className="font-normal text-gray-400">(format=embedding from server)</span>
+                  {t("embeddings.backendEmbeddingText")} <span className="font-normal text-gray-400">{t("embeddings.formatEmbeddingFromServer")}</span>
                 </h3>
                 <div className="h-32 overflow-auto rounded-md border border-gray-200 bg-gray-900 p-3">
                   {embeddingFetching && (
-                    <div className="text-xs text-gray-400">Fetching embedding text…</div>
+                    <div className="text-xs text-gray-400">{t("embeddings.fetchingEmbeddingText")}</div>
                   )}
                   {embeddingError && !embeddingFetching && (
                     <pre className="text-xs text-amber-400 whitespace-pre-wrap">{embeddingError}</pre>
@@ -659,8 +662,8 @@ export const EmbeddingsPage: React.FC = () => {
                   {!embeddingText && !embeddingFetching && !embeddingError && (
                     <div className="text-xs text-gray-500">
                       {selectedDocId
-                        ? "Save embedding metadata and ensure the backend has embedding queries defined to see output."
-                        : "Select a document to fetch backend embedding text."}
+                        ? t("embeddings.saveMetadataToSeeOutput")
+                        : t("embeddings.selectDocumentToFetch")}
                     </div>
                   )}
                 </div>

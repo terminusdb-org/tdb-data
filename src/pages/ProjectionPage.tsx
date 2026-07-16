@@ -1,4 +1,5 @@
 import React, { useMemo, useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   PageShell,
   PageHeader,
@@ -74,6 +75,7 @@ import { useStreamingEmbeddings } from "@/hooks/useStreamingEmbeddings";
 import { isSubdocument } from "@/types/terminusdb";
 
 export const ProjectionPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const dimensions = useAppSelector(selectDimensions);
   const embeddingRole = useAppSelector(selectEmbeddingRole);
@@ -197,7 +199,7 @@ export const ProjectionPage: React.FC = () => {
         }));
       },
       onError: (err) => {
-        dispatch(setError({ message: `Streaming embeddings error: ${err.message}` }));
+        dispatch(setError({ message: t("projection.streamingError", { message: err.message }) }));
       },
     },
   );
@@ -455,10 +457,10 @@ export const ProjectionPage: React.FC = () => {
     dispatch(setEmbeddingRole(embeddingRole === "document" ? "clustering" : "document"));
   }, [dispatch, embeddingRole]);
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
-  if (schemaLoading) return <PagePlaceholder>Loading schema…</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
+  if (schemaLoading) return <PagePlaceholder>{t("common.loadingSchema")}</PagePlaceholder>;
 
-  const title = dimensions === 2 ? "2D Projection" : "3D Projection";
+  const title = dimensions === 2 ? t("projection.2dTitle") : t("projection.3dTitle");
 
   return (
     <PageShell
@@ -468,18 +470,18 @@ export const ProjectionPage: React.FC = () => {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
               <p className="mt-0.5 text-sm text-gray-500">
-                UMAP dimension reduction of document embeddings
-                {isProjecting && " — projecting…"}
-                {!isProjecting && isBackgroundProjecting && " — computing other view…"}
+                {t("projection.umapDescription")}
+                {isProjecting && t("projection.projecting")}
+                {!isProjecting && isBackgroundProjecting && t("projection.computingOtherView")}
               </p>
               {servedCommit && (
                 <p className="mt-0.5 text-xs text-gray-400">
-                  Data from commit:{" "}
+                  {t("projection.dataFromCommit")}{" "}
                   <span className="font-mono">{servedCommit.slice(0, 12)}</span>
                   {indexStatus?.last_indexed_commit &&
                     indexStatus.last_indexed_commit !== servedCommit && (
                       <span className="ml-2 text-amber-600">
-                        ⚠ Newer commit available: {indexStatus.last_indexed_commit.slice(0, 12)}
+                        {t("projection.newerCommitAvailable")} {indexStatus.last_indexed_commit.slice(0, 12)}
                       </span>
                     )}
                 </p>
@@ -488,14 +490,14 @@ export const ProjectionPage: React.FC = () => {
             <div className="flex items-center gap-2">
               {Object.keys(loadedEmbeddings).length > 0 && (
                 <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                  {scatterPoints.length} points
+                  {scatterPoints.length} {t("projection.points")}
                 </span>
               )}
               <button
                 type="button"
                 onClick={toggleDimensions}
                 className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                title="Toggle 2D/3D view"
+                title={t("projection.toggleView")}
               >
                 {dimensions === 2 ? "2D" : "3D"}
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -511,9 +513,9 @@ export const ProjectionPage: React.FC = () => {
                       ? "border-dfrntBlue-300 bg-dfrntBlue-50 text-dfrntBlue-700"
                       : "border-gray-300 text-gray-600"
                   }`}
-                  title="Toggle document/clustering embeddings"
+                  title={t("projection.toggleEmbeddingRole")}
                 >
-                  {embeddingRole === "clustering" ? "Clustering" : "Document"}
+                  {embeddingRole === "clustering" ? t("projection.clustering") : t("projection.document")}
                   <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5 5-5" />
                   </svg>
@@ -528,12 +530,12 @@ export const ProjectionPage: React.FC = () => {
         <div className="flex flex-1 flex-col">
           <div className="relative flex-1">
             {selectedTypes.size === 0 && !((projectWorkingSet && workingSetIds.size > 0) || (projectSelectionOnly && projectionSelectionIds.size > 0)) ? (
-              <PagePlaceholder>Select a document type or enable Working Set union to load embeddings.</PagePlaceholder>
+              <PagePlaceholder>{t("projection.selectTypeOrWorkingSet")}</PagePlaceholder>
             ) : embeddingsLoading ? (
               <div className="flex h-full items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
                   <div className="text-sm text-base-content/60">
-                    Loading embeddings… {streamState.loadedCount}/{streamState.totalCount || "?"}
+                    {t("projection.loadingEmbeddings")} {streamState.loadedCount}/{streamState.totalCount || "?"}
                   </div>
                   {streamState.totalCount > 0 && (
                     <progress
@@ -545,9 +547,9 @@ export const ProjectionPage: React.FC = () => {
                 </div>
               </div>
             ) : Object.keys(loadedEmbeddings).length === 0 ? (
-              <PagePlaceholder>No embeddings found. Index your documents first.</PagePlaceholder>
+              <PagePlaceholder>{t("projection.noEmbeddingsFound")}</PagePlaceholder>
             ) : isProjecting ? (
-              <PagePlaceholder>Running UMAP projection…</PagePlaceholder>
+              <PagePlaceholder>{t("projection.runningUmap")}</PagePlaceholder>
             ) : scatterPoints.length > 0 ? (
               dimensions === 3 ? (
                 <Scatter3D
@@ -579,7 +581,7 @@ export const ProjectionPage: React.FC = () => {
                 />
               )
             ) : (
-              <PagePlaceholder>No visible points. Select at least one document type.</PagePlaceholder>
+              <PagePlaceholder>{t("projection.noVisiblePoints")}</PagePlaceholder>
             )}
 
             {(() => {
@@ -591,8 +593,8 @@ export const ProjectionPage: React.FC = () => {
               if (projectionSelectionIds.size > 1) {
                 return (
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-700 backdrop-blur-sm border-t border-gray-200">
-                    {projectionSelectionIds.size} selected
-                    {projectSelectionOnly && " (projecting only selection)"}
+                    {projectionSelectionIds.size} {t("projection.selected")}
+                    {projectSelectionOnly && t("projection.projectingOnlySelection")}
                   </div>
                 );
               }
@@ -600,7 +602,7 @@ export const ProjectionPage: React.FC = () => {
               if (!displayId) {
                 return (
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-400 backdrop-blur-sm border-t border-gray-200">
-                    Click a point to view document details
+                    {t("projection.clickToViewDetails")}
                   </div>
                 );
               }
@@ -608,7 +610,7 @@ export const ProjectionPage: React.FC = () => {
               if (displayLoading) {
                 return (
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-400 backdrop-blur-sm border-t border-gray-200">
-                    Loading {displayId}…
+                    {t("common.loading")} {displayId}…
                   </div>
                 );
               }
@@ -616,7 +618,7 @@ export const ProjectionPage: React.FC = () => {
               if (!displayDoc) {
                 return (
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-white/90 px-4 py-2 text-sm text-gray-400 backdrop-blur-sm border-t border-gray-200">
-                    No document found for {displayId}
+                    {t("projection.noDocumentFound")} {displayId}
                   </div>
                 );
               }
@@ -631,7 +633,7 @@ export const ProjectionPage: React.FC = () => {
                       <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{docType}</span>
                     )}
                     {hoveredId && hoveredId !== selectedId && (
-                      <span className="text-xs text-gray-400">(hovering)</span>
+                      <span className="text-xs text-gray-400">{t("projection.hovering")}</span>
                     )}
                   </div>
                   {name && <div className="truncate text-xs text-gray-700">{name}</div>}
@@ -644,8 +646,8 @@ export const ProjectionPage: React.FC = () => {
           {projectionSelectionIds.size > 0 && (
             <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2 text-sm">
               <span className="text-gray-600">
-                {projectionSelectionIds.size} selected
-                {projectSelectionOnly && " (projecting only selection)"}
+                {projectionSelectionIds.size} {t("projection.selected")}
+                {projectSelectionOnly && t("projection.projectingOnlySelection")}
               </span>
               <button
                 className={
@@ -655,19 +657,19 @@ export const ProjectionPage: React.FC = () => {
                 }
                 onClick={handleProjectSelection}
               >
-                {projectSelectionOnly ? "Project All" : "Project Selection"}
+                {projectSelectionOnly ? t("projection.projectAll") : t("projection.projectSelection")}
               </button>
               <button
                 className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600"
                 onClick={handleClearSelection}
               >
-                Clear
+                {t("common.clear")}
               </button>
             </div>
           )}
           {projectionSelectionIds.size === 0 && scatterPoints.length > 0 && (
             <div className="border-t border-gray-100 px-4 py-1.5 text-xs text-gray-400">
-              Tip: Shift+click points to multi-select, then &ldquo;Project Selection&rdquo; to re-run UMAP on a subset.
+              {t("projection.tipShiftClick")}
             </div>
           )}
         </div>
@@ -678,7 +680,7 @@ export const ProjectionPage: React.FC = () => {
           sections={[
             {
               id: "types",
-              title: "Document Types",
+              title: t("projection.documentTypes"),
               icon: (
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75h16.5v16.5H3.75z" />
@@ -708,7 +710,7 @@ export const ProjectionPage: React.FC = () => {
             },
             {
               id: "duplicates",
-              title: "Duplicates",
+              title: t("projection.duplicates"),
               badge: showDuplicates && duplicateGroups.length > 0 ? duplicateGroups.length : undefined,
               icon: (
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -729,7 +731,7 @@ export const ProjectionPage: React.FC = () => {
             },
             {
               id: "working-set",
-              title: "Working Set",
+              title: t("projection.workingSet"),
               badge: workingSetIds.size > 0 ? workingSetIds.size : undefined,
               icon: (
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

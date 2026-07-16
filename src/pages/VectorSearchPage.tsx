@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   useDuplicatesQuery,
   useSimilarQuery,
@@ -16,6 +17,7 @@ import { distanceToPercent, similarityLabel } from "@/utils/similarity";
 type Tab = "similar" | "duplicates" | "compare";
 
 const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearchParams; setUrlSearchParams: (sp: URLSearchParams, opts?: { replace?: boolean }) => void }> = ({ routeParams, urlSearchParams, setUrlSearchParams }) => {
+  const { t } = useTranslation();
   const docId = urlSearchParams.get("id") ?? "";
   const searchText = urlSearchParams.get("text") ?? "";
   const searchMode = urlSearchParams.get("smode") ?? "doc";
@@ -66,7 +68,7 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Find documents semantically similar to a specific document or to raw text. In document mode, search for a document to find its nearest neighbours. In text mode, enter raw text to embed and find similar documents.
+        {t("vectorSearch.similarDescription")}
       </p>
 
       {/* Mode toggle */}
@@ -78,7 +80,7 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
             searchMode === "doc" ? "bg-dfrntBlue-500 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"
           }`}
         >
-          By Document
+          {t("vectorSearch.byDocument")}
         </button>
         <button
           type="button"
@@ -87,7 +89,7 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
             searchMode === "text" ? "bg-dfrntBlue-500 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"
           }`}
         >
-          By Text
+          {t("vectorSearch.byText")}
         </button>
       </div>
 
@@ -98,25 +100,25 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
               suggestPath={suggestPath}
               value={docId}
               onChange={(id) => handleSearch(id)}
-              placeholder="Search for a document…"
-              label="Source document"
+              placeholder={t("vectorSearch.searchForDocument")}
+              label={t("vectorSearch.sourceDocument")}
             />
           </div>
         ) : (
           <div className="flex-1">
-            <label htmlFor="similar-text" className="mb-1 block text-xs font-medium text-gray-500">Search text</label>
+            <label htmlFor="similar-text" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.searchText")}</label>
             <textarea
               id="similar-text"
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
-              placeholder="Enter text to find similar documents…"
+              placeholder={t("vectorSearch.enterTextToFind")}
               rows={3}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
         )}
         <div>
-          <label htmlFor="similar-count" className="mb-1 block text-xs font-medium text-gray-500">Max results</label>
+          <label htmlFor="similar-count" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.maxResults")}</label>
           <select
             id="similar-count"
             value={count}
@@ -140,7 +142,7 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
             disabled={!textInput.trim() || isFetching}
             className="rounded-md bg-dfrntBlue-500 px-4 py-2 text-sm font-medium text-white hover:bg-dfrntBlue-400 disabled:bg-gray-300"
           >
-            Search
+            {t("common.search")}
           </button>
         )}
       </div>
@@ -149,10 +151,10 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
           {"status" in error
             ? (() => {
-                const errData = "data" in error && error.data ? JSON.stringify(error.data) : "Failed to find similar documents";
-                return `Error ${error.status}: ${errData}`;
+                const errData = "data" in error && error.data ? JSON.stringify(error.data) : t("vectorSearch.failedToFindSimilar");
+                return `${t("common.error")} ${error.status}: ${errData}`;
               })()
-            : "Failed to find similar documents"}
+            : t("vectorSearch.failedToFindSimilar")}
         </div>
       )}
 
@@ -162,19 +164,19 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          Finding similar documents…
+          {t("vectorSearch.findingSimilar")}
         </div>
       )}
 
       {!isFetching && triggered && results.length === 0 && !error && (
-        <div className="py-8 text-center text-sm text-gray-500">No similar documents found.</div>
+        <div className="py-8 text-center text-sm text-gray-500">{t("vectorSearch.noSimilarFound")}</div>
       )}
 
       {results.length > 0 && (
         <div className="space-y-3">
           <div className="text-sm text-gray-500">
-            {results.length} similar document{results.length !== 1 ? "s" : ""}
-            {searchMode === "doc" && <> to <span className="font-data font-medium text-gray-700">{docId}</span></>}
+            {results.length} {t("vectorSearch.similarDocument", { count: results.length })}
+            {searchMode === "doc" && <> {t("vectorSearch.to")} <span className="font-data font-medium text-gray-700">{docId}</span></>}
           </div>
           {results.map((hit) => (
             <SearchResultCard
@@ -193,6 +195,7 @@ const SimilarTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
 };
 
 const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearchParams; setUrlSearchParams: (sp: URLSearchParams, opts?: { replace?: boolean }) => void }> = ({ routeParams, urlSearchParams, setUrlSearchParams }) => {
+  const { t } = useTranslation();
   const triggered = urlSearchParams.has("triggered");
   const urlThreshold = Number(urlSearchParams.get("threshold") ?? "0.15");
   const urlCount = Number(urlSearchParams.get("count") ?? "20");
@@ -238,11 +241,11 @@ const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSe
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Find near-identical document pairs across the dataset. Duplicates are documents with very low embedding distance, indicating likely redundant or repeated content. Filter by document type to scope the scan and speed up results.
+        {t("vectorSearch.duplicatesDescription")}
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor="dup-threshold" className="mb-1 block text-xs font-medium text-gray-500">Threshold (distance)</label>
+          <label htmlFor="dup-threshold" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.threshold")}</label>
           <input
             id="dup-threshold"
             type="number"
@@ -255,7 +258,7 @@ const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSe
           />
         </div>
         <div>
-          <label htmlFor="dup-count" className="mb-1 block text-xs font-medium text-gray-500">Max results</label>
+          <label htmlFor="dup-count" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.maxResults")}</label>
           <select
             id="dup-count"
             value={countInput}
@@ -269,14 +272,14 @@ const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSe
           </select>
         </div>
         <div>
-          <label htmlFor="dup-doctype" className="mb-1 block text-xs font-medium text-gray-500">Document type (optional)</label>
+          <label htmlFor="dup-doctype" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.documentTypeOptional")}</label>
           <select
             id="dup-doctype"
             value={docTypeInput}
             onChange={(e) => setDocTypeInput(e.target.value)}
             className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">All types</option>
+            <option value="">{t("common.allTypes")}</option>
             {docTypes.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
@@ -288,30 +291,30 @@ const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSe
           disabled={isFetching}
           className="rounded-md bg-dfrntBlue-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-dfrntBlue-400 disabled:bg-gray-300"
         >
-          {isFetching ? "Finding…" : "Find Duplicates"}
+          {isFetching ? t("vectorSearch.finding") : t("vectorSearch.findDuplicates")}
         </button>
       </div>
 
       {error && triggered && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-          {"status" in error ? `Error: ${String(error.status)}` : "Failed to find duplicates"}
+          {"status" in error ? `${t("common.error")}: ${String(error.status)}` : t("vectorSearch.failedToFindDuplicates")}
         </div>
       )}
 
       {!isFetching && triggered && results.length === 0 && !error && (
-        <div className="py-8 text-center text-sm text-gray-500">No duplicates found at this threshold.</div>
+        <div className="py-8 text-center text-sm text-gray-500">{t("vectorSearch.noDuplicatesFound")}</div>
       )}
 
       {results.length > 0 && (
         <div className="space-y-3">
-          <div className="text-sm text-gray-500">{results.length} duplicate group{results.length !== 1 ? "s" : ""}</div>
+          <div className="text-sm text-gray-500">{results.length} {t("vectorSearch.duplicateGroup", { count: results.length })}</div>
           {results.map((group, i) => {
             const groupColors = ["border-l-dfrntBlue-400", "border-l-green-400", "border-l-yellow-400", "border-l-purple-400", "border-l-pink-400"];
             const borderColor = groupColors[i % groupColors.length];
             return (
               <div key={i} className={`rounded-lg border border-gray-200 border-l-4 ${borderColor} bg-white p-4`}>
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="text-xs font-medium text-gray-500">Group {i + 1}</span>
+                  <span className="text-xs font-medium text-gray-500">{t("vectorSearch.group")} {i + 1}</span>
                   <SimilarityBadge distance={group.distance} size="lg" />
                 </div>
                 <div className="space-y-2">
@@ -334,6 +337,7 @@ const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSe
 };
 
 const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearchParams; setUrlSearchParams: (sp: URLSearchParams, opts?: { replace?: boolean }) => void }> = ({ routeParams, urlSearchParams, setUrlSearchParams }) => {
+  const { t } = useTranslation();
   const role = urlSearchParams.get("role") ?? "query";
   const sourceMode = urlSearchParams.get("smode") ?? "text";
   const targetMode = urlSearchParams.get("tmode") ?? "text";
@@ -375,7 +379,7 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
       }).unwrap();
       setResult(res);
     } catch (err: unknown) {
-      console.error("Vector search failed:", err);
+      console.error(t("vectorSearch.compareFailed"), err);
       setResult(null);
     }
   };
@@ -392,7 +396,7 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Compare two documents or text snippets by embedding distance. Each source and target can independently be set to text or document mode.
+        {t("vectorSearch.compareDescription")}
       </p>
 
       <div className="grid grid-cols-2 gap-4">
@@ -403,14 +407,14 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
               onClick={() => updateParam("smode", "text")}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${sourceMode === "text" ? "bg-dfrntBlue-500 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}
             >
-              Source: Text
+              {t("vectorSearch.sourceText")}
             </button>
             <button
               type="button"
               onClick={() => updateParam("smode", "doc")}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${sourceMode === "doc" ? "bg-dfrntBlue-500 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}
             >
-              Source: Document
+              {t("vectorSearch.sourceDocument")}
             </button>
           </div>
           {sourceMode === "doc" ? (
@@ -419,8 +423,8 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
                 suggestPath={suggestPath}
                 value={sourceDocId}
                 onChange={(id) => updateParam("source_id", id)}
-                placeholder="Select source document…"
-                label="Source document"
+                placeholder={t("vectorSearch.selectSourceDocument")}
+                label={t("vectorSearch.sourceDocument")}
               />
               {sourceEmbedding && (
                 <div className="mt-1 line-clamp-2 text-xs text-gray-400">{sourceEmbedding.slice(0, 200)}…</div>
@@ -428,12 +432,12 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
             </>
           ) : (
             <>
-              <label htmlFor="compare-source-text" className="mb-1 block text-xs font-medium text-gray-500">Source text</label>
+              <label htmlFor="compare-source-text" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.sourceText")}</label>
               <textarea
                 id="compare-source-text"
                 value={sourceText}
                 onChange={(e) => setSourceText(e.target.value)}
-                placeholder="Enter source text…"
+                placeholder={t("vectorSearch.enterSourceText")}
                 rows={4}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               />
@@ -447,14 +451,14 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
               onClick={() => updateParam("tmode", "text")}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${targetMode === "text" ? "bg-dfrntBlue-500 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}
             >
-              Target: Text
+              {t("vectorSearch.targetText")}
             </button>
             <button
               type="button"
               onClick={() => updateParam("tmode", "doc")}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${targetMode === "doc" ? "bg-dfrntBlue-500 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}
             >
-              Target: Document
+              {t("vectorSearch.targetDocument")}
             </button>
           </div>
           {targetMode === "doc" ? (
@@ -463,8 +467,8 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
                 suggestPath={suggestPath}
                 value={targetDocId}
                 onChange={(id) => updateParam("target_id", id)}
-                placeholder="Select target document…"
-                label="Target document"
+                placeholder={t("vectorSearch.selectTargetDocument")}
+                label={t("vectorSearch.targetDocument")}
               />
               {targetEmbedding && (
                 <div className="mt-1 line-clamp-2 text-xs text-gray-400">{targetEmbedding.slice(0, 200)}…</div>
@@ -472,12 +476,12 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
             </>
           ) : (
             <>
-              <label htmlFor="compare-target-text" className="mb-1 block text-xs font-medium text-gray-500">Target text</label>
+              <label htmlFor="compare-target-text" className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.targetText")}</label>
               <textarea
                 id="compare-target-text"
                 value={targetText}
                 onChange={(e) => setTargetText(e.target.value)}
-                placeholder="Enter target text…"
+                placeholder={t("vectorSearch.enterTargetText")}
                 rows={4}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               />
@@ -488,7 +492,7 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
 
       <div className="flex items-end gap-3">
         <div>
-          <span className="mb-1 block text-xs font-medium text-gray-500">Role</span>
+          <span className="mb-1 block text-xs font-medium text-gray-500">{t("vectorSearch.role")}</span>
           <div className="flex gap-1">
             {["query", "document", "clustering", "classification"].map((r) => (
               <button
@@ -512,13 +516,13 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
           disabled={isLoading || !canCompare}
           className="rounded-md bg-dfrntBlue-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-dfrntBlue-400 disabled:bg-gray-300"
         >
-          {isLoading ? "Comparing…" : "Compare"}
+          {isLoading ? t("vectorSearch.comparing") : t("vectorSearch.compare")}
         </button>
       </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-          {"status" in error ? `Error: ${String(error.status)}` : "Comparison failed"}
+          {"status" in error ? `${t("common.error")}: ${String(error.status)}` : t("vectorSearch.comparisonFailed")}
         </div>
       )}
 
@@ -541,15 +545,15 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
           </div>
           <div className="space-y-2">
             <div>
-              <span className="text-xs font-medium text-gray-500">Similarity</span>
+              <span className="text-xs font-medium text-gray-500">{t("vectorSearch.similarity")}</span>
               <p className="text-lg font-semibold text-gray-900">{label}</p>
             </div>
             <div>
-              <span className="text-xs font-medium text-gray-500">Distance</span>
+              <span className="text-xs font-medium text-gray-500">{t("vectorSearch.distance")}</span>
               <p className="font-data text-sm text-gray-700">{result.distance.toFixed(4)}</p>
             </div>
             <div>
-              <span className="text-xs font-medium text-gray-500">Role</span>
+              <span className="text-xs font-medium text-gray-500">{t("vectorSearch.role")}</span>
               <p className="text-sm font-medium text-gray-700">{result.source_role ?? role}</p>
             </div>
           </div>
@@ -560,17 +564,18 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
 };
 
 export const VectorSearchPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const tab = (urlSearchParams.get("mode") as Tab) ?? "similar";
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
 
   const modes: ReadonlyArray<{ id: Tab; label: string; description: string; icon: React.ReactNode }> = [
     {
       id: "similar",
-      label: "Similar",
-      description: "Find semantically related documents",
+      label: t("vectorSearch.similar"),
+      description: t("vectorSearch.similarTabDescription"),
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
@@ -579,8 +584,8 @@ export const VectorSearchPage: React.FC = () => {
     },
     {
       id: "duplicates",
-      label: "Duplicates",
-      description: "Discover near-identical content",
+      label: t("vectorSearch.duplicates"),
+      description: t("vectorSearch.duplicatesTabDescription"),
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-.975M15.75 17.25h-.975m-7.5 0v3.375c0 .621.504 1.125 1.125 1.125H9.75m-2.475 0H9.75m0 0v-3.375m0 0c0-.621.504-1.125 1.125-1.125h.975M9.75 17.25h.975m0 0v3.375m0-3.375c0-.621.504-1.125 1.125-1.125h.975m-.975 0h.975" />
@@ -589,8 +594,8 @@ export const VectorSearchPage: React.FC = () => {
     },
     {
       id: "compare",
-      label: "Compare",
-      description: "Compare data products by embedding",
+      label: t("vectorSearch.compare"),
+      description: t("vectorSearch.compareTabDescription"),
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -609,9 +614,9 @@ export const VectorSearchPage: React.FC = () => {
     <PageShell
       header={
         <PageHeader>
-          <h2 className="text-lg font-semibold text-gray-900">Vector Search</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("vectorSearch.title")}</h2>
           <p className="mt-0.5 text-sm text-gray-500">
-            Find similar documents, discover duplicates, resolve entities, and compare data products using embedding-based similarity.
+            {t("vectorSearch.description")}
           </p>
         </PageHeader>
       }

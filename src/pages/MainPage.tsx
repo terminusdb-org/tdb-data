@@ -1,7 +1,9 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useRouteParams, SearchBar } from "@/components";
 
 export const MainPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const hasContext = !!routeParams;
 
@@ -11,12 +13,14 @@ export const MainPage: React.FC = () => {
         <h1 className="mb-4 text-center text-2xl font-bold text-gray-900">
           {hasContext
             ? `${routeParams!.org}/${routeParams!.team}`
-            : "Data Explorer"}
+            : t("mainPage.dataExplorer")}
         </h1>
         <p className="mb-6 text-center text-sm text-gray-500">
           {hasContext
-            ? `Search documents in ${routeParams!.refType === "branch" ? `branch "${routeParams!.refName}"` : `commit "${routeParams!.refName}"`}`
-            : "Select a data product from the sidebar or navigate to a data product URL"}
+            ? routeParams!.refType === "branch"
+              ? t("mainPage.searchInBranch", { name: routeParams!.refName })
+              : t("mainPage.searchInCommit", { name: routeParams!.refName })
+            : t("mainPage.selectDataProductPrompt")}
         </p>
         <SearchBar />
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useSuggestQuery } from "@/store";
 import type { SuggestResponse } from "@/types/terminusdb";
 
@@ -14,9 +15,10 @@ export const DocumentPicker: React.FC<DocumentPickerProps> = ({
   suggestPath,
   value,
   onChange,
-  placeholder = "Search for a document…",
+  placeholder,
   label,
 }) => {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState(value);
   const [debounced, setDebounced] = useState(value);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -116,7 +118,7 @@ export const DocumentPicker: React.FC<DocumentPickerProps> = ({
           onChange={(e) => { setInputValue(e.target.value); setShowDropdown(true); }}
           onFocus={() => setShowDropdown(true)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t("documentPicker.placeholder")}
           className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm font-data text-gray-900 placeholder-gray-400 focus:border-dfrntBlue-400 focus:ring-2 focus:ring-dfrntBlue-100"
         />
         {isFetching && (
@@ -149,7 +151,7 @@ export const DocumentPicker: React.FC<DocumentPickerProps> = ({
               tabIndex={0}
             >
               <span className="font-medium text-gray-900">{c}</span>
-              <span className="ml-2 text-xs text-gray-400">completion</span>
+              <span className="ml-2 text-xs text-gray-400">{t("common.completion")}</span>
             </div>
           ))}
           {hits.map((h, i) => {
@@ -164,7 +166,7 @@ export const DocumentPicker: React.FC<DocumentPickerProps> = ({
                 tabIndex={0}
               >
                 <span className="font-data font-medium text-gray-900">{h.id}</span>
-                <span className="ml-2 text-xs text-gray-400">{h.doc_type ?? "doc"}</span>
+                <span className="ml-2 text-xs text-gray-400">{h.doc_type ?? t("common.doc")}</span>
               </div>
             );
           })}

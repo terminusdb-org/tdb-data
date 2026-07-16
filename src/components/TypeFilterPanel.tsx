@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { TypeColor } from "@/utils/typeColors";
 import { ProjectionSearchBar } from "./ProjectionSearchBar";
 
@@ -47,12 +48,13 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
   onHighlightIds,
   onAddToWorkingSet,
 }) => {
+  const { t } = useTranslation();
   const [searchExpanded, setSearchExpanded] = useState(false);
   return (
     <div className="p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Document Types
+          {t("search.documentTypes")}
           {isLoading && (
             <span className="ml-1 inline-block h-2.5 w-2.5 animate-spin rounded-full border border-gray-300 border-t-dfrntBlue-500 align-middle" />
           )}
@@ -62,14 +64,14 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
             className="text-xs text-gray-400 hover:text-gray-600"
             onClick={onSelectAll}
           >
-            All
+            {t("search.all")}
           </button>
           <span className="text-xs text-gray-300">|</span>
           <button
             className="text-xs text-gray-400 hover:text-gray-600"
             onClick={onSelectNone}
           >
-            None
+            {t("search.none")}
           </button>
         </div>
       </div>
@@ -104,7 +106,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
 
       {types.length === 0 && (
         <div className="py-4 text-center text-xs text-gray-400">
-          No types available
+          {t("typeFilterPanel.noTypesAvailable")}
         </div>
       )}
 
@@ -115,7 +117,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
             className={`flex cursor-pointer items-center gap-2 text-sm ${
               workingSetCount > 0 ? "text-gray-700" : "text-gray-400"
             }`}
-            title="Include working set documents in the projection (union with selected types)"
+            title={t("typeFilterPanel.workingSetTitle")}
           >
             <input
               type="checkbox"
@@ -124,7 +126,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
               onChange={onToggleProjectWorkingSet}
               disabled={workingSetCount === 0}
             />
-            <span className="flex-1 truncate">Working Set (union)</span>
+            <span className="flex-1 truncate">{t("typeFilterPanel.workingSetUnion")}</span>
             <span className="text-xs text-gray-400 tabular-nums">{workingSetCount}</span>
           </label>
         </>
@@ -137,7 +139,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
             className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-400 hover:text-gray-600"
             onClick={() => setSearchExpanded((v) => !v)}
           >
-            <span>Search</span>
+            <span>{t("common.search")}</span>
             <svg
               className="h-3 w-3 transition-transform"
               style={{ transform: searchExpanded ? "rotate(180deg)" : "none" }}
@@ -165,7 +167,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
       <div className="my-3 border-t border-gray-100" />
 
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-        Filter Mode
+        {t("typeFilterPanel.filterMode")}
       </div>
       <div className="mb-3 flex gap-1">
         <button
@@ -176,7 +178,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
           }
           onClick={() => onFilterModeChange("visual")}
         >
-          Visual Filter
+          {t("typeFilterPanel.visualFilter")}
         </button>
         <button
           className={
@@ -186,7 +188,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
           }
           onClick={() => onFilterModeChange("reproject")}
         >
-          Re-project
+          {t("typeFilterPanel.reproject")}
         </button>
       </div>
 
@@ -196,7 +198,7 @@ export const TypeFilterPanel: React.FC<TypeFilterPanelProps> = ({
           onClick={onReproject}
           disabled={isProjecting}
         >
-          {isProjecting ? "Projecting…" : "Re-project Now"}
+          {isProjecting ? t("typeFilterPanel.projecting") : t("typeFilterPanel.reprojectNow")}
         </button>
       )}
     </div>

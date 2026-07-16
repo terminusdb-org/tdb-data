@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/store";
 import { useRouteParams, PageShell, PageHeader, btnSecondary } from "@/components";
 import { config } from "@/config";
@@ -24,6 +25,7 @@ const INITIAL_COUNT = 1000;
 const LOAD_MORE_COUNT = 1000;
 
 export const BranchHistoryPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const navigate = useNavigate();
   const credentials = useAppSelector((state) => state.auth.credentials);
@@ -187,9 +189,9 @@ export const BranchHistoryPage: React.FC = () => {
       <PageHeader>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Commit History</h1>
+            <h1 className="text-lg font-semibold text-gray-900">{t("branchHistory.title")}</h1>
             <p className="text-sm text-gray-500">
-              {org}/{team} — branch {branchName}
+              {org}/{team} — {t("branchHistory.branch")} {branchName}
             </p>
           </div>
           {currentCommitId && (
@@ -197,9 +199,9 @@ export const BranchHistoryPage: React.FC = () => {
               type="button"
               onClick={navigateToBranchHistory}
               className={btnSecondary}
-              title={`Back to branch ${branchName} history`}
+              title={t("branchHistory.backToBranch", { branch: branchName })}
             >
-              Back to branch
+              {t("branchHistory.backToBranchButton")}
             </button>
           )}
         </div>
@@ -212,14 +214,14 @@ export const BranchHistoryPage: React.FC = () => {
         )}
 
         {loading && mergedCommits.length === 0 ? (
-          <p className="text-sm text-gray-400">Loading commits…</p>
+          <p className="text-sm text-gray-400">{t("branchHistory.loadingCommits")}</p>
         ) : mergedCommits.length === 0 && !error ? (
-          <p className="text-sm text-gray-400">No commits found.</p>
+          <p className="text-sm text-gray-400">{t("branchHistory.noCommitsFound")}</p>
         ) : (
           <>
             <div className="mb-3 text-xs text-gray-500">
-              Showing {mergedCommits.length} commit{mergedCommits.length !== 1 ? "s" : ""} (newest first)
-              {currentCommitId && <span className="ml-2 text-amber-600">— viewing commit {currentCommitId.slice(0, 12)}</span>}
+              {t("branchHistory.showingCommits", { count: mergedCommits.length })}
+              {currentCommitId && <span className="ml-2 text-amber-600">— {t("branchHistory.viewingCommit", { id: currentCommitId.slice(0, 12) })}</span>}
             </div>
             <div className="space-y-0">
               {mergedCommits.map((entry, idx) => {
@@ -250,16 +252,16 @@ export const BranchHistoryPage: React.FC = () => {
                               ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
                               : "bg-gray-100 text-gray-700 hover:bg-dfrntBlue-50 hover:text-dfrntBlue-700"
                           }`}
-                          title={`View data at commit ${entry.identifier.slice(0, 12)}`}
+                          title={t("branchHistory.viewDataAtCommit", { id: entry.identifier.slice(0, 12) })}
                         >
                           {entry.identifier.slice(0, 12)}
                         </button>
                         <span className="text-sm font-medium text-gray-900">
-                          {entry.message || "(no message)"}
+                          {entry.message || t("branchHistory.noMessage")}
                         </span>
                         {isCurrent && (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            viewing
+                            {t("branchHistory.viewing")}
                           </span>
                         )}
                         {isLatest && !isCurrent && (
@@ -267,9 +269,9 @@ export const BranchHistoryPage: React.FC = () => {
                             type="button"
                             onClick={navigateToBranch}
                             className="rounded-full bg-dfrntBlue-100 px-2 py-0.5 text-xs font-medium text-dfrntBlue-700 hover:bg-dfrntBlue-200"
-                            title={`Go to branch ${branchName} head`}
+                            title={t("branchHistory.goToBranchHead", { branch: branchName })}
                           >
-                            latest
+                            {t("branchHistory.latest")}
                           </button>
                         )}
                       </div>
@@ -293,7 +295,7 @@ export const BranchHistoryPage: React.FC = () => {
                     disabled={loading}
                     className={btnSecondary}
                   >
-                    {loading ? "Loading…" : `Load ${LOAD_MORE_COUNT} more`}
+                    {loading ? t("common.loading") : t("branchHistory.loadMore", { count: LOAD_MORE_COUNT })}
                   </button>
                 )}
                 <button
@@ -302,7 +304,7 @@ export const BranchHistoryPage: React.FC = () => {
                   disabled={loading}
                   className={btnSecondary}
                 >
-                  {loading ? "Loading…" : "Load all"}
+                  {loading ? t("common.loading") : t("branchHistory.loadAll")}
                 </button>
               </div>
             )}

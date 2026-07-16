@@ -1,5 +1,6 @@
 import React from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, logout, useAppSelector, selectLatestCommitId, selectConnectionStatus } from "@/store";
 
 interface RailItem {
@@ -80,18 +81,18 @@ const historyIcon = (
 );
 
 const allItems: ReadonlyArray<RailItem> = [
-  { label: "Search", segment: "", icon: searchIcon },
-  { label: "Explore", segment: "doctypes", icon: exploreIcon },
-  { label: "Schema", segment: "schema", icon: schemaIcon },
-  { label: "Embeddings", segment: "embeddings", icon: embeddingsIcon },
-  { label: "Documents", segment: "documents", icon: documentsIcon },
-  { label: "Raw JSON", segment: "raw", icon: rawJsonIcon },
-  { label: "GraphQL", segment: "graphql", icon: graphqlIcon },
-  { label: "Vector Search", segment: "vector-search", icon: vectorSearchIcon },
-  { label: "Entity Resolution", segment: "entity-resolution", icon: entityResolutionIcon },
-  { label: "Projection", segment: "projection", icon: embeddingsIcon },
-  { label: "Context", segment: "context", icon: contextIcon },
-  { label: "History", segment: "history", icon: historyIcon },
+  { label: "nav.search", segment: "", icon: searchIcon },
+  { label: "nav.explore", segment: "doctypes", icon: exploreIcon },
+  { label: "nav.schema", segment: "schema", icon: schemaIcon },
+  { label: "nav.embeddings", segment: "embeddings", icon: embeddingsIcon },
+  { label: "nav.documents", segment: "documents", icon: documentsIcon },
+  { label: "nav.rawJson", segment: "raw", icon: rawJsonIcon },
+  { label: "nav.graphql", segment: "graphql", icon: graphqlIcon },
+  { label: "nav.vectorSearch", segment: "vector-search", icon: vectorSearchIcon },
+  { label: "nav.entityResolution", segment: "entity-resolution", icon: entityResolutionIcon },
+  { label: "nav.projection", segment: "projection", icon: embeddingsIcon },
+  { label: "nav.context", segment: "context", icon: contextIcon },
+  { label: "nav.history", segment: "history", icon: historyIcon },
 ];
 
 export interface IconRailProps {
@@ -99,6 +100,7 @@ export interface IconRailProps {
 }
 
 export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
+  const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -143,18 +145,19 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col items-center overflow-y-auto py-2" aria-label="Main navigation">
+      <nav className="flex flex-1 flex-col items-center overflow-y-auto py-2" aria-label={t("nav.mainNavigation")}>
         {allItems.map((item) => {
           const isActive = currentSegment === item.segment;
           const path = buildPath(item.segment);
           const isDisabled = !hasContext;
+          const label = t(item.label);
           return (
             <button
               key={item.label}
               type="button"
               disabled={isDisabled}
-              title={item.label}
-              aria-label={item.label}
+              title={label}
+              aria-label={label}
               aria-current={isActive ? "page" : undefined}
               onClick={() => {
                 navigate(path);
@@ -170,7 +173,7 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
             >
               {item.icon}
               <span className="pointer-events-none absolute left-12 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                {item.label}
+                {label}
               </span>
               {isActive && (
                 <span className="absolute -left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-full bg-dfrntBlue-600" />
@@ -197,8 +200,8 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         )}
         <button
           type="button"
-          title="All data products"
-          aria-label="All data products"
+          title={t("nav.allDataProducts")}
+          aria-label={t("nav.allDataProducts")}
           onClick={() => {
             navigate("/");
             onNavigate?.();
@@ -211,8 +214,8 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         </button>
         <button
           type="button"
-          title={`Sign out (${username})`}
-          aria-label={`Sign out (${username})`}
+          title={t("nav.signOutWithUser", { username })}
+          aria-label={t("nav.signOutWithUser", { username })}
           onClick={() => {
             dispatch(logout());
             navigate("/login", { replace: true });

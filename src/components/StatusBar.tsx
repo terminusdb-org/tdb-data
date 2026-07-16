@@ -1,10 +1,12 @@
 import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetIndexStatusQuery, useGetSchemaQuery, useGraphqlDocumentCountQuery } from "@/store";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import { isSubdocument, type SchemaClass } from "@/types/terminusdb";
 
 export const StatusBar: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
 
@@ -54,7 +56,7 @@ export const StatusBar: React.FC = () => {
   if (!routeParams) {
     return (
       <footer className="flex h-8 items-center border-t border-gray-200 bg-white px-4 text-xs text-gray-400">
-        Select a data product to view statistics
+        {t("statusBar.selectDataProduct")}
       </footer>
     );
   }
@@ -76,26 +78,26 @@ export const StatusBar: React.FC = () => {
       </span>
       <span className="hidden text-gray-300 sm:inline">|</span>
       <button type="button" onClick={handleClick("index-stats")} className="hover:text-dfrntBlue-600 hover:underline">
-        Documents:{" "}
+        {t("statusBar.documentsLabel")}{" "}
         <span className="font-data font-medium text-gray-700">
           {documentCount !== null ? documentCount.toLocaleString() : "—"}
         </span>
       </button>
       <button type="button" onClick={handleClick("index-stats")} className="hidden hover:text-dfrntBlue-600 hover:underline sm:inline">
-        Indexed:{" "}
+        {t("statusBar.indexedLabel")}{" "}
         <span className="font-data font-medium text-gray-700">
           {indexStatus?.engine?.searchable_documents != null ? indexStatus.engine.searchable_documents.toLocaleString() : "—"}
         </span>
       </button>
       <span className="hidden text-gray-300 sm:inline">|</span>
       <button type="button" onClick={handleClick("doctypes")} className="hidden hover:text-dfrntBlue-600 hover:underline sm:inline">
-        Types: <span className="font-data font-medium">{docTypes.length > 0 ? docTypes.length : "—"}</span>
+        {t("statusBar.typesLabel")} <span className="font-data font-medium">{docTypes.length > 0 ? docTypes.length : "—"}</span>
       </button>
       <button type="button" onClick={handleClick("documents")} className="hidden hover:text-dfrntBlue-600 hover:underline md:inline">
-        Documents
+        {t("nav.documents")}
       </button>
       <button type="button" onClick={handleClick("raw")} className="hidden hover:text-dfrntBlue-600 hover:underline md:inline">
-        Raw JSON
+        {t("nav.rawJson")}
       </button>
     </footer>
   );

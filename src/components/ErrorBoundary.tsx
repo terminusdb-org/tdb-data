@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import i18n from "@/i18n";
 
 interface ErrorBoundaryProps {
   readonly children: ReactNode;
@@ -21,7 +22,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error("ErrorBoundary caught:", error, errorInfo);
+    console.error(i18n.t("errorBoundary.caught"), error, errorInfo);
   }
 
   handleReset = (): void => {
@@ -52,11 +53,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 />
               </svg>
               <h1 className="text-lg font-semibold text-gray-900">
-                Something went wrong
+                {i18n.t("errorBoundary.somethingWentWrong")}
               </h1>
             </div>
             <p className="mb-4 text-sm text-gray-600">
-              An unexpected error occurred. Try reloading the page, or click below to reset.
+              {i18n.t("errorBoundary.unexpectedError")}
             </p>
             {this.state.error && (
               <pre className="mb-4 max-h-32 overflow-auto rounded bg-gray-100 p-3 text-xs text-gray-700">
@@ -69,14 +70,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 onClick={() => window.location.reload()}
                 className="rounded-md bg-dfrntBlue-600 px-4 py-2 text-sm font-medium text-white hover:bg-dfrntBlue-700"
               >
-                Reload Page
+                {i18n.t("errorBoundary.reloadPage")}
               </button>
               <button
                 type="button"
                 onClick={this.handleReset}
                 className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
               >
-                Try Again
+                {i18n.t("errorBoundary.tryAgain")}
               </button>
             </div>
           </div>

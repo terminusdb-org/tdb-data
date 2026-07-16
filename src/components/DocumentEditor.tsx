@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import type { TerminusDBDocument } from "@/types/terminusdb";
@@ -28,6 +29,7 @@ const MONACO_OPTIONS = {
 };
 
 export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCancel, saving }) => {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
   const [valid, setValid] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -80,22 +82,22 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
         if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? "Save failed";
+          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("documentEditor.saveFailed");
           setSaveError(String(msg));
         } else {
-          setSaveError(String(data ?? "Save failed"));
+          setSaveError(t("documentEditor.saveFailed"));
         }
       } else {
-        setSaveError("Save failed");
+        setSaveError(t("documentEditor.saveFailed"));
       }
     }
   };
 
   const tabs: ReadonlyArray<{ id: EditorTab; label: string }> = [
-    { id: "json", label: "JSON" },
-    { id: "markdown", label: "Markdown" },
-    { id: "embedding", label: "Embedding" },
-    { id: "similar", label: "Similar" },
+    { id: "json", label: t("documentEditor.json") },
+    { id: "markdown", label: t("documentEditor.markdown") },
+    { id: "embedding", label: t("documentEditor.embedding") },
+    { id: "similar", label: t("documentEditor.similar") },
   ];
 
   return (
@@ -123,7 +125,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
             onClick={onCancel}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -131,7 +133,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
             disabled={!valid || saving}
             className="rounded-md bg-dfrntBlue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-dfrntBlue-400 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("documentEditor.saving") : t("common.save")}
           </button>
         </div>
       </div>
@@ -167,7 +169,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
             />
             {!valid && (
               <div className="absolute bottom-4 left-4 rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700">
-                Invalid JSON — fix errors before saving
+                {t("documentEditor.invalidJson")}
               </div>
             )}
             {valid && saveError && (
@@ -180,10 +182,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
 
         {activeTab === "markdown" && (
           <div className="flex-1 overflow-auto p-4">
-            {markdownFetching && <div className="text-sm text-gray-500">Loading markdown…</div>}
+            {markdownFetching && <div className="text-sm text-gray-500">{t("documentEditor.loadingMarkdown")}</div>}
             {markdownErr && !markdownFetching && (
               <div className="text-sm text-red-600">
-                Failed to load markdown: {"status" in markdownErr ? String(markdownErr.status) : "Unknown error"}
+                {t("documentEditor.failedToLoadMarkdown")} {"status" in markdownErr ? String(markdownErr.status) : t("common.unknown")}
               </div>
             )}
             {markdownText && !markdownFetching && !markdownErr && (
@@ -192,17 +194,17 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
               </div>
             )}
             {!markdownText && !markdownFetching && !markdownErr && (
-              <div className="text-sm text-gray-400">No markdown available for this document.</div>
+              <div className="text-sm text-gray-400">{t("documentEditor.noMarkdown")}</div>
             )}
           </div>
         )}
 
         {activeTab === "embedding" && (
           <div className="flex-1 overflow-auto p-4">
-            {embeddingFetching && <div className="text-sm text-gray-500">Fetching embedding text…</div>}
+            {embeddingFetching && <div className="text-sm text-gray-500">{t("documentEditor.fetchingEmbedding")}</div>}
             {embeddingErr && !embeddingFetching && (
               <div className="text-sm text-red-600">
-                Failed to load embedding: {"status" in embeddingErr ? String(embeddingErr.status) : "Unknown error"}
+                {t("documentEditor.failedToLoadEmbedding")} {"status" in embeddingErr ? String(embeddingErr.status) : t("common.unknown")}
               </div>
             )}
             {embeddingText && !embeddingFetching && !embeddingErr && (
@@ -211,7 +213,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
               </pre>
             )}
             {!embeddingText && !embeddingFetching && !embeddingErr && (
-              <div className="text-sm text-gray-400">No embedding text available for this document.</div>
+              <div className="text-sm text-gray-400">{t("documentEditor.noEmbeddingText")}</div>
             )}
           </div>
         )}
@@ -229,7 +231,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
         )}
 
         {activeTab === "similar" && (!routeParams || !docId) && (
-          <div className="p-4 text-sm text-gray-400">Save the document first to find similar documents.</div>
+          <div className="p-4 text-sm text-gray-400">{t("documentEditor.saveFirst")}</div>
         )}
       </div>
     </div>

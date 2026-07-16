@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   useCandidatesMutation,
   useGetSchemaQuery,
@@ -204,6 +205,7 @@ const stageColors: Record<string, string> = {
 };
 
 export const EntityResolutionPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -322,7 +324,7 @@ export const EntityResolutionPage: React.FC = () => {
       dispatch(setLexicalScores(scores));
     } catch (err) {
       dispatch(setCandidates(null));
-      dispatch(setCandidatesError("status" in (err as object) ? `Error: ${String((err as { status: unknown }).status)}` : "Failed to load candidates"));
+      dispatch(setCandidatesError("status" in (err as object) ? `${t("common.error")}: ${String((err as { status: unknown }).status)}` : t("entityResolution.failedToLoadCandidates")));
     } finally {
       dispatch(setCandidatesLoading(false));
       setLoadStartTime(null);
@@ -377,7 +379,7 @@ export const EntityResolutionPage: React.FC = () => {
       const perfect = parsePerfectMatchCSV(text);
       if (perfect.length === 0) {
         dispatch(setPerfectMatches(null));
-        dispatch(setCsvError("CSV must have a header row with 'set_id' and 'target_id' columns, followed by at least one data row."));
+        dispatch(setCsvError(t("entityResolution.csvFormatError")));
         dispatch(setCsvFileName(null));
         return;
       }
@@ -385,7 +387,7 @@ export const EntityResolutionPage: React.FC = () => {
       dispatch(setCsvFileName(file.name));
     };
     reader.onerror = () => {
-      dispatch(setCsvError("Failed to read file."));
+      dispatch(setCsvError(t("entityResolution.failedToReadFile")));
       dispatch(setPerfectMatches(null));
       dispatch(setCsvFileName(null));
     };
@@ -431,39 +433,39 @@ export const EntityResolutionPage: React.FC = () => {
           path: docPath,
           id: TRIAL_DOC_ID,
           document: doc as unknown as { "@id": string; "@type": string; [key: string]: unknown },
-          author: "admin",
-          message: "Save ER trial",
+          author: t("common.admin"),
+          message: t("entityResolution.saveTrialMessage"),
         }).unwrap();
       } catch {
         await insertTrial({
           path: docPath,
           document: doc as unknown as { "@id": string; "@type": string; [key: string]: unknown },
-          author: "admin",
-          message: "Save ER trial",
+          author: t("common.admin"),
+          message: t("entityResolution.saveTrialMessage"),
         }).unwrap();
       }
       setSaveSuccess(true);
       setTrialLabel("");
       refetchTrials();
     } catch (err) {
-      setSaveError("status" in (err as object) ? `Error: ${String((err as { status: unknown }).status)}` : "Failed to save trial");
+      setSaveError("status" in (err as object) ? `${t("common.error")}: ${String((err as { status: unknown }).status)}` : t("entityResolution.failedToSaveTrial"));
     }
   };
 
   const handleDeleteTrial = async (trialTimestamp: string) => {
     try {
-      const updatedTrials = trials.filter((t) => t.timestamp !== trialTimestamp);
+      const updatedTrials = trials.filter((trial) => trial.timestamp !== trialTimestamp);
       const doc = buildTrialDocument(updatedTrials);
       await replaceTrial({
         path: docPath,
         id: TRIAL_DOC_ID,
         document: doc as unknown as { "@id": string; "@type": string; [key: string]: unknown },
-        author: "admin",
-        message: "Delete ER trial",
+        author: t("common.admin"),
+        message: t("entityResolution.deleteTrialMessage"),
       }).unwrap();
       refetchTrials();
     } catch (err: unknown) {
-      console.error("Failed to delete ER trial:", err);
+      console.error(t("entityResolution.failedToDeleteTrial"), err);
     }
   };
 
@@ -523,15 +525,15 @@ export const EntityResolutionPage: React.FC = () => {
     return buckets;
   }, [resolveResult, candidates, blendAlpha]);
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
 
   return (
     <PageShell
       header={
         <PageHeader>
-          <h2 className="text-lg font-semibold text-gray-900">Entity Resolution Tuning</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("entityResolution.title")}</h2>
           <p className="mt-0.5 text-sm text-gray-500">
-            Load KNN candidates once, then tune matching parameters locally for instant feedback. Lexical signals (Jaccard, rare tokens) boost effective similarity.
+            {t("entityResolution.description")}
           </p>
         </PageHeader>
       }
@@ -543,30 +545,30 @@ export const EntityResolutionPage: React.FC = () => {
             {/* Source/Target type selectors */}
             <div className="space-y-2">
               <div>
-                <label htmlFor="er-source-type" className="mb-1 block text-xs font-medium text-gray-500">Source type</label>
+                <label htmlFor="er-source-type" className="mb-1 block text-xs font-medium text-gray-500">{t("entityResolution.sourceType")}</label>
                 <select
                   id="er-source-type"
                   value={setDocType}
                   onChange={(e) => updateParam("setType", e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                 >
-                  <option value="">All types</option>
-                  {docTypes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                  <option value="">{t("common.allTypes")}</option>
+                  {docTypes.map((dt) => (
+                    <option key={dt} value={dt}>{dt}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label htmlFor="er-target-type" className="mb-1 block text-xs font-medium text-gray-500">Target type</label>
+                <label htmlFor="er-target-type" className="mb-1 block text-xs font-medium text-gray-500">{t("entityResolution.targetType")}</label>
                 <select
                   id="er-target-type"
                   value={targetDocType}
                   onChange={(e) => updateParam("targetType", e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                 >
-                  <option value="">All types</option>
-                  {docTypes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                  <option value="">{t("common.allTypes")}</option>
+                  {docTypes.map((dt) => (
+                    <option key={dt} value={dt}>{dt}</option>
                   ))}
                 </select>
               </div>
@@ -575,7 +577,7 @@ export const EntityResolutionPage: React.FC = () => {
             {/* K + Threshold */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label htmlFor="er-k" className="mb-1 block text-xs font-medium text-gray-500">K (neighbors)</label>
+                <label htmlFor="er-k" className="mb-1 block text-xs font-medium text-gray-500">{t("entityResolution.kNeighbors")}</label>
                 <input
                   id="er-k"
                   type="number" min={1} max={50} value={k}
@@ -584,7 +586,7 @@ export const EntityResolutionPage: React.FC = () => {
                 />
               </div>
               <div className="flex-1">
-                <label htmlFor="er-threshold" className="mb-1 block text-xs font-medium text-gray-500">Threshold</label>
+                <label htmlFor="er-threshold" className="mb-1 block text-xs font-medium text-gray-500">{t("entityResolution.threshold")}</label>
                 <input
                   id="er-threshold"
                   type="number" step={0.01} min={0} max={1} value={threshold}
@@ -596,64 +598,64 @@ export const EntityResolutionPage: React.FC = () => {
 
             {/* Tau sliders */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Tau Thresholds</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t("entityResolution.tauThresholds")}</div>
               <p className="text-xs text-gray-500">
-                Tau controls how close two documents must be to match. Lower tau = stricter matching (fewer matches, higher precision). The Threshold above controls how many candidates are fetched from the search engine; tau controls which of those candidates become matches.
+                {t("entityResolution.tauDescription")}
               </p>
-              <SliderControl label="τ 1:1 (core)" value={tauOneToOne} onChange={(v) => updateParam("tau1to1", String(v))} />
-              <p className="text-xs text-gray-400">Core: mutual nearest neighbours within this distance form 1:1 matches.</p>
-              <SliderControl label="τ 1:N (set extra)" value={tauOneToMany} onChange={(v) => updateParam("tau1toN", String(v))} />
-              <p className="text-xs text-gray-400">Set extra: additional targets matched to each set document beyond the core.</p>
-              <SliderControl label="τ N:1 (target extra)" value={tauManyToOne} onChange={(v) => updateParam("tauNto1", String(v))} />
-              <p className="text-xs text-gray-400">Target extra: additional set documents matched to each target beyond the core.</p>
+              <SliderControl label={t("entityResolution.tauOneToOne")} value={tauOneToOne} onChange={(v) => updateParam("tau1to1", String(v))} />
+              <p className="text-xs text-gray-400">{t("entityResolution.tau1to1Description")}</p>
+              <SliderControl label={t("entityResolution.tauOneToMany")} value={tauOneToMany} onChange={(v) => updateParam("tau1toN", String(v))} />
+              <p className="text-xs text-gray-400">{t("entityResolution.tau1toNDescription")}</p>
+              <SliderControl label={t("entityResolution.tauManyToOne")} value={tauManyToOne} onChange={(v) => updateParam("tauNto1", String(v))} />
+              <p className="text-xs text-gray-400">{t("entityResolution.tauNto1Description")}</p>
             </div>
 
             {/* Blend slider */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Distance Blending</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t("entityResolution.distanceBlending")}</div>
               <SliderControl
-                label="Clustering ←→ Document"
+                label={t("entityResolution.clusteringDocument")}
                 value={blendAlpha}
                 onChange={(v) => updateParam("blend", String(v))}
                 format={(v) => `${Math.round(v * 100)}% doc`}
               />
               {!hasClustering && candidates && (
-                <p className="text-xs text-amber-600">Clustering distances not available — showing document distances only.</p>
+                <p className="text-xs text-amber-600">{t("entityResolution.clusteringNotAvailable")}</p>
               )}
             </div>
 
             {/* Lexical sliders */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Lexical Boost</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t("entityResolution.lexicalBoost")}</div>
               <p className="text-xs text-gray-500">
-                Lexical signals reduce the effective distance for pairs that share text similarity, pulling them below the tau thresholds.
+                {t("entityResolution.lexicalBoostDescription")}
               </p>
               <SliderControl
-                label="Jaccard Boost"
+                label={t("entityResolution.jaccardBoost")}
                 value={jaccardWeight}
                 onChange={(v) => updateParam("jaccard", String(v))}
                 format={(v) => `${Math.round(v * 100)}%`}
               />
               <p className="text-xs text-gray-400">
-                Jaccard measures word overlap between two documents. Higher boost = pairs sharing more words get pulled closer together (lower effective distance), making them more likely to match.
+                {t("entityResolution.jaccardDescription")}
               </p>
               <SliderControl
-                label="Rare Token Boost"
+                label={t("entityResolution.rareTokenBoost")}
                 value={rareTokenWeight}
                 onChange={(v) => updateParam("rareToken", String(v))}
                 format={(v) => `${Math.round(v * 100)}%`}
               />
               <p className="text-xs text-gray-400">
-                Rare tokens are uncommon words (e.g. model numbers, brand names) that appear in few documents. Sharing rare words is a stronger match signal than sharing common words. Higher boost = pairs sharing rare words get pulled closer.
+                {t("entityResolution.rareTokenDescription")}
               </p>
             </div>
 
             {/* Presets */}
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => applyPreset("loose")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">Loose</button>
-              <button type="button" onClick={() => applyPreset("balanced")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">Balanced</button>
-              <button type="button" onClick={() => applyPreset("strict")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">Strict</button>
-              <button type="button" onClick={() => applyPreset("lexical")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">Lexical</button>
+              <button type="button" onClick={() => applyPreset("loose")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">{t("entityResolution.loose")}</button>
+              <button type="button" onClick={() => applyPreset("balanced")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">{t("entityResolution.balanced")}</button>
+              <button type="button" onClick={() => applyPreset("strict")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">{t("entityResolution.strict")}</button>
+              <button type="button" onClick={() => applyPreset("lexical")} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">{t("entityResolution.lexical")}</button>
             </div>
 
             {/* Load candidates + demo */}
@@ -664,7 +666,7 @@ export const EntityResolutionPage: React.FC = () => {
                 disabled={candidatesLoading}
                 className="flex-1 rounded-md bg-dfrntBlue-500 px-4 py-2 text-sm font-medium text-white hover:bg-dfrntBlue-400 disabled:bg-gray-300"
               >
-                {candidatesLoading ? `Loading… ${loadElapsed}s` : candidates ? "Reload Candidates" : "Load Candidates"}
+                {candidatesLoading ? `${t("common.loading")} ${loadElapsed}s` : candidates ? t("entityResolution.reloadCandidates") : t("entityResolution.loadCandidates")}
               </button>
               <button
                 type="button"
@@ -676,9 +678,9 @@ export const EntityResolutionPage: React.FC = () => {
                   dispatch(setCandidatesError(null));
                 }}
                 className="rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                title="Load synthetic demo data to test the UI without a backend"
+                title={t("entityResolution.demoTooltip")}
               >
-                Demo
+                {t("entityResolution.demo")}
               </button>
             </div>
 
@@ -688,19 +690,19 @@ export const EntityResolutionPage: React.FC = () => {
 
             {candidates && (
               <div className="text-xs text-gray-500">
-                {candidates.stats.set_points} set · {candidates.stats.target_points} target · {candidates.stats.set_to_target_edges} edges
+                {candidates.stats.set_points} {t("entityResolution.set")} · {candidates.stats.target_points} {t("entityResolution.target")} · {candidates.stats.set_to_target_edges} {t("entityResolution.edges")}
               </div>
             )}
 
             {/* Save trial */}
             {resolveResult && matchStats && (
               <div className="space-y-2 border-t border-gray-200 pt-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Save Trial</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t("entityResolution.saveTrial")}</div>
                 <input
                   type="text"
                   value={trialLabel}
                   onChange={(e) => setTrialLabel(e.target.value)}
-                  placeholder="Trial label (optional)"
+                  placeholder={t("entityResolution.trialLabelOptional")}
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
                 />
                 <button
@@ -708,9 +710,9 @@ export const EntityResolutionPage: React.FC = () => {
                   onClick={handleSaveTrial}
                   className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  Save Trial
+                  {t("entityResolution.saveTrial")}
                 </button>
-                {saveSuccess && <div className="text-xs text-green-600">Trial saved successfully.</div>}
+                {saveSuccess && <div className="text-xs text-green-600">{t("entityResolution.trialSavedSuccessfully")}</div>}
                 {saveError && <div className="text-xs text-red-600">{saveError}</div>}
               </div>
             )}
@@ -721,17 +723,17 @@ export const EntityResolutionPage: React.FC = () => {
         <div className="flex-1 overflow-auto p-6">
           {!candidates && !candidatesLoading && (
             <div className="flex h-full items-center justify-center text-sm text-gray-500">
-              Select source and target types, then click &ldquo;Load Candidates&rdquo; to begin.
+              {t("entityResolution.selectToBegin")}
             </div>
           )}
 
           {candidatesLoading && (
             <div className="flex h-full flex-col items-center justify-center gap-3">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-dfrntBlue-200 border-t-dfrntBlue-500" />
-              <div className="text-sm font-medium text-gray-700">Loading candidates…</div>
+              <div className="text-sm font-medium text-gray-700">{t("entityResolution.loadingCandidates")}</div>
               <div className="text-xs text-gray-400">
-                {loadElapsed}s elapsed — fetching nearest neighbours and content from the search engine.
-                {loadElapsed > 10 && " This is taking longer than usual; large datasets may require more time."}
+                {t("entityResolution.elapsedFetching", { seconds: loadElapsed })}
+                {loadElapsed > 10 && t("entityResolution.takingLonger")}
               </div>
             </div>
           )}
@@ -742,9 +744,9 @@ export const EntityResolutionPage: React.FC = () => {
               <div className="flex items-center gap-6 rounded-lg border border-gray-200 bg-white p-4">
                 {matchStats ? (
                   <>
-                    <Gauge value={matchStats.f1} label="F1 Score" size="lg" />
-                    <Gauge value={matchStats.precision} label="Precision" />
-                    <Gauge value={matchStats.recall} label="Recall" />
+                    <Gauge value={matchStats.f1} label={t("entityResolution.f1Score")} size="lg" />
+                    <Gauge value={matchStats.precision} label={t("entityResolution.precision")} />
+                    <Gauge value={matchStats.recall} label={t("entityResolution.recall")} />
                     <div className="flex-1" />
                     <div className="grid grid-cols-5 gap-3">
                       <div className="text-center">
@@ -761,17 +763,17 @@ export const EntityResolutionPage: React.FC = () => {
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-semibold text-gray-900">{matchStats.totalResolved}</div>
-                        <div className="text-xs text-gray-500">Matched</div>
+                        <div className="text-xs text-gray-500">{t("entityResolution.matched")}</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-semibold text-gray-900">{matchStats.totalPerfect}</div>
-                        <div className="text-xs text-gray-500">Perfect</div>
+                        <div className="text-xs text-gray-500">{t("entityResolution.perfect")}</div>
                       </div>
                     </div>
                   </>
                 ) : (
                   <div className="flex-1 text-center text-sm text-gray-500">
-                    Upload a ground truth CSV to see F1/precision/recall metrics.
+                    {t("entityResolution.uploadGroundTruthCSV")}
                   </div>
                 )}
               </div>
@@ -790,19 +792,19 @@ export const EntityResolutionPage: React.FC = () => {
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
                 >
-                  Upload Ground Truth CSV
+                  {t("entityResolution.uploadGroundTruthCSVButton")}
                 </button>
-                {csvFileName && <span className="text-xs text-gray-500">{csvFileName} ({perfectMatches?.length ?? 0} matches)</span>}
+                {csvFileName && <span className="text-xs text-gray-500">{csvFileName} ({perfectMatches?.length ?? 0} {t("entityResolution.matches")})</span>}
                 {csvError && <span className="text-xs text-red-600">{csvError}</span>}
               </div>
 
               {/* Tab bar */}
               <div className="flex gap-1 border-b border-gray-200">
                 {([
-                  { id: "matches", label: `Matches (${resolveResult.stats.total})` },
-                  { id: "histogram", label: "Histogram" },
-                  { id: "scatter", label: "Trial Scatter" },
-                  { id: "trials", label: `Saved Trials (${trials.length})` },
+                  { id: "matches", label: t("entityResolution.matchesTab", { count: resolveResult.stats.total }) },
+                  { id: "histogram", label: t("entityResolution.histogram") },
+                  { id: "scatter", label: t("entityResolution.trialScatter") },
+                  { id: "trials", label: t("entityResolution.savedTrialsTab", { count: trials.length }) },
                 ] as const).map((tab) => (
                   <button
                     key={tab.id}
@@ -829,31 +831,31 @@ export const EntityResolutionPage: React.FC = () => {
                       onChange={(e) => dispatch(setStageFilter(e.target.value as StageFilter))}
                       className="rounded-md border border-gray-300 px-2 py-1 text-xs"
                     >
-                      <option value="all">All stages</option>
-                      <option value="core">Core</option>
-                      <option value="set_extra">Set Extra</option>
-                      <option value="target_extra">Target Extra</option>
+                      <option value="all">{t("entityResolution.allStages")}</option>
+                      <option value="core">{t("entityResolution.core")}</option>
+                      <option value="set_extra">{t("entityResolution.setExtra")}</option>
+                      <option value="target_extra">{t("entityResolution.targetExtra")}</option>
                     </select>
                     <select
                       value={sortBy}
                       onChange={(e) => dispatch(setSortBy(e.target.value as SortBy))}
                       className="rounded-md border border-gray-300 px-2 py-1 text-xs"
                     >
-                      <option value="effective">Sort: Effective Dist</option>
-                      <option value="distance">Sort: Embedding Dist</option>
-                      <option value="lexical">Sort: Lexical Score</option>
-                      <option value="setId">Sort: Set ID</option>
-                      <option value="targetId">Sort: Target ID</option>
+                      <option value="effective">{t("entityResolution.sortEffectiveDist")}</option>
+                      <option value="distance">{t("entityResolution.sortEmbeddingDist")}</option>
+                      <option value="lexical">{t("entityResolution.sortLexicalScore")}</option>
+                      <option value="setId">{t("entityResolution.sortSetId")}</option>
+                      <option value="targetId">{t("entityResolution.sortTargetId")}</option>
                     </select>
                     <button
                       type="button"
                       onClick={() => dispatch(setSortDir(sortDir === "asc" ? "desc" : "asc"))}
                       className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
                     >
-                      {sortDir === "asc" ? "↑ Asc" : "↓ Desc"}
+                      {sortDir === "asc" ? t("entityResolution.asc") : t("entityResolution.desc")}
                     </button>
                     <span className="text-gray-400">
-                      {resolveResult.stats.core} core · {resolveResult.stats.setExtra} set-extra · {resolveResult.stats.targetExtra} target-extra
+                      {resolveResult.stats.core} {t("entityResolution.core")} · {resolveResult.stats.setExtra} {t("entityResolution.setExtra")} · {resolveResult.stats.targetExtra} {t("entityResolution.targetExtra")}
                     </span>
                   </div>
 
@@ -862,13 +864,13 @@ export const EntityResolutionPage: React.FC = () => {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 text-xs font-medium text-gray-500">
                         <tr>
-                          <th className="px-3 py-2 text-left">Set ID</th>
-                          <th className="px-3 py-2 text-left">Target ID</th>
-                          <th className="px-3 py-2 text-right">Embed Dist</th>
-                          <th className="px-3 py-2 text-center">Lexical</th>
-                          <th className="px-3 py-2 text-right">Effective</th>
-                          <th className="px-3 py-2 text-center">Stage</th>
-                          <th className="px-3 py-2 text-right">Actions</th>
+                          <th className="px-3 py-2 text-left">{t("entityResolution.setId")}</th>
+                          <th className="px-3 py-2 text-left">{t("entityResolution.targetId")}</th>
+                          <th className="px-3 py-2 text-right">{t("entityResolution.embedDist")}</th>
+                          <th className="px-3 py-2 text-center">{t("entityResolution.lexical")}</th>
+                          <th className="px-3 py-2 text-right">{t("entityResolution.effective")}</th>
+                          <th className="px-3 py-2 text-center">{t("entityResolution.stage")}</th>
+                          <th className="px-3 py-2 text-right">{t("entityResolution.actions")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -895,7 +897,7 @@ export const EntityResolutionPage: React.FC = () => {
                                   onClick={(e) => { e.stopPropagation(); setCompareIndex(i); }}
                                   className="rounded-md px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                                 >
-                                  Compare
+                                  {t("entityResolution.compare")}
                                 </button>
                               </td>
                             </tr>
@@ -905,7 +907,7 @@ export const EntityResolutionPage: React.FC = () => {
                     </table>
                     {filteredMatches.length > 200 && (
                       <div className="border-t border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                        Showing first 200 of {filteredMatches.length} matches
+                        {t("entityResolution.showingFirstN", { count: filteredMatches.length })}
                       </div>
                     )}
                   </div>
@@ -914,7 +916,7 @@ export const EntityResolutionPage: React.FC = () => {
 
               {resultsTab === "histogram" && (
                 <div className="rounded-lg border border-gray-200 bg-white p-6">
-                  <h3 className="mb-4 text-sm font-semibold text-gray-700">Distance Distribution</h3>
+                  <h3 className="mb-4 text-sm font-semibold text-gray-700">{t("entityResolution.distanceDistribution")}</h3>
                   <div className="flex items-end gap-2" style={{ height: 200 }}>
                     {histogramData.map((bucket, i) => {
                       const maxCount = Math.max(...histogramData.map((b) => b.matched + b.unmatched), 1);
@@ -933,8 +935,8 @@ export const EntityResolutionPage: React.FC = () => {
                     })}
                   </div>
                   <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-green-600" /> Matched</span>
-                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-gray-300" /> Unmatched</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-green-600" /> {t("entityResolution.matched")}</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-gray-300" /> {t("entityResolution.unmatched")}</span>
                   </div>
                   {/* Threshold lines */}
                   <div className="mt-4 flex gap-4 text-xs">
@@ -947,16 +949,16 @@ export const EntityResolutionPage: React.FC = () => {
 
               {resultsTab === "scatter" && (
                 <div className="rounded-lg border border-gray-200 bg-white p-6">
-                  <h3 className="mb-4 text-sm font-semibold text-gray-700">Trial Scatter: Precision vs Recall</h3>
+                  <h3 className="mb-4 text-sm font-semibold text-gray-700">{t("entityResolution.trialScatterPrecisionRecall")}</h3>
                   {trials.length === 0 && !matchStats ? (
-                    <p className="text-sm text-gray-500">No saved trials yet. Save a trial to see it plotted here.</p>
+                    <p className="text-sm text-gray-500">{t("entityResolution.noSavedTrialsPlot")}</p>
               ) : (
                     <svg viewBox="0 0 400 400" className="w-full max-w-md">
                       {/* Axes */}
                       <line x1="40" y1="10" x2="40" y2="380" stroke="#e5e7eb" strokeWidth="1" />
                       <line x1="40" y1="380" x2="390" y2="380" stroke="#e5e7eb" strokeWidth="1" />
-                      <text x="20" y="200" transform="rotate(-90 20 200)" textAnchor="middle" className="fill-gray-400 text-xs">Recall</text>
-                      <text x="215" y="398" textAnchor="middle" className="fill-gray-400 text-xs">Precision</text>
+                      <text x="20" y="200" transform="rotate(-90 20 200)" textAnchor="middle" className="fill-gray-400 text-xs">{t("entityResolution.recall")}</text>
+                      <text x="215" y="398" textAnchor="middle" className="fill-gray-400 text-xs">{t("entityResolution.precision")}</text>
                       {/* Grid lines */}
                       {[0, 0.25, 0.5, 0.75, 1].map((v) => (
                         <g key={v}>
@@ -965,16 +967,16 @@ export const EntityResolutionPage: React.FC = () => {
                         </g>
                       ))}
                       {/* Trial points */}
-                      {trials.map((t, i) => {
-                        const cx = 40 + t.metrics.precision * 350;
-                        const cy = 380 - t.metrics.recall * 370;
-                        const f1Pct = Math.round(t.metrics.f1 * 100);
+                      {trials.map((trial, i) => {
+                        const cx = 40 + trial.metrics.precision * 350;
+                        const cy = 380 - trial.metrics.recall * 370;
+                        const f1Pct = Math.round(trial.metrics.f1 * 100);
                         const color = f1Pct >= 85 ? "#16a34a" : f1Pct >= 70 ? "#ca8a04" : "#dc2626";
-                        const r = 4 + Math.min(8, t.metrics.totalMatched / 100);
+                        const r = 4 + Math.min(8, trial.metrics.totalMatched / 100);
                         return (
                           <g key={i}>
                             <circle cx={cx} cy={cy} r={r} fill={color} opacity="0.7" />
-                            <title>{`${t.label ?? `Trial ${i + 1}`}\nF1: ${t.metrics.f1.toFixed(3)}\nP: ${t.metrics.precision.toFixed(3)}\nR: ${t.metrics.recall.toFixed(3)}`}</title>
+                            <title>{`${trial.label ?? t("entityResolution.trialN", { n: i + 1 })}\nF1: ${trial.metrics.f1.toFixed(3)}\nP: ${trial.metrics.precision.toFixed(3)}\nR: ${trial.metrics.recall.toFixed(3)}`}</title>
                           </g>
                         );
                       })}
@@ -988,7 +990,7 @@ export const EntityResolutionPage: React.FC = () => {
                           stroke="#2563eb"
                           strokeWidth="2"
                         >
-                          <title>Current (unsaved)</title>
+                          <title>{t("entityResolution.currentUnsaved")}</title>
                         </circle>
                       )}
                     </svg>
@@ -999,7 +1001,7 @@ export const EntityResolutionPage: React.FC = () => {
               {resultsTab === "trials" && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-700">Saved Trials</h3>
+                    <h3 className="text-sm font-semibold text-gray-700">{t("entityResolution.savedTrials")}</h3>
                     <button
                       type="button"
                       onClick={() => {
@@ -1013,49 +1015,49 @@ export const EntityResolutionPage: React.FC = () => {
                       }}
                       className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                     >
-                      Export All
+                      {t("entityResolution.exportAll")}
                     </button>
                   </div>
                   {trials.length === 0 ? (
-                    <p className="text-sm text-gray-500">No saved trials yet.</p>
+                    <p className="text-sm text-gray-500">{t("entityResolution.noSavedTrialsYet")}</p>
                   ) : (
                     <div className="overflow-x-auto rounded-lg border border-gray-200">
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-xs font-medium text-gray-500">
                           <tr>
-                            <th className="px-3 py-2 text-left">Label</th>
-                            <th className="px-3 py-2 text-left">Timestamp</th>
+                            <th className="px-3 py-2 text-left">{t("entityResolution.label")}</th>
+                            <th className="px-3 py-2 text-left">{t("entityResolution.timestamp")}</th>
                             <th className="px-3 py-2 text-right">F1</th>
-                            <th className="px-3 py-2 text-right">Precision</th>
-                            <th className="px-3 py-2 text-right">Recall</th>
-                            <th className="px-3 py-2 text-right">Threshold</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.precision")}</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.recall")}</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.threshold")}</th>
                             <th className="px-3 py-2 text-right">τ1:1</th>
                             <th className="px-3 py-2 text-right">τ1:N</th>
                             <th className="px-3 py-2 text-right">τN:1</th>
-                            <th className="px-3 py-2 text-right">Blend</th>
-                            <th className="px-3 py-2 text-right">Jaccard</th>
-                            <th className="px-3 py-2 text-right">Rare</th>
-                            <th className="px-3 py-2 text-right">Actions</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.blend")}</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.jaccard")}</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.rare")}</th>
+                            <th className="px-3 py-2 text-right">{t("entityResolution.actions")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {trials.map((t, i) => (
+                          {trials.map((trial, i) => (
                             <tr key={i} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 text-xs text-gray-900">{t.label ?? `Trial ${i + 1}`}</td>
-                              <td className="px-3 py-2 text-xs text-gray-500">{t.timestamp.slice(0, 19)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{(t.metrics.f1 * 100).toFixed(1)}%</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{(t.metrics.precision * 100).toFixed(1)}%</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{(t.metrics.recall * 100).toFixed(1)}%</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.threshold.toFixed(2)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.tauOneToOne.toFixed(2)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.tauOneToMany.toFixed(2)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.tauManyToOne.toFixed(2)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.blendAlpha.toFixed(2)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.jaccardWeight.toFixed(2)}</td>
-                              <td className="px-3 py-2 text-right tabular-nums text-xs">{t.params.rareTokenWeight.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-xs text-gray-900">{trial.label ?? t("entityResolution.trialN", { n: i + 1 })}</td>
+                              <td className="px-3 py-2 text-xs text-gray-500">{trial.timestamp.slice(0, 19)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{(trial.metrics.f1 * 100).toFixed(1)}%</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{(trial.metrics.precision * 100).toFixed(1)}%</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{(trial.metrics.recall * 100).toFixed(1)}%</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.threshold.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.tauOneToOne.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.tauOneToMany.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.tauManyToOne.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.blendAlpha.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.jaccardWeight.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-xs">{trial.params.rareTokenWeight.toFixed(2)}</td>
                               <td className="px-3 py-2 text-right">
-                                <button type="button" onClick={() => handleLoadTrial(t)} className="rounded-md px-2 py-0.5 text-xs font-medium text-dfrntBlue-600 hover:bg-dfrntBlue-50">Load</button>
-                                <button type="button" onClick={() => handleDeleteTrial(t.timestamp)} className="ml-1 rounded-md px-2 py-0.5 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
+                                <button type="button" onClick={() => handleLoadTrial(trial)} className="rounded-md px-2 py-0.5 text-xs font-medium text-dfrntBlue-600 hover:bg-dfrntBlue-50">{t("common.load")}</button>
+                                <button type="button" onClick={() => handleDeleteTrial(trial.timestamp)} className="ml-1 rounded-md px-2 py-0.5 text-xs font-medium text-red-500 hover:bg-red-50">{t("common.delete")}</button>
                               </td>
                             </tr>
                           ))}

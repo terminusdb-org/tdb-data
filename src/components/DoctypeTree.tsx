@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { SchemaClass } from "@/types/terminusdb";
 import { isSubdocument as isSubdoc } from "@/types/terminusdb";
 
@@ -77,6 +78,7 @@ interface TreeItemProps {
 }
 
 const TreeItem: React.FC<TreeItemProps> = ({ node, level, onSelect, selectedType }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = React.useState(true);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedType === node.id;
@@ -108,7 +110,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, level, onSelect, selectedType
               setExpanded(!expanded);
             }}
             className="flex h-4 w-4 items-center justify-center text-gray-400 hover:text-gray-600"
-            aria-label={expanded ? "Collapse" : "Expand"}
+            aria-label={expanded ? t("doctypeTree.collapse") : t("doctypeTree.expand")}
           >
             <svg className="h-3 w-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} style={{ transform: expanded ? "rotate(90deg)" : "none" }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -143,6 +145,7 @@ interface DoctypeTreeProps {
 }
 
 export const DoctypeTree: React.FC<DoctypeTreeProps> = ({ classes }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const params = useParams();
   const [selectedType, setSelectedType] = React.useState<string | null>(null);
@@ -162,7 +165,7 @@ export const DoctypeTree: React.FC<DoctypeTreeProps> = ({ classes }) => {
   if (tree.length === 0) {
     return (
       <div className="p-8 text-center text-sm text-gray-500">
-        No document types found. The schema may be empty or not yet loaded.
+        {t("doctypeTree.noDocTypes")}
       </div>
     );
   }

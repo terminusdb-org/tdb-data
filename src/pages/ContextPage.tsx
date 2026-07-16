@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Editor from "@monaco-editor/react";
 import { useGetPrefixesQuery, useReplaceContextMutation, useAppSelector } from "@/store";
 import { PageShell, PageHeader, PagePlaceholder, btnPrimary, useRouteParams } from "@/components";
@@ -6,6 +7,7 @@ import { buildApiPath } from "@/utils/routes";
 import { isValidJson } from "@/utils/validation";
 
 export const ContextPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const [text, setText] = useState("");
   const [valid, setValid] = useState(true);
@@ -28,8 +30,8 @@ export const ContextPage: React.FC = () => {
     }
   }, [schemaData]);
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
-  if (isLoading) return <PagePlaceholder>Loading context…</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
+  if (isLoading) return <PagePlaceholder>{t("context.loadingContext")}</PagePlaceholder>;
 
   const handleChange = (value: string | undefined) => {
     const newText = value ?? "";
@@ -46,12 +48,12 @@ export const ContextPage: React.FC = () => {
         path: schemaPath,
         context: parsed,
         author: username,
-        message: "Updated context via Data Explorer",
+        message: t("common.updatedContextVia"),
       }).unwrap();
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus(""), 3000);
     } catch (err: unknown) {
-      console.error("Failed to save context:", err);
+      console.error(t("context.failedToSave"), err);
       setSaveStatus("error");
       setValid(false);
     }
@@ -62,14 +64,14 @@ export const ContextPage: React.FC = () => {
       header={
         <PageHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Context Editor (@context)</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t("context.title")}</h2>
             <button
               type="button"
               onClick={handleSave}
               disabled={!valid || saveStatus === "saving"}
               className={btnPrimary}
             >
-              {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved!" : "Save Context"}
+              {saveStatus === "saving" ? t("common.saving") : saveStatus === "saved" ? t("common.saved") : t("context.saveContext")}
             </button>
           </div>
         </PageHeader>
@@ -92,7 +94,7 @@ export const ContextPage: React.FC = () => {
         />
         {!valid && (
           <div className="absolute bottom-4 left-4 rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700">
-            Invalid JSON — fix errors before saving
+            {t("context.invalidJson")}
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface PanelSection {
   readonly id: string;
@@ -19,6 +20,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
   side = "right",
   defaultActiveIds,
 }) => {
+  const { t } = useTranslation();
   const [activePanelIds, setActivePanelIds] = useState<string[]>(
     defaultActiveIds ? [...defaultActiveIds] : [],
   );
@@ -96,8 +98,8 @@ export const PanelDock: React.FC<PanelDockProps> = ({
       })}
       <button
         type="button"
-        title={collapsed ? "Expand panel" : "Collapse panel"}
-        aria-label={collapsed ? "Expand panel" : "Collapse panel"}
+        title={collapsed ? t("panelDock.expandPanel") : t("panelDock.collapsePanel")}
+        aria-label={collapsed ? t("panelDock.expandPanel") : t("panelDock.collapsePanel")}
         onClick={() => setCollapsed((v) => !v)}
         className={`${collapsed ? "" : "ml-auto"} flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600`}
       >
@@ -174,9 +176,9 @@ export const PanelDock: React.FC<PanelDockProps> = ({
               <button
                 type="button"
                 onClick={() => togglePanel(section.id)}
-                aria-label={`Close ${section.title} panel`}
+                aria-label={`${t("panelDock.closePanel")} ${section.title}`}
                 className="text-gray-300 hover:text-gray-500"
-                title="Remove panel"
+                title={t("panelDock.removePanel")}
               >
                 <svg
                   className="h-3.5 w-3.5"
@@ -212,7 +214,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
           className={`fixed top-2 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 shadow-sm md:hidden ${
             side === "right" ? "right-2" : "left-2"
           }`}
-          aria-label="Open panels"
+          aria-label={t("panelDock.openPanels")}
         >
           <svg
             className="h-5 w-5"
@@ -239,7 +241,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
             onKeyDown={(e) => { if (e.key === "Escape") setMobileOpen(false); }}
             role="button"
             tabIndex={0}
-            aria-label="Close panel"
+            aria-label={t("panelDock.closePanels")}
           />
           <div
             className={`fixed top-0 z-50 flex h-full w-72 flex-col bg-white shadow-lg md:hidden ${
@@ -274,7 +276,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                aria-label="Close panels"
+                aria-label={t("panelDock.closePanels")}
                 className="ml-auto flex h-9 w-9 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100"
               >
                 <svg

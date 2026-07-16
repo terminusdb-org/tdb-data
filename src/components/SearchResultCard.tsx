@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useGetDocumentQuery } from "@/store";
 import type { SearchHit } from "@/types/terminusdb";
 import { SimilarityBadge } from "./SimilarityBadge";
@@ -34,6 +35,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
   showSimilarButton = true,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [showSimilar, setShowSimilar] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -101,7 +103,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
             onClick={(e) => { e.stopPropagation(); setShowPreview(true); }}
             className="rounded-md px-2 py-0.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
           >
-            Preview
+            {t("searchResultCard.preview")}
           </button>
           {showSimilarButton && (
             <button
@@ -109,7 +111,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
               onClick={(e) => { e.stopPropagation(); setShowSimilar(!showSimilar); }}
               className="rounded-md px-2 py-0.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
             >
-              {showSimilar ? "Hide" : "Similar"}
+              {showSimilar ? t("searchResultCard.hide") : t("searchResultCard.similar")}
             </button>
           )}
           <button
@@ -117,7 +119,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
             onClick={handleCopyId}
             className="rounded-md px-2 py-0.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
           >
-            {copied ? "Copied!" : "Copy ID"}
+            {copied ? t("searchResultCard.copied") : t("searchResultCard.copyId")}
           </button>
         </div>
       </div>

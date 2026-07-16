@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { distanceToPercent } from "@/utils/similarity";
 
 interface SimilarityBadgeProps {
@@ -7,6 +8,7 @@ interface SimilarityBadgeProps {
 }
 
 export const SimilarityBadge: React.FC<SimilarityBadgeProps> = ({ distance, size = "sm" }) => {
+  const { t } = useTranslation();
   const pct = distanceToPercent(distance);
   const barWidth = size === "lg" ? "w-20" : "w-10";
   const barHeight = size === "lg" ? "h-2" : "h-1.5";
@@ -14,7 +16,7 @@ export const SimilarityBadge: React.FC<SimilarityBadgeProps> = ({ distance, size
     pct >= 80 ? "bg-green-500" : pct >= 60 ? "bg-yellow-500" : "bg-gray-400";
 
   return (
-    <div className="flex items-center gap-1.5" title={`Distance: ${distance.toFixed(4)}`}>
+    <div className="flex items-center gap-1.5" title={`${t("similarityBadge.distance")}${distance.toFixed(4)}`}>
       <div className={`${barWidth} ${barHeight} rounded-full bg-gray-200 overflow-hidden`}>
         <div
           className={`h-full rounded-full ${color}`}
@@ -22,7 +24,7 @@ export const SimilarityBadge: React.FC<SimilarityBadgeProps> = ({ distance, size
         />
       </div>
       <span className="text-xs font-bold tabular-nums text-gray-400">
-        {pct}%
+        {pct}{t("similarityBadge.percent")}
       </span>
     </div>
   );

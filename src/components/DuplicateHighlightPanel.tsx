@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { SimilarityBadge } from "./SimilarityBadge";
 
 export interface DupPanelGroup {
@@ -23,11 +24,12 @@ export const DuplicateHighlightPanel: React.FC<DuplicateHighlightPanelProps> = (
   onToggleLoadDuplicates,
   duplicatesLoading,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Duplicates{showDuplicates && groups.length > 0 && ` (${groups.length})`}
+          {t("duplicateHighlightPanel.title")}{showDuplicates && groups.length > 0 && ` (${groups.length})`}
         </span>
         <button
           type="button"
@@ -40,27 +42,27 @@ export const DuplicateHighlightPanel: React.FC<DuplicateHighlightPanelProps> = (
           disabled={duplicatesLoading}
         >
           {duplicatesLoading
-            ? "Loading…"
+            ? t("common.loading")
             : showDuplicates
-              ? "Hide"
-              : "Load"}
+              ? t("duplicateHighlightPanel.hide")
+              : t("duplicateHighlightPanel.load")}
         </button>
       </div>
       <div className="overflow-auto">
         {!showDuplicates && (
           <div className="py-4 text-center text-xs text-gray-400">
-            Click &ldquo;Load&rdquo; to find duplicates
+            {t("duplicateHighlightPanel.clickLoad")}
           </div>
         )}
         {showDuplicates && duplicatesLoading && (
           <div className="flex items-center justify-center py-4 text-xs text-gray-400">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-dfrntBlue-500" />
-            <span className="ml-2">Finding duplicates…</span>
+            <span className="ml-2">{t("duplicateHighlightPanel.finding")}</span>
           </div>
         )}
         {showDuplicates && !duplicatesLoading && groups.length === 0 && (
           <div className="py-4 text-center text-xs text-gray-400">
-            No duplicates found
+            {t("duplicateHighlightPanel.none")}
           </div>
         )}
         {groups.map((group, i) => (
@@ -78,7 +80,7 @@ export const DuplicateHighlightPanel: React.FC<DuplicateHighlightPanelProps> = (
             <div className="mb-1 flex items-center gap-2">
               <SimilarityBadge distance={group.distance} />
               <span className="text-xs text-gray-400">
-                {group.members.length} docs
+                {group.members.length} {t("duplicateHighlightPanel.docs")}
               </span>
               {onAddToWorkingSet && (
                 <button
@@ -88,9 +90,9 @@ export const DuplicateHighlightPanel: React.FC<DuplicateHighlightPanelProps> = (
                     e.stopPropagation();
                     onAddToWorkingSet(group.members as readonly string[] as string[]);
                   }}
-                  title="Add group to working set"
+                  title={t("duplicateHighlightPanel.addGroupToWorkingSet")}
                 >
-                  + Set
+                  {t("duplicateHighlightPanel.addSet")}
                 </button>
               )}
             </div>

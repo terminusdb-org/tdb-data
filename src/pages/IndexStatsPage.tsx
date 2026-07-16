@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useGetSchemaQuery, useGetIndexStatusQuery, useTriggerIndexMutation, useDeleteIndexMutation,
   useGetClusteringQuery, useToggleClusteringMutation,
@@ -40,6 +41,7 @@ function truncateId(id: string | null | undefined, maxLen = 24): string {
 }
 
 export const IndexStatsPage: React.FC = () => {
+  const { t } = useTranslation();
   const routeParams = useRouteParams();
   const [triggerIndex] = useTriggerIndexMutation();
   const [deleteIndex] = useDeleteIndexMutation();
@@ -73,10 +75,10 @@ export const IndexStatsPage: React.FC = () => {
       refetchClustering();
     } catch (err) {
       const errData = (err as { data?: Record<string, unknown> }).data;
-      const msg = String(errData?.["api:message"] ?? errData?.["api:status"] ?? `Failed to ${action} clustering`);
+      const msg = String(errData?.["api:message"] ?? errData?.["api:status"] ?? t("indexStats.failedToToggleClustering", { action }));
       setClusteringError(msg);
     }
-  }, [routeParams, toggleClustering, refetchClustering]);
+  }, [routeParams, toggleClustering, refetchClustering, t]);
 
   const handleToggleClustering = useCallback(async () => {
     if (!routeParams) return;
@@ -84,14 +86,14 @@ export const IndexStatsPage: React.FC = () => {
     const current = clusteringData?.storeClustering ?? false;
     const action = current ? "disable" : "enable";
     setConfirmState({
-      title: `${action === "enable" ? "Enable" : "Disable"} Clustering`,
-      message: `${action === "enable" ? "Enable" : "Disable"} clustering for ${routeParams.org}/${routeParams.team}? This will modify the schema metadata on main.`,
+      title: t("indexStats.toggleClusteringTitle", { action: action === "enable" ? t("common.enable") : t("common.disable") }),
+      message: t("indexStats.toggleClusteringMessage", { action: action === "enable" ? t("common.enable") : t("common.disable"), org: routeParams.org, team: routeParams.team }),
       onConfirm: () => {
         setConfirmState(null);
         void doToggleClustering(!current, action);
       },
     });
-  }, [routeParams, clusteringData, doToggleClustering]);
+  }, [routeParams, clusteringData, doToggleClustering, t]);
 
   const { data: schemaClasses, refetch: refetchSchema } = useGetSchemaQuery(
     { path: schemaPath, asList: true },
@@ -141,11 +143,11 @@ export const IndexStatsPage: React.FC = () => {
       refetchCounts();
       setTimeout(() => setTriggerStatus(""), 5000);
     } catch (err: unknown) {
-      console.error("Trigger index failed:", err);
+      console.error(t("indexStats.triggerIndexFailed"), err);
       setTriggerStatus("error");
       setTimeout(() => setTriggerStatus(""), 5000);
     }
-  }, [indexPath, triggerIndex, refetchIndex, refetchCounts]);
+  }, [indexPath, triggerIndex, refetchIndex, refetchCounts, t]);
 
   const handleReindex = useCallback(async () => {
     if (!indexPath) return;
@@ -159,11 +161,11 @@ export const IndexStatsPage: React.FC = () => {
       refetchCounts();
       setTimeout(() => setReindexStatus(""), 5000);
     } catch (err: unknown) {
-      console.error("Reindex failed:", err);
+      console.error(t("indexStats.reindexFailed"), err);
       setReindexStatus("error");
       setTimeout(() => setReindexStatus(""), 5000);
     }
-  }, [indexPath, deleteIndex, triggerIndex, refetchIndex, refetchCounts]);
+  }, [indexPath, deleteIndex, triggerIndex, refetchIndex, refetchCounts, t]);
 
   const handleRefresh = useCallback(() => {
     refetchIndex();
@@ -172,7 +174,7 @@ export const IndexStatsPage: React.FC = () => {
     refetchClustering();
   }, [refetchIndex, refetchCounts, refetchSchema, refetchClustering]);
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+  if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
 
   const idx = indexStatus as IndexStatus | undefined;
   const bp = idx?.branch_processing;
@@ -193,7 +195,7 @@ export const IndexStatsPage: React.FC = () => {
       header={
         <PageHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Index & Document Statistics</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t("indexStats.title")}</h2>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -207,7 +209,7 @@ export const IndexStatsPage: React.FC = () => {
                     : "bg-gray-100 text-gray-600 hover:bg-dfrntBlue-50 hover:text-dfrntBlue-700"
                 }`}
               >
-                {triggerStatus === "indexing" ? "Indexing…" : triggerStatus === "success" ? "Index triggered" : triggerStatus === "error" ? "Index failed" : "Trigger Index"}
+                {triggerStatus === "indexing" ? t("indexStats.indexing") : triggerStatus === "success" ? t("indexStats.indexTriggered") : triggerStatus === "error" ? t("indexStats.indexFailed") : t("indexStats.triggerIndex")}
               </button>
               <button
                 type="button"
@@ -221,7 +223,7 @@ export const IndexStatsPage: React.FC = () => {
                     : "bg-gray-100 text-gray-600 hover:bg-amber-50 hover:text-amber-700"
                 }`}
               >
-                {reindexStatus === "deleting" ? "Deleting…" : reindexStatus === "indexing" ? "Indexing…" : reindexStatus === "success" ? "Reindexed" : reindexStatus === "error" ? "Reindex failed" : "Reindex"}
+                {reindexStatus === "deleting" ? t("indexStats.deleting") : reindexStatus === "indexing" ? t("indexStats.indexing") : reindexStatus === "success" ? t("indexStats.reindexed") : reindexStatus === "error" ? t("indexStats.reindexFailed") : t("indexStats.reindex")}
               </button>
               <button
                 type="button"
@@ -229,7 +231,7 @@ export const IndexStatsPage: React.FC = () => {
                 disabled={loadingCounts || indexLoading}
                 className={btnSecondary}
               >
-                {loadingCounts || indexLoading ? "Refreshing…" : "Refresh"}
+                {loadingCounts || indexLoading ? t("indexStats.refreshing") : t("indexStats.refresh")}
               </button>
             </div>
           </div>
@@ -239,22 +241,22 @@ export const IndexStatsPage: React.FC = () => {
       <div className="space-y-6 p-4">
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard label="Total Documents" value={totalDocs !== null ? totalDocs : "—"} />
-          <StatCard label="Indexed Documents" value={eng?.searchable_documents ?? "—"} />
-          <StatCard label="Document Types" value={docTypes.length} />
-          <StatCard label="Text Segments Indexed" value={eng?.text_segments_indexed ?? "—"} />
+          <StatCard label={t("indexStats.totalDocuments")} value={totalDocs !== null ? totalDocs : "—"} />
+          <StatCard label={t("indexStats.indexedDocuments")} value={eng?.searchable_documents ?? "—"} />
+          <StatCard label={t("indexStats.documentTypes")} value={docTypes.length} />
+          <StatCard label={t("indexStats.textSegmentsIndexed")} value={eng?.text_segments_indexed ?? "—"} />
         </div>
 
         {/* Document counts by type */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Documents by Type</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t("indexStats.documentsByType")}</h3>
           </div>
           <div className="divide-y divide-gray-100">
             {loadingCounts && typeCounts.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-500">Counting documents…</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t("indexStats.countingDocuments")}</div>
             ) : typeCounts.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-500">No document types found.</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t("indexStats.noDocumentTypesFound")}</div>
             ) : (
               typeCounts.map(({ type, count }) => (
                 <div key={type} className="flex items-center justify-between px-4 py-2.5 text-sm">
@@ -264,7 +266,7 @@ export const IndexStatsPage: React.FC = () => {
               ))
             )}
             {countError && (
-              <div className="px-4 py-2 text-xs text-red-600">Error counting documents: {countError}</div>
+              <div className="px-4 py-2 text-xs text-red-600">{t("indexStats.errorCountingDocuments")} {countError}</div>
             )}
           </div>
         </div>
@@ -272,36 +274,36 @@ export const IndexStatsPage: React.FC = () => {
         {/* Index Status */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Index Status</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t("indexStats.indexStatus")}</h3>
           </div>
           <div className="divide-y divide-gray-100">
             {indexLoading && (
-              <div className="px-4 py-3 text-sm text-gray-500">Loading index status…</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t("indexStats.loadingIndexStatus")}</div>
             )}
             {indexErrMessage && !indexLoading && (
               <div className="px-4 py-3 text-sm text-amber-600">
-                Index status unavailable: {indexErrMessage}
+                {t("indexStats.indexStatusUnavailable")} {indexErrMessage}
               </div>
             )}
             {!indexLoading && !indexErrMessage && idx && (
               <>
                 <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="font-medium text-gray-700">Status</span>
+                  <span className="font-medium text-gray-700">{t("indexStats.status")}</span>
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${statusColor}`}>
-                    {idx.status ?? "unknown"}
+                    {idx.status ?? t("indexStats.unknown")}
                   </span>
                 </div>
                 {idx.error && (
                   <div className="px-4 py-2.5 text-sm text-red-600">
-                    <span className="font-medium">Error: </span>{idx.error}
+                    <span className="font-medium">{t("common.error")}: </span>{idx.error}
                   </div>
                 )}
                 <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="font-medium text-gray-700">Branch</span>
+                  <span className="font-medium text-gray-700">{t("indexStats.branch")}</span>
                   <span className="font-data text-gray-900">{idx.branch ?? "—"}</span>
                 </div>
                 <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="font-medium text-gray-700">Last Indexed Commit</span>
+                  <span className="font-medium text-gray-700">{t("indexStats.lastIndexedCommit")}</span>
                   <span className="font-data text-gray-900" title={idx.last_indexed_commit ?? undefined}>
                     {truncateId(idx.last_indexed_commit)}
                   </span>
@@ -309,7 +311,7 @@ export const IndexStatsPage: React.FC = () => {
               </>
             )}
             {!indexLoading && !indexErrMessage && !idx && (
-              <div className="px-4 py-3 text-sm text-gray-500">No index status available.</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t("indexStats.noIndexStatusAvailable")}</div>
             )}
           </div>
         </div>
@@ -317,21 +319,21 @@ export const IndexStatsPage: React.FC = () => {
         {/* Clustering */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Clustering</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t("indexStats.clustering")}</h3>
           </div>
           <div className="divide-y divide-gray-100">
             {clusteringIsError ? (
-              <div className="px-4 py-3 text-sm text-gray-500">Schema context not readable — clustering status unavailable.</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t("indexStats.clusteringUnavailable")}</div>
             ) : clusteringData ? (
               <div className="flex items-center justify-between px-4 py-3 text-sm">
                 <div className="flex items-center gap-2">
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${clusteringData.storeClustering ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                    {clusteringData.storeClustering ? "Clustering" : "No clustering"}
+                    {clusteringData.storeClustering ? t("indexStats.clustering") : t("indexStats.noClustering")}
                   </span>
                   <span className="text-xs text-gray-500">
                     {clusteringData.storeClustering
-                      ? "Clustering embeddings are stored with documents"
-                      : "Clustering embeddings are not stored"}
+                      ? t("indexStats.clusteringEmbeddingsStored")
+                      : t("indexStats.clusteringEmbeddingsNotStored")}
                   </span>
                 </div>
                 <button
@@ -340,20 +342,20 @@ export const IndexStatsPage: React.FC = () => {
                   disabled={clusteringToggling}
                   className="rounded px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
                 >
-                  {clusteringToggling ? "…" : clusteringData.storeClustering ? "Disable" : "Enable"}
+                  {clusteringToggling ? "…" : clusteringData.storeClustering ? t("common.disable") : t("common.enable")}
                 </button>
               </div>
             ) : (
-              <div className="px-4 py-3 text-sm text-gray-500">Loading clustering status…</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t("indexStats.loadingClusteringStatus")}</div>
             )}
             <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span className="font-medium text-gray-700">Index Engine Status</span>
+              <span className="font-medium text-gray-700">{t("indexStats.indexEngineStatus")}</span>
               {idx?.engine?.store_clustering === true ? (
-                <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Clustering active</span>
+                <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">{t("indexStats.clusteringActive")}</span>
               ) : idx?.engine?.store_clustering === false ? (
-                <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Clustering inactive</span>
+                <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{t("indexStats.clusteringInactive")}</span>
               ) : (
-                <span className="text-xs text-gray-400">Unknown (engine unavailable)</span>
+                <span className="text-xs text-gray-400">{t("indexStats.unknownEngineUnavailable")}</span>
               )}
             </div>
             {clusteringError && (
@@ -366,12 +368,12 @@ export const IndexStatsPage: React.FC = () => {
         {bp && (
           <div className="rounded-lg border border-gray-200 bg-white">
             <div className="border-b border-gray-200 px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-900">Branch Processing Progress</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t("indexStats.branchProcessingProgress")}</h3>
             </div>
             <div className="divide-y divide-gray-100">
               <div className="px-4 py-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-gray-700">Commits Processed</span>
+                  <span className="font-medium text-gray-700">{t("indexStats.commitsProcessed")}</span>
                   <span className="font-data tabular-nums text-gray-900">
                     {bp.commits_processed ?? 0} / {bp.total_commits ?? 0}
                   </span>
@@ -386,15 +388,15 @@ export const IndexStatsPage: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <span className="font-medium text-gray-700">Current Commit</span>
+                <span className="font-medium text-gray-700">{t("indexStats.currentCommit")}</span>
                 <span className="font-data text-gray-900" title={bp.current_commit ?? undefined}>
                   {truncateId(bp.current_commit)}
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <span className="font-medium text-gray-700">Upcoming Commit</span>
+                <span className="font-medium text-gray-700">{t("indexStats.upcomingCommit")}</span>
                 <span className="font-data text-gray-900" title={bp.upcoming_commit ?? undefined}>
-                  {bp.upcoming_commit ? truncateId(bp.upcoming_commit) : "None (at HEAD)"}
+                  {bp.upcoming_commit ? truncateId(bp.upcoming_commit) : t("indexStats.noneAtHead")}
                 </span>
               </div>
             </div>
@@ -405,17 +407,17 @@ export const IndexStatsPage: React.FC = () => {
         {eng && (
           <div className="rounded-lg border border-gray-200 bg-white">
             <div className="border-b border-gray-200 px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-900">Engine Statistics</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t("indexStats.engineStatistics")}</h3>
             </div>
             <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3">
-              <StatCard label="Processed Documents" value={eng.processed_documents ?? "—"} />
-              <StatCard label="Total Documents" value={eng.total_documents ?? "—"} />
-              <StatCard label="Documents Sent" value={eng.documents_sent ?? "—"} />
-              <StatCard label="Searchable Documents" value={eng.searchable_documents ?? "—"} />
-              <StatCard label="Text Segments Indexed" value={eng.text_segments_indexed ?? "—"} />
-              <StatCard label="Commits Received" value={eng.commits_received ?? "—"} />
+              <StatCard label={t("indexStats.processedDocuments")} value={eng.processed_documents ?? "—"} />
+              <StatCard label={t("indexStats.totalDocuments")} value={eng.total_documents ?? "—"} />
+              <StatCard label={t("indexStats.documentsSent")} value={eng.documents_sent ?? "—"} />
+              <StatCard label={t("indexStats.searchableDocuments")} value={eng.searchable_documents ?? "—"} />
+              <StatCard label={t("indexStats.textSegmentsIndexed")} value={eng.text_segments_indexed ?? "—"} />
+              <StatCard label={t("indexStats.commitsReceived")} value={eng.commits_received ?? "—"} />
               <StatCard
-                label="Pending Updates"
+                label={t("indexStats.pendingUpdates")}
                 value={eng.pending_updates ?? 0}
                 highlight={(eng.pending_updates ?? 0) > 0}
               />
@@ -428,7 +430,7 @@ export const IndexStatsPage: React.FC = () => {
         open={confirmState !== null}
         title={confirmState?.title ?? ""}
         message={confirmState?.message ?? ""}
-        confirmLabel="Confirm"
+        confirmLabel={t("common.confirm")}
         destructive
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export interface ProjectionUnderpanelProps {
   readonly selectedId: string | null;
@@ -13,10 +14,11 @@ export const ProjectionUnderpanel: React.FC<ProjectionUnderpanelProps> = ({
   document,
   isLoading,
 }) => {
+  const { t } = useTranslation();
   if (!selectedId) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 text-sm text-gray-400">
-        Click a point to view document details
+        {t("projectionUnderpanel.clickToView")}
       </div>
     );
   }
@@ -24,7 +26,7 @@ export const ProjectionUnderpanel: React.FC<ProjectionUnderpanelProps> = ({
   if (isLoading) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 text-sm text-gray-400">
-        Loading document…
+        {t("projectionUnderpanel.loadingDoc")}
       </div>
     );
   }
@@ -32,7 +34,7 @@ export const ProjectionUnderpanel: React.FC<ProjectionUnderpanelProps> = ({
   if (!document) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 text-sm text-gray-400">
-        No document found for {selectedId}
+        {t("projectionUnderpanel.noDocFound", { id: selectedId })}
       </div>
     );
   }

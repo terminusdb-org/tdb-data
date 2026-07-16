@@ -73,4 +73,7 @@ export const selectIsAuthenticated = (state: AuthRootState): boolean =>
 export const selectAuthUsername = (state: AuthRootState): string | null =>
   state.auth.username;
 
+export const selectAuthCredentials = (state: AuthRootState): string | null =>
+  state.auth.credentials;
+
 export default authSlice.reducer;

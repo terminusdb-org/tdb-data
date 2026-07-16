@@ -9,6 +9,8 @@ import {
   type CommitEntry,
 } from "./commitStreamSlice";
 import { config } from "@/config";
+import { selectAuthCredentials } from "./authSlice";
+import type { RootState } from "./store";
 
 interface StreamParams {
   org: string;
@@ -36,21 +38,12 @@ function cleanup() {
   activeParams = null;
 }
 
-function getCredentials(): string | null {
-  try {
-    const raw = localStorage.getItem("terminusdb_data_auth");
-    if (raw) {
-      const parsed = JSON.parse(raw) as { credentials?: string };
-      return parsed.credentials ?? null;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
+function getCredentials(getState: () => RootState): string | null {
+  return selectAuthCredentials(getState());
 }
 
 async function connectStream(
-  api: { dispatch: (action: unknown) => void },
+  api: { dispatch: (action: unknown) => void; getState: () => unknown },
   params: StreamParams,
 ) {
   const { org, team, branch } = params;
@@ -70,7 +63,7 @@ async function connectStream(
     : "";
   const url = `${baseUrl}/api/v1/ext/commits/${org}/${team}/local/branch/${branch}?timeout=false${sinceParam}`;
 
-  const credentials = getCredentials();
+  const credentials = getCredentials(api.getState as () => RootState);
   const headers: Record<string, string> = {
     Accept: "application/x-ndjson",
   };

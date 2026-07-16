@@ -1,0 +1,115 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "refresh": "Refresh",
+    "search": "Search",
+    "clear": "Clear",
+    "select": "Select",
+    "new": "New",
+    "previous": "Previous",
+    "next": "Next",
+    "allTypes": "All types",
+    "noResults": "No results found",
+    "selectDataProduct": "Select a data product first."
+  },
+  "nav": {
+    "search": "Search",
+    "explore": "Explore",
+    "schema": "Schema",
+    "embeddings": "Embeddings",
+    "documents": "Documents",
+    "rawJson": "Raw JSON",
+    "graphql": "GraphQL",
+    "vectorSearch": "Vector Search",
+    "entityResolution": "Entity Resolution",
+    "projection": "Projection",
+    "context": "Context",
+    "history": "History",
+    "indexStats": "Index Stats",
+    "doctypes": "Document Types"
+  },
+  "documents": {
+    "title": "Documents",
+    "newDocument": "New Document",
+    "addToWorkingSet": "Add to Working Set",
+    "deleteSelected": "Delete Selected",
+    "selected": "{{count}} selected",
+    "preview": "Preview",
+    "actions": "Actions",
+    "page": "Page {{page}}",
+    "pageSize": "Page size"
+  },
+  "projection": {
+    "title2d": "2D Projection",
+    "title3d": "3D Projection",
+    "subtitle": "UMAP dimension reduction of document embeddings",
+    "projecting": "projecting…",
+    "computingOtherView": "computing other view…",
+    "selectType": "Select a document type or enable Working Set union to load embeddings.",
+    "noEmbeddings": "No embeddings found. Index your documents first.",
+    "runningUmap": "Running UMAP projection…",
+    "noVisiblePoints": "No visible points. Select at least one document type.",
+    "clickToView": "Click a point to view document details",
+    "tipShiftClick": "Tip: Shift+click points to multi-select, then \"Project Selection\" to re-run UMAP on a subset."
+  },
+  "schema": {
+    "title": "Schema",
+    "editor": "Schema Editor",
+    "classes": "Classes"
+  },
+  "embeddings": {
+    "title": "Embeddings",
+    "typeSelector": "Document Type",
+    "noTypeSelected": "Select a document type to view embeddings."
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search documents…",
+    "filters": "Filters",
+    "results": "Results"
+  },
+  "statusBar": {
+    "documents": "Documents",
+    "indexed": "Indexed",
+    "types": "Types",
+    "selectDataProduct": "Select a data product to view statistics"
+  },
+  "indexStats": {
+    "title": "Index Stats",
+    "documentsByType": "Documents by Type",
+    "noDocTypes": "No document types found.",
+    "countingDocuments": "Counting documents…",
+    "triggerIndex": "Trigger Index",
+    "reindex": "Reindex"
+  },
+  "entityResolution": {
+    "title": "Entity Resolution",
+    "candidates": "Candidates",
+    "merge": "Merge"
+  },
+  "rawJson": {
+    "title": "Raw JSON",
+    "insert": "Insert",
+    "update": "Update"
+  },
+  "graphql": {
+    "title": "GraphQL",
+    "query": "Query",
+    "results": "Results",
+    "run": "Run Query"
+  },
+  "branchHistory": {
+    "title": "Branch History",
+    "loadMore": "Load More",
+    "loadAll": "Load All",
+    "commit": "Commit",
+    "author": "Author",
+    "message": "Message",
+    "timestamp": "Timestamp"
+  }
+}

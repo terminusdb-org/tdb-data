@@ -75,6 +75,9 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
         <div
           className="mb-2 cursor-pointer text-sm leading-relaxed text-gray-800"
           onClick={navigateToDoc}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigateToDoc(); } }}
+          role="button"
+          tabIndex={0}
         >
           <span className="line-clamp-3">
             {highlightTerms(String(hit.chunk.snippet), query)}

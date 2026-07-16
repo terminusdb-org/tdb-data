@@ -1,7 +1,7 @@
 export { store } from "./store";
 export type { RootState, AppDispatch } from "./store";
 export { useAppDispatch, useAppSelector } from "./hooks";
-export { login, logout, selectIsAuthenticated, selectAuthUsername } from "./authSlice";
+export { login, logout, selectIsAuthenticated, selectAuthUsername, selectAuthCredentials } from "./authSlice";
 export { setContext, clearContext, selectDataProduct } from "./dataProductSlice";
 export type { DataProductState, RefType } from "./dataProductSlice";
 export { setError, clearError, selectLatestError } from "./errorSlice";

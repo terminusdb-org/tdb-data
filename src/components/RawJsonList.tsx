@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly } from "@/store";
-import { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass } from "@/components";
+import { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, ConfirmDialog } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { TerminusDBDocument, PageSizes } from "@/types/terminusdb";
 import { PAGE_SIZE_OPTIONS } from "@/types/terminusdb";
@@ -27,6 +27,11 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   const [useCustomId, setUseCustomId] = useState(false);
   const [customId, setCustomId] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [editText, setEditText] = useState("");
   const [editValid, setEditValid] = useState(true);
   const [editError, setEditError] = useState<string | null>(null);
@@ -50,7 +55,10 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
     { skip: !docPath }
   );
 
-  const allDocs: TerminusDBDocument[] = Array.isArray(documentsData) ? documentsData : documentsData ? [documentsData] : [];
+  const allDocs: TerminusDBDocument[] = useMemo(() =>
+    Array.isArray(documentsData) ? documentsData : documentsData ? [documentsData] : [],
+    [documentsData]
+  );
   const documents = idFilter.trim()
     ? allDocs.filter((d) => (d["@id"] ?? "").startsWith(idFilter.trim()))
     : allDocs;
@@ -131,8 +139,18 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm(`Delete document "${id}"? This cannot be undone.`)) return;
+  const handleDelete = (id: string) => {
+    setConfirmState({
+      title: "Delete Document",
+      message: `Delete document "${id}"? This cannot be undone.`,
+      onConfirm: () => {
+        setConfirmState(null);
+        void doDelete(id);
+      },
+    });
+  };
+
+  const doDelete = async (id: string) => {
     setDeleteError(null);
     try {
       await deleteDoc({ path: docPath, id, author: username, message: "Deleted via Raw JSON" }).unwrap();
@@ -175,6 +193,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   };
 
   return (
+    <>
     <PageShell
       header={
         <PageHeader>
@@ -385,6 +404,16 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
           </ul>
         )}
     </PageShell>
+    <ConfirmDialog
+      open={confirmState !== null}
+      title={confirmState?.title ?? ""}
+      message={confirmState?.message ?? ""}
+      confirmLabel="Delete"
+      destructive
+      onConfirm={() => confirmState?.onConfirm()}
+      onCancel={() => setConfirmState(null)}
+    />
+    </>
   );
 };
 

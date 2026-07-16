@@ -38,8 +38,8 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
   width,
   height,
 }) => {
-  const selectionSet = selectionIds ?? new Set<string>();
-  const wsSet = workingSetIds ?? new Set<string>();
+  const selectionSet = useMemo(() => selectionIds ?? new Set<string>(), [selectionIds]);
+  const wsSet = useMemo(() => workingSetIds ?? new Set<string>(), [workingSetIds]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const layers = useMemo(() => {
     const selectedPoints = (points as ScatterPoint[]).filter((d) => selectionSet.has(d.id));

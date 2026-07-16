@@ -40,8 +40,10 @@ export const SearchBar: React.FC = () => {
   const refType = branch ? "branch" : commitId ? "commit" : null;
   const refName = branch ?? commitId ?? null;
 
-  const routeParams: RouteParams | null =
-    org && team && refType && refName ? { org, team, refType, refName } : null;
+  const routeParams: RouteParams | null = useMemo(() =>
+    org && team && refType && refName ? { org, team, refType, refName } : null,
+    [org, team, refType, refName]
+  );
 
   useEffect(() => {
     setHistory(getSearchHistory());
@@ -87,8 +89,8 @@ export const SearchBar: React.FC = () => {
   );
 
   const suggest: SuggestResponse | undefined = suggestData;
-  const completions = suggest?.completions ?? [];
-  const hits = suggest?.hits ?? [];
+  const completions = useMemo(() => suggest?.completions ?? [], [suggest]);
+  const hits = useMemo(() => suggest?.hits ?? [], [suggest]);
   const totalApprox = suggest?.total_approx ?? 0;
 
   const allItems = useMemo(() => [
@@ -168,7 +170,7 @@ export const SearchBar: React.FC = () => {
     setHistory([]);
   };
 
-  const allResults: SearchHit[] = searchResults ?? [];
+  const allResults: SearchHit[] = useMemo(() => searchResults ?? [], [searchResults]);
   const availableTypes = useMemo(() => {
     const set = new Set<string>();
     allResults.forEach((h) => {
@@ -248,6 +250,7 @@ export const SearchBar: React.FC = () => {
           <button
             type="button"
             onClick={handleClearInput}
+            aria-label="Clear search"
             className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -277,9 +280,12 @@ export const SearchBar: React.FC = () => {
             <div
               className="cursor-pointer border-b border-gray-100 px-4 py-2.5 text-sm hover:bg-gray-50"
               onMouseDown={(e) => { e.preventDefault(); handleSelect(allItems[0]); }}
+              role="option"
+              aria-selected={activeIndex === 0}
+              tabIndex={0}
             >
               <span className="text-gray-400">Search for </span>
-              <span className="font-medium text-gray-900">"{debouncedQuery}"</span>
+              <span className="font-medium text-gray-900">&ldquo;{debouncedQuery}&rdquo;</span>
             </div>
           )}
           {completions.map((c, i) => {
@@ -289,6 +295,9 @@ export const SearchBar: React.FC = () => {
                 key={`c-${i}`}
                 className={`cursor-pointer px-4 py-2.5 text-sm ${idx === activeIndex ? "bg-dfrntBlue-50" : "hover:bg-gray-50"}`}
                 onMouseDown={(e) => { e.preventDefault(); handleSelect(allItems[idx]); }}
+                role="option"
+                aria-selected={idx === activeIndex}
+                tabIndex={0}
               >
                 <span className="font-medium text-gray-900">{c}</span>
                 <span className="ml-2 text-xs text-gray-400">completion</span>
@@ -302,6 +311,9 @@ export const SearchBar: React.FC = () => {
                 key={`h-${h.id}`}
                 className={`cursor-pointer px-4 py-2.5 text-sm ${idx === activeIndex ? "bg-dfrntBlue-50" : "hover:bg-gray-50"}`}
                 onMouseDown={(e) => { e.preventDefault(); handleSelect(allItems[idx]); }}
+                role="option"
+                aria-selected={idx === activeIndex}
+                tabIndex={0}
               >
                 <span className="font-medium text-gray-900">{h.id}</span>
                 <span className="ml-2 text-xs text-gray-400">doc</span>
@@ -343,7 +355,7 @@ export const SearchBar: React.FC = () => {
           {!isSearching && !searchErr && allResults.length === 0 && (
             <div className="py-8 text-center">
               <p className="text-sm text-gray-500">
-                No results found for <span className="font-medium text-gray-700">"{urlQuery}"</span>
+                No results found for <span className="font-medium text-gray-700">&ldquo;{urlQuery}&rdquo;</span>
               </p>
               <p className="mt-1 text-xs text-gray-400">Try different keywords or check your spelling</p>
             </div>
@@ -363,7 +375,7 @@ export const SearchBar: React.FC = () => {
               <div className="flex-1">
                 <div className="mb-3 text-sm text-gray-500">
                   About {filteredResults.length} result{filteredResults.length !== 1 ? "s" : ""}
-                  {urlQuery && <> for <span className="font-medium text-gray-700">"{urlQuery}"</span></>}
+                  {urlQuery && <> for <span className="font-medium text-gray-700">&ldquo;{urlQuery}&rdquo;</span></>}
                 </div>
                 {filteredResults.length === 0 ? (
                   <div className="py-8 text-center text-sm text-gray-500">

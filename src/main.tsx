@@ -4,6 +4,7 @@ import { Provider } from "react-redux";
 import { store } from "@/store";
 import { App } from "./App";
 import "./index.css";
+import "@/i18n";
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 

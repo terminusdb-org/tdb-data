@@ -13,7 +13,7 @@ interface LogCommit {
 
 function formatTimestamp(ts: string): string {
   const num = Number(ts);
-  if (!isNaN(num) && num > 0) {
+  if (!Number.isNaN(num) && num > 0) {
     const date = new Date(num * 1000);
     return date.toLocaleString();
   }
@@ -53,13 +53,15 @@ export const BranchHistoryPage: React.FC = () => {
     return `${org}/${team}/local/branch/${branchName}`;
   }, [org, team, branchName]);
 
-  const fetchCommits = useCallback(async (count: number) => {
+  const fetchCommits = useCallback(async (count: number, isInitialLoad: boolean = true) => {
     const logPath = buildLogPath();
     if (!logPath) return;
 
     setLoading(true);
-    setError(null);
-    setCommits([]);
+    if (isInitialLoad) {
+      setCommits([]);
+      setError(null);
+    }
     try {
       const url = `${config.apiUrl}/api/log/${logPath}?start=0&count=${count}&stream=true`;
       const headers: Record<string, string> = {
@@ -137,12 +139,12 @@ export const BranchHistoryPage: React.FC = () => {
   const handleLoadMore = () => {
     const nextCount = currentCount + LOAD_MORE_COUNT;
     setCurrentCount(nextCount);
-    fetchCommits(nextCount);
+    fetchCommits(nextCount, false);
   };
 
   const handleLoadAll = () => {
     // count=-1 means all in the API
-    fetchCommits(-1);
+    fetchCommits(-1, false);
   };
 
   // Live commit stream from Redux — new commits are prepended by the stream

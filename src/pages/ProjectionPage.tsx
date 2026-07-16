@@ -64,12 +64,14 @@ import {
   selectLoadedEmbeddings,
   selectServedCommit,
   selectStoreClustering,
+  setError,
 } from "@/store";
 import { buildApiPath } from "@/utils/routes";
 import { generateTypeColors } from "@/utils/typeColors";
 import { filterEmbeddings } from "@/utils/filterEmbeddings";
 import { useUmapProjection, type UmapProjectionPoint } from "@/hooks/useUmapProjection";
 import { useStreamingEmbeddings } from "@/hooks/useStreamingEmbeddings";
+import { isSubdocument } from "@/types/terminusdb";
 
 export const ProjectionPage: React.FC = () => {
   const routeParams = useRouteParams();
@@ -100,7 +102,7 @@ export const ProjectionPage: React.FC = () => {
     return schemaClasses
       .filter((c) => {
         const t = c["@type"];
-        return t === "Class" || t === "Enum";
+        return (t === "Class" || t === "Enum") && !isSubdocument(c);
       })
       .map((c) => c["@id"])
       .filter((id): id is string => typeof id === "string");
@@ -195,7 +197,7 @@ export const ProjectionPage: React.FC = () => {
         }));
       },
       onError: (err) => {
-        console.error("Streaming embeddings error:", err);
+        dispatch(setError({ message: `Streaming embeddings error: ${err.message}` }));
       },
     },
   );
@@ -240,10 +242,10 @@ export const ProjectionPage: React.FC = () => {
   }, [allEmbeddings, projectSelectionOnly, projectionSelectionIds, projectWorkingSet, workingSetIds, selectedTypes, docToTypeMap]);
 
   const cacheKey = useMemo(() => {
-    const loadedKey = [...loadedTypes].sort().join(",");
-    const selectedKey = [...selectedTypes].sort().join(",");
-    const wsKey = projectWorkingSet && workingSetIds.size > 0 ? `ws:${[...workingSetIds].sort().join(",")}` : "no-ws";
-    const selectKey = projectSelectionOnly ? `sel:${[...projectionSelectionIds].sort().join(",")}` : "all";
+    const loadedKey = [...loadedTypes].sort((a, b) => a.localeCompare(b)).join(",");
+    const selectedKey = [...selectedTypes].sort((a, b) => a.localeCompare(b)).join(",");
+    const wsKey = projectWorkingSet && workingSetIds.size > 0 ? `ws:${[...workingSetIds].sort((a, b) => a.localeCompare(b)).join(",")}` : "no-ws";
+    const selectKey = projectSelectionOnly ? `sel:${[...projectionSelectionIds].sort((a, b) => a.localeCompare(b)).join(",")}` : "all";
     return `${embeddingRole}|${loadedKey}|sel:${selectedKey}|${wsKey}|${selectKey}`;
   }, [loadedTypes, selectedTypes, embeddingRole, projectSelectionOnly, projectionSelectionIds, projectWorkingSet, workingSetIds]);
 
@@ -665,7 +667,7 @@ export const ProjectionPage: React.FC = () => {
           )}
           {projectionSelectionIds.size === 0 && scatterPoints.length > 0 && (
             <div className="border-t border-gray-100 px-4 py-1.5 text-xs text-gray-400">
-              Tip: Shift+click points to multi-select, then "Project Selection" to re-run UMAP on a subset.
+              Tip: Shift+click points to multi-select, then &ldquo;Project Selection&rdquo; to re-run UMAP on a subset.
             </div>
           )}
         </div>
@@ -757,8 +759,8 @@ export const ProjectionPage: React.FC = () => {
 
 
 function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
   return [r, g, b];
 }

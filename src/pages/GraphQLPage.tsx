@@ -31,7 +31,8 @@ export const GraphQLPage: React.FC = () => {
 
         root = ReactDOM.createRoot(containerRef.current!);
         root.render(React.createElement(GraphiQL, { fetcher }));
-      } catch {
+      } catch (err: unknown) {
+        console.error("Failed to load GraphiQL:", err);
         if (containerRef.current) {
           containerRef.current.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">Failed to load GraphiQL. Make sure the package is installed.</div>';
         }

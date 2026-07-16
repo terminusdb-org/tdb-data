@@ -49,7 +49,7 @@ export const DuplicateHighlightPanel: React.FC<DuplicateHighlightPanelProps> = (
       <div className="overflow-auto">
         {!showDuplicates && (
           <div className="py-4 text-center text-xs text-gray-400">
-            Click "Load" to find duplicates
+            Click &ldquo;Load&rdquo; to find duplicates
           </div>
         )}
         {showDuplicates && duplicatesLoading && (
@@ -69,6 +69,11 @@ export const DuplicateHighlightPanel: React.FC<DuplicateHighlightPanelProps> = (
             className="border-b border-gray-50 py-2 hover:bg-gray-50"
             onMouseEnter={() => onHighlight(new Set(group.members))}
             onMouseLeave={() => onHighlight(new Set())}
+            onFocus={() => onHighlight(new Set(group.members))}
+            onBlur={() => onHighlight(new Set())}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onHighlight(new Set(group.members)); } }}
           >
             <div className="mb-1 flex items-center gap-2">
               <SimilarityBadge distance={group.distance} />

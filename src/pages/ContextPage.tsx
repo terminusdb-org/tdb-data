@@ -50,7 +50,8 @@ export const ContextPage: React.FC = () => {
       }).unwrap();
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus(""), 3000);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Failed to save context:", err);
       setSaveStatus("error");
       setValid(false);
     }

@@ -38,8 +38,8 @@ export const Scatter3D: React.FC<Scatter3DProps> = ({
   width,
   height,
 }) => {
-  const selectionSet = selectionIds ?? new Set<string>();
-  const wsSet = workingSetIds ?? new Set<string>();
+  const selectionSet = useMemo(() => selectionIds ?? new Set<string>(), [selectionIds]);
+  const wsSet = useMemo(() => workingSetIds ?? new Set<string>(), [workingSetIds]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const layers = useMemo(() => {
     const selectedPoints = (points as Point3D[]).filter((d) => selectionSet.has(d.id));
@@ -149,7 +149,6 @@ export const Scatter3D: React.FC<Scatter3DProps> = ({
 
   const views = useMemo(
     () => [
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       new OrbitView({
         id: "main",
         controller: {
@@ -157,8 +156,8 @@ export const Scatter3D: React.FC<Scatter3DProps> = ({
           keyboardRotate: true,
           dragPan: true,
           inertia: true,
-        } as any,
-      } as any),
+        } as Record<string, unknown>,
+      } as Record<string, unknown>),
     ],
     [],
   );

@@ -79,11 +79,17 @@ export const MatchComparisonModal: React.FC<MatchComparisonModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close comparison"
     >
       <div
         className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Match comparison"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">

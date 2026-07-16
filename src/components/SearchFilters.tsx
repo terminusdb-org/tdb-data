@@ -32,7 +32,7 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
     onChange({ ...filters, types: next });
   };
 
-  const allTypes = availableTypes.slice().sort();
+  const allTypes = availableTypes.slice().sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-5">

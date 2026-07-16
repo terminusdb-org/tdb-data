@@ -4,7 +4,8 @@ import {
   useGetClusteringQuery, useToggleClusteringMutation,
   useGraphqlDocumentCountQuery,
 } from "@/store";
-import { PageShell, PageHeader, PagePlaceholder, btnSecondary, useRouteParams } from "@/components";
+import { isSubdocument } from "@/types/terminusdb";
+import { PageShell, PageHeader, PagePlaceholder, btnSecondary, useRouteParams, ConfirmDialog } from "@/components";
 import { buildApiPath } from "@/utils/routes";
 import type { SchemaClass, IndexStatus } from "@/types/terminusdb";
 
@@ -55,20 +56,19 @@ export const IndexStatsPage: React.FC = () => {
   );
   const [toggleClustering, { isLoading: clusteringToggling }] = useToggleClusteringMutation();
   const [clusteringError, setClusteringError] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
-  const handleToggleClustering = useCallback(async () => {
+  const doToggleClustering = useCallback(async (enable: boolean, action: string) => {
     if (!routeParams) return;
-    setClusteringError(null);
-    const current = clusteringData?.storeClustering ?? false;
-    const action = current ? "disable" : "enable";
-    if (!window.confirm(`${action === "enable" ? "Enable" : "Disable"} clustering for ${routeParams.org}/${routeParams.team}? This will modify the schema metadata on main.`)) {
-      return;
-    }
     try {
       await toggleClustering({
         org: routeParams.org,
         db: routeParams.team,
-        enable: !current,
+        enable,
       }).unwrap();
       refetchClustering();
     } catch (err) {
@@ -76,7 +76,22 @@ export const IndexStatsPage: React.FC = () => {
       const msg = String(errData?.["api:message"] ?? errData?.["api:status"] ?? `Failed to ${action} clustering`);
       setClusteringError(msg);
     }
-  }, [routeParams, clusteringData, toggleClustering, refetchClustering]);
+  }, [routeParams, toggleClustering, refetchClustering]);
+
+  const handleToggleClustering = useCallback(async () => {
+    if (!routeParams) return;
+    setClusteringError(null);
+    const current = clusteringData?.storeClustering ?? false;
+    const action = current ? "disable" : "enable";
+    setConfirmState({
+      title: `${action === "enable" ? "Enable" : "Disable"} Clustering`,
+      message: `${action === "enable" ? "Enable" : "Disable"} clustering for ${routeParams.org}/${routeParams.team}? This will modify the schema metadata on main.`,
+      onConfirm: () => {
+        setConfirmState(null);
+        void doToggleClustering(!current, action);
+      },
+    });
+  }, [routeParams, clusteringData, doToggleClustering]);
 
   const { data: schemaClasses, refetch: refetchSchema } = useGetSchemaQuery(
     { path: schemaPath, asList: true },
@@ -91,9 +106,9 @@ export const IndexStatsPage: React.FC = () => {
   const docTypes = useMemo(() => {
     if (!schemaClasses) return [];
     return schemaClasses
-      .filter((c: SchemaClass) => c["@type"] === "Class")
+      .filter((c: SchemaClass) => c["@type"] === "Class" && !isSubdocument(c))
       .map((c) => c["@id"])
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
   }, [schemaClasses]);
 
   const { data: graphqlCounts, isLoading: countsLoading, error: countErrorObj, refetch: refetchCounts } = useGraphqlDocumentCountQuery(
@@ -125,7 +140,8 @@ export const IndexStatsPage: React.FC = () => {
       refetchIndex();
       refetchCounts();
       setTimeout(() => setTriggerStatus(""), 5000);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Trigger index failed:", err);
       setTriggerStatus("error");
       setTimeout(() => setTriggerStatus(""), 5000);
     }
@@ -142,7 +158,8 @@ export const IndexStatsPage: React.FC = () => {
       refetchIndex();
       refetchCounts();
       setTimeout(() => setReindexStatus(""), 5000);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Reindex failed:", err);
       setReindexStatus("error");
       setTimeout(() => setReindexStatus(""), 5000);
     }
@@ -171,6 +188,7 @@ export const IndexStatsPage: React.FC = () => {
     : null;
 
   return (
+    <>
     <PageShell
       header={
         <PageHeader>
@@ -406,5 +424,15 @@ export const IndexStatsPage: React.FC = () => {
         )}
       </div>
     </PageShell>
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message ?? ""}
+        confirmLabel="Confirm"
+        destructive
+        onConfirm={() => confirmState?.onConfirm()}
+        onCancel={() => setConfirmState(null)}
+      />
+    </>
   );
 };

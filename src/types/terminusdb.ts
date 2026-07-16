@@ -158,6 +158,11 @@ export interface CandidatesResult {
   };
 }
 
+export function isSubdocument(cls: SchemaClass): boolean {
+  const sub = cls["@subdocument"];
+  return sub === true || sub === "true" || Array.isArray(sub);
+}
+
 export interface EmbeddingsByTypeResponse {
   readonly doc_embeddings: Readonly<Record<string, ReadonlyArray<number>>>;
   readonly clustering_embeddings: Readonly<Record<string, ReadonlyArray<number>>>;

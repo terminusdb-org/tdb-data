@@ -32,8 +32,13 @@ export const graphqlApi = baseApi.injectEndpoints({
           body: { query: `{ ${fields} }` },
         };
       },
-      transformResponse: (response: { data?: Record<string, number> }) =>
-        response.data ?? {},
+      transformResponse: (response: { data?: Record<string, number>; errors?: ReadonlyArray<{ message?: string }> }) => {
+        if (response.errors && response.errors.length > 0) {
+          const messages = response.errors.map((e) => e.message ?? "Unknown GraphQL error").join("; ");
+          throw new Error(messages);
+        }
+        return response.data ?? {};
+      },
     }),
   }),
 });

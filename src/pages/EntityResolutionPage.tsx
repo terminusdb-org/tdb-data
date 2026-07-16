@@ -16,7 +16,8 @@ import {
 import type { StageFilter, SortBy } from "@/store";
 import { PageShell, PageHeader, PagePlaceholder, useRouteParams, DocumentPreviewModal, MatchComparisonModal } from "@/components";
 import { buildApiPath } from "@/utils/routes";
-import type { CandidatesResult } from "@/types/terminusdb";
+import type { CandidatesResult, SchemaClass } from "@/types/terminusdb";
+import { isSubdocument } from "@/types/terminusdb";
 import { resolve, computeMatchStats, type ResolveResult, type MatchStats } from "@/utils/resolve";
 import { computeLexicalScores, normalizeId, type CandidateEntry as LexCandidateEntry } from "@/utils/lexical";
 import { parsePerfectMatchCSV } from "@/utils/csv";
@@ -207,8 +208,6 @@ export const EntityResolutionPage: React.FC = () => {
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
-
   const setDocType = urlSearchParams.get("setType") ?? "";
   const targetDocType = urlSearchParams.get("targetType") ?? "";
   const k = Number(urlSearchParams.get("k") ?? "3");
@@ -245,24 +244,24 @@ export const EntityResolutionPage: React.FC = () => {
   const [replaceTrial] = useReplaceRawJsonDocumentMutation();
   const [insertTrial] = useInsertRawJsonDocumentMutation();
 
-  const candidatesPath = buildApiPath(routeParams, "plugin/search-candidates");
-  const schemaPath = buildApiPath(routeParams, "schema");
-  const docPath = buildApiPath(routeParams, "document");
+  const candidatesPath = routeParams ? buildApiPath(routeParams, "plugin/search-candidates") : "";
+  const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
+  const docPath = routeParams ? buildApiPath(routeParams, "document") : "";
 
-  const { data: schemaClasses } = useGetSchemaQuery({ path: schemaPath, asList: true });
+  const { data: schemaClasses } = useGetSchemaQuery({ path: schemaPath, asList: true }, { skip: !routeParams });
 
   const docTypes = useMemo(() => {
     if (!schemaClasses) return [];
     return schemaClasses
-      .filter((c) => c["@type"] === "Class")
+      .filter((c: SchemaClass) => c["@type"] === "Class" && !isSubdocument(c))
       .map((c) => c["@id"])
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
   }, [schemaClasses]);
 
-  const trialsPath = buildApiPath(routeParams, "document");
+  const trialsPath = routeParams ? buildApiPath(routeParams, "document") : "";
   const { data: trialDoc, refetch: refetchTrials } = useGetDocumentsQuery(
     { path: trialsPath, id: TRIAL_DOC_ID, asList: true },
-    { skip: !candidates },
+    { skip: !candidates || !routeParams },
   );
 
   const trials = useMemo(() => {
@@ -274,7 +273,7 @@ export const EntityResolutionPage: React.FC = () => {
 
   const { data: previewDoc } = useGetDocumentsQuery(
     { path: docPath, id: previewId ?? "", asList: true },
-    { skip: !previewId },
+    { skip: !previewId || !routeParams },
   );
 
   const updateParam = (key: string, value: string) => {
@@ -463,8 +462,8 @@ export const EntityResolutionPage: React.FC = () => {
         message: "Delete ER trial",
       }).unwrap();
       refetchTrials();
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      console.error("Failed to delete ER trial:", err);
     }
   };
 
@@ -482,6 +481,7 @@ export const EntityResolutionPage: React.FC = () => {
   };
 
   const navigateToDoc = (id: string) => {
+    if (!routeParams) return;
     navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(id)}`);
   };
 
@@ -523,6 +523,8 @@ export const EntityResolutionPage: React.FC = () => {
     return buckets;
   }, [resolveResult, candidates, blendAlpha]);
 
+  if (!routeParams) return <PagePlaceholder>Select a data product first.</PagePlaceholder>;
+
   return (
     <PageShell
       header={
@@ -541,8 +543,9 @@ export const EntityResolutionPage: React.FC = () => {
             {/* Source/Target type selectors */}
             <div className="space-y-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Source type</label>
+                <label htmlFor="er-source-type" className="mb-1 block text-xs font-medium text-gray-500">Source type</label>
                 <select
+                  id="er-source-type"
                   value={setDocType}
                   onChange={(e) => updateParam("setType", e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -554,8 +557,9 @@ export const EntityResolutionPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Target type</label>
+                <label htmlFor="er-target-type" className="mb-1 block text-xs font-medium text-gray-500">Target type</label>
                 <select
+                  id="er-target-type"
                   value={targetDocType}
                   onChange={(e) => updateParam("targetType", e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -571,16 +575,18 @@ export const EntityResolutionPage: React.FC = () => {
             {/* K + Threshold */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-gray-500">K (neighbors)</label>
+                <label htmlFor="er-k" className="mb-1 block text-xs font-medium text-gray-500">K (neighbors)</label>
                 <input
+                  id="er-k"
                   type="number" min={1} max={50} value={k}
                   onChange={(e) => updateParam("k", e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                 />
               </div>
               <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-gray-500">Threshold</label>
+                <label htmlFor="er-threshold" className="mb-1 block text-xs font-medium text-gray-500">Threshold</label>
                 <input
+                  id="er-threshold"
                   type="number" step={0.01} min={0} max={1} value={threshold}
                   onChange={(e) => updateParam("threshold", e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
@@ -715,7 +721,7 @@ export const EntityResolutionPage: React.FC = () => {
         <div className="flex-1 overflow-auto p-6">
           {!candidates && !candidatesLoading && (
             <div className="flex h-full items-center justify-center text-sm text-gray-500">
-              Select source and target types, then click "Load Candidates" to begin.
+              Select source and target types, then click &ldquo;Load Candidates&rdquo; to begin.
             </div>
           )}
 

@@ -144,6 +144,9 @@ export const DocumentPicker: React.FC<DocumentPickerProps> = ({
               key={`c-${i}`}
               className={`cursor-pointer px-3 py-2 text-sm ${i === activeIndex ? "bg-dfrntBlue-50" : "hover:bg-gray-50"}`}
               onMouseDown={(e) => { e.preventDefault(); handleSelect(allItems[i]); }}
+              role="option"
+              aria-selected={i === activeIndex}
+              tabIndex={0}
             >
               <span className="font-medium text-gray-900">{c}</span>
               <span className="ml-2 text-xs text-gray-400">completion</span>
@@ -156,6 +159,9 @@ export const DocumentPicker: React.FC<DocumentPickerProps> = ({
                 key={`h-${h.id}`}
                 className={`cursor-pointer px-3 py-2 text-sm ${idx === activeIndex ? "bg-dfrntBlue-50" : "hover:bg-gray-50"}`}
                 onMouseDown={(e) => { e.preventDefault(); handleSelect(allItems[idx]); }}
+                role="option"
+                aria-selected={idx === activeIndex}
+                tabIndex={0}
               >
                 <span className="font-data font-medium text-gray-900">{h.id}</span>
                 <span className="ml-2 text-xs text-gray-400">{h.doc_type ?? "doc"}</span>

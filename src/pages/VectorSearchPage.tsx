@@ -9,7 +9,8 @@ import {
 } from "@/store";
 import { PageShell, PageHeader, PagePlaceholder, useRouteParams, SimilarityBadge, SearchResultCard, DocumentPicker } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
-import type { DuplicatesResponse, SearchHit, CompareResponse } from "@/types/terminusdb";
+import type { DuplicatesResponse, SearchHit, CompareResponse, SchemaClass } from "@/types/terminusdb";
+import { isSubdocument } from "@/types/terminusdb";
 import { distanceToPercent, similarityLabel } from "@/utils/similarity";
 
 type Tab = "similar" | "duplicates" | "compare";
@@ -210,9 +211,9 @@ const DuplicatesTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSe
   const docTypes = useMemo(() => {
     if (!schemaClasses) return [];
     return schemaClasses
-      .filter((c) => c["@type"] === "Class")
+      .filter((c: SchemaClass) => c["@type"] === "Class" && !isSubdocument(c))
       .map((c) => c["@id"])
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
   }, [schemaClasses]);
 
   const docTypesParam = docTypeInput ? [docTypeInput] : undefined;
@@ -373,7 +374,8 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
         target,
       }).unwrap();
       setResult(res);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Vector search failed:", err);
       setResult(null);
     }
   };

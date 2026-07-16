@@ -70,6 +70,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
             key={s.id}
             type="button"
             title={s.title}
+            aria-label={s.title}
             onClick={() => {
               if (collapsed) {
                 setCollapsed(false);
@@ -96,6 +97,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
       <button
         type="button"
         title={collapsed ? "Expand panel" : "Collapse panel"}
+        aria-label={collapsed ? "Expand panel" : "Collapse panel"}
         onClick={() => setCollapsed((v) => !v)}
         className={`${collapsed ? "" : "ml-auto"} flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600`}
       >
@@ -172,6 +174,7 @@ export const PanelDock: React.FC<PanelDockProps> = ({
               <button
                 type="button"
                 onClick={() => togglePanel(section.id)}
+                aria-label={`Close ${section.title} panel`}
                 className="text-gray-300 hover:text-gray-500"
                 title="Remove panel"
               >
@@ -233,6 +236,10 @@ export const PanelDock: React.FC<PanelDockProps> = ({
           <div
             className="fixed inset-0 z-40 bg-black/20 md:hidden"
             onClick={() => setMobileOpen(false)}
+            onKeyDown={(e) => { if (e.key === "Escape") setMobileOpen(false); }}
+            role="button"
+            tabIndex={0}
+            aria-label="Close panel"
           />
           <div
             className={`fixed top-0 z-50 flex h-full w-72 flex-col bg-white shadow-lg md:hidden ${
@@ -267,8 +274,8 @@ export const PanelDock: React.FC<PanelDockProps> = ({
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="ml-auto flex h-9 w-9 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100"
                 aria-label="Close panels"
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100"
               >
                 <svg
                   className="h-5 w-5"

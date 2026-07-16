@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { useGetSchemaQuery, useReplaceSchemaMutation, useReplaceSchemaDocumentMutation, useInsertSchemaDocumentMutation, useDeleteSchemaDocumentMutation, useAppSelector } from "@/store";
-import { PageShell, PageHeader, PagePlaceholder, btnPrimary, btnSecondary, selectClass, useRouteParams } from "@/components";
+import { PageShell, PageHeader, PagePlaceholder, btnPrimary, btnSecondary, selectClass, useRouteParams, ConfirmDialog } from "@/components";
 import { buildApiPath, buildRoutePath } from "@/utils/routes";
 import { isValidJson } from "@/utils/validation";
 import type { SchemaClass } from "@/types/terminusdb";
@@ -25,6 +25,11 @@ export const SchemaPage: React.FC = () => {
   const [valid, setValid] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"" | "saving" | "saved" | "error">("");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [replaceSchema] = useReplaceSchemaMutation();
   const [replaceSchemaDocument] = useReplaceSchemaDocumentMutation();
   const [insertSchemaDocument] = useInsertSchemaDocumentMutation();
@@ -140,9 +145,20 @@ export const SchemaPage: React.FC = () => {
     navigate(`${routeBase}/schema/class/new`);
   };
 
-  const handleDeleteClass = async () => {
+  const handleDeleteClass = () => {
     if (!selectedClassId) return;
-    if (!window.confirm(`Delete class "${selectedClassId}"? This cannot be undone.`)) return;
+    setConfirmState({
+      title: "Delete Class",
+      message: `Delete class "${selectedClassId}"? This cannot be undone.`,
+      onConfirm: () => {
+        setConfirmState(null);
+        void doDeleteClass();
+      },
+    });
+  };
+
+  const doDeleteClass = async () => {
+    if (!selectedClassId) return;
     setSaveStatus("saving");
     setSaveError(null);
     try {
@@ -185,6 +201,7 @@ export const SchemaPage: React.FC = () => {
     : btnPrimary;
 
   return (
+    <>
     <PageShell
       header={
         <PageHeader>
@@ -251,5 +268,15 @@ export const SchemaPage: React.FC = () => {
         )}
       </div>
     </PageShell>
+    <ConfirmDialog
+      open={confirmState !== null}
+      title={confirmState?.title ?? ""}
+      message={confirmState?.message ?? ""}
+      confirmLabel="Delete"
+      destructive
+      onConfirm={() => confirmState?.onConfirm()}
+      onCancel={() => setConfirmState(null)}
+    />
+    </>
   );
 };

@@ -131,7 +131,7 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
       await deleteDoc({ path: docPath, id, author: username, message: `Delete named set "${id}"` });
       refetch();
     },
-    [deleteDoc, docPath, refetch]
+    [deleteDoc, docPath, refetch, username]
   );
 
   const filteredItems = useMemo(() => {
@@ -201,7 +201,6 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
               if (e.key === "Enter") handleSave();
               if (e.key === "Escape") setShowSaveDialog(false);
             }}
-            autoFocus
           />
           <div className="mt-1 flex gap-2">
             <button

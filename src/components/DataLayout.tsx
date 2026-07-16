@@ -84,6 +84,10 @@ export const DataLayout: React.FC = () => {
           <div
             className="fixed inset-0 z-40 bg-black/20 md:hidden"
             onClick={() => setMobileNavOpen(false)}
+            onKeyDown={(e) => { if (e.key === "Escape") setMobileNavOpen(false); }}
+            role="button"
+            tabIndex={0}
+            aria-label="Close navigation"
           />
           <div className="fixed left-0 top-0 z-50 h-full md:hidden">
             <IconRail onNavigate={() => setMobileNavOpen(false)} />
@@ -121,7 +125,7 @@ export const DataLayout: React.FC = () => {
             </button>
           </div>
         )}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-3 sm:p-6">
           {params.commitId && (
             <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
               <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

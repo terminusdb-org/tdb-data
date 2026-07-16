@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, logout, useAppSelector, selectLatestCommitId, selectConnectionStatus } from "@/store";
 
 interface RailItem {
@@ -102,6 +102,7 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
   const params = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const location = useLocation();
   const username = useAppSelector((state) => state.auth.username);
   const latestCommitId = useAppSelector(selectLatestCommitId);
   const connectionStatus = useAppSelector(selectConnectionStatus);
@@ -123,9 +124,13 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
   };
 
   const currentSegment = (() => {
-    if (!params["*"]) return "";
-    const parts = params["*"].split("/");
-    return parts[0] ?? "";
+    const parts = location.pathname.split("/");
+    const localIdx = parts.indexOf("local");
+    if (localIdx === -1) return "";
+    // After 'local' comes 'branch/{name}' or 'commit/{id}', then the segment
+    const segmentIdx = localIdx + 3;
+    if (segmentIdx >= parts.length) return "";
+    return parts[segmentIdx] ?? "";
   })();
 
   return (
@@ -138,7 +143,7 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col items-center overflow-y-auto py-2">
+      <nav className="flex flex-1 flex-col items-center overflow-y-auto py-2" aria-label="Main navigation">
         {allItems.map((item) => {
           const isActive = currentSegment === item.segment;
           const path = buildPath(item.segment);
@@ -149,6 +154,8 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
               type="button"
               disabled={isDisabled}
               title={item.label}
+              aria-label={item.label}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => {
                 navigate(path);
                 onNavigate?.();
@@ -191,6 +198,7 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         <button
           type="button"
           title="All data products"
+          aria-label="All data products"
           onClick={() => {
             navigate("/");
             onNavigate?.();
@@ -204,6 +212,7 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         <button
           type="button"
           title={`Sign out (${username})`}
+          aria-label={`Sign out (${username})`}
           onClick={() => {
             dispatch(logout());
             navigate("/login", { replace: true });

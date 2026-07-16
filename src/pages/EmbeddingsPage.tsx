@@ -23,6 +23,7 @@ import {
 import { buildApiPath } from "@/utils/routes";
 import { formatGraphql, formatHandlebars, renderHandlebars } from "@/utils/format";
 import type { SchemaClass } from "@/types/terminusdb";
+import { isSubdocument } from "@/types/terminusdb";
 
 const EDITOR_HEIGHT = 240;
 
@@ -168,7 +169,7 @@ export const EmbeddingsPage: React.FC = () => {
     if (typeFromUrl !== selectedType) {
       setSelectedType(typeFromUrl);
     }
-  }, [typeFromUrl]);
+  }, [typeFromUrl, selectedType]);
 
   const schemaReadPath = routeParams ? buildApiPath(routeParams, "schema") : "";
   const docPath = routeParams ? buildApiPath(routeParams, "document") : "";
@@ -207,7 +208,7 @@ export const EmbeddingsPage: React.FC = () => {
   const docTypes = useMemo(() => {
     if (!schemaClasses) return [];
     return schemaClasses
-      .filter((c) => c["@type"] === "Class")
+      .filter((c) => c["@type"] === "Class" && !isSubdocument(c))
       .map((c) => ({
         id: c["@id"],
         hasEmbedding: getEmbeddingFromSchema(c) !== null,
@@ -304,7 +305,8 @@ export const EmbeddingsPage: React.FC = () => {
       setStatus("saved");
       setSchemaVersion((v) => v + 1);
       setTimeout(() => setStatus(""), 3000);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Failed to save embedding config:", err);
       setStatus("error");
     }
   };
@@ -408,7 +410,7 @@ export const EmbeddingsPage: React.FC = () => {
         {/* Type selector */}
         <div className="flex items-end gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Document Type</label>
+            <span className="block text-xs font-medium text-gray-500 mb-1">Document Type</span>
             <TypeCombobox
               items={docTypes}
               value={selectedType}

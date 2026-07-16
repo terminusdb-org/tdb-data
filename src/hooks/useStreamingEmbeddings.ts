@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "@/config";
+import { store, selectAuthCredentials } from "@/store";
 
 export interface StreamingEmbeddingsParams {
   readonly path: string;
@@ -92,15 +93,13 @@ export function useStreamingEmbeddings(
       doc_types: params.docTypes ?? [],
     });
 
-    const authState = JSON.parse(
-      window.localStorage.getItem("terminusdb_data_auth") ?? "{}",
-    ) as { credentials?: string };
+    const credentials = selectAuthCredentials(store.getState());
     const headers: Record<string, string> = {
       Accept: "application/x-ndjson",
       "Content-Type": "application/json",
     };
-    if (authState.credentials) {
-      headers.Authorization = `Basic ${authState.credentials}`;
+    if (credentials) {
+      headers.Authorization = `Basic ${credentials}`;
     }
 
     (async () => {
@@ -120,7 +119,7 @@ export function useStreamingEmbeddings(
         const servedCommit = response.headers.get("x-served-commit") ?? "";
         const storeClustering =
           (response.headers.get("x-store-clustering") ?? "false").toLowerCase() === "true";
-        const totalCount = parseInt(response.headers.get("x-total-count") ?? "0", 10) || 0;
+        const totalCount = Number.parseInt(response.headers.get("x-total-count") ?? "0", 10) || 0;
 
         setState((prev) => ({
           ...prev,
@@ -139,6 +138,19 @@ export function useStreamingEmbeddings(
         const docEmbeddings: Record<string, number[]> = {};
         const clusteringEmbeddings: Record<string, number[]> = {};
         let loadedCount = 0;
+        let pendingCount = 0;
+        const FLUSH_INTERVAL = 50;
+
+        const flushState = (streaming: boolean) => {
+          setState((prev) => ({
+            ...prev,
+            docEmbeddings: { ...docEmbeddings },
+            clusteringEmbeddings: { ...clusteringEmbeddings },
+            loadedCount,
+            isStreaming: streaming,
+          }));
+          pendingCount = 0;
+        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -160,13 +172,11 @@ export function useStreamingEmbeddings(
                 clusteringEmbeddings[record.doc_id] = [...record.clustering_embedding];
               }
               loadedCount++;
+              pendingCount++;
 
-              setState((prev) => ({
-                ...prev,
-                docEmbeddings: { ...docEmbeddings },
-                clusteringEmbeddings: { ...clusteringEmbeddings },
-                loadedCount,
-              }));
+              if (pendingCount >= FLUSH_INTERVAL) {
+                flushState(true);
+              }
 
               callbacksRef.current.onProgress?.(loadedCount, totalCount);
             } catch {
@@ -190,13 +200,7 @@ export function useStreamingEmbeddings(
           }
         }
 
-        setState((prev) => ({
-          ...prev,
-          docEmbeddings: { ...docEmbeddings },
-          clusteringEmbeddings: { ...clusteringEmbeddings },
-          loadedCount,
-          isStreaming: false,
-        }));
+        flushState(false);
 
         callbacksRef.current.onComplete({
           docEmbeddings,

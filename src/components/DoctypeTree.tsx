@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { SchemaClass } from "@/types/terminusdb";
+import { isSubdocument as isSubdoc } from "@/types/terminusdb";
 
 interface DoctypeTreeNode {
   readonly id: string;
@@ -14,10 +15,7 @@ function buildTree(classes: SchemaClass[]): DoctypeTreeNode[] {
   const classMap = new Map<string, SchemaClass>();
   classes.forEach((cls) => classMap.set(cls["@id"], cls));
 
-  const isSubdocument = (cls: SchemaClass): boolean => {
-    const sub = cls["subdocument"];
-    return sub === true || sub === "true";
-  };
+  const isSubdocument = (cls: SchemaClass): boolean => isSubdoc(cls);
 
   const isAbstract = (cls: SchemaClass): boolean => {
     const abs = cls["abstract"];
@@ -91,7 +89,14 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, level, onSelect, selectedType
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={() => onSelect(node.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect(node.id);
+          }
+        }}
         role="treeitem"
+        tabIndex={0}
         aria-expanded={hasChildren ? expanded : undefined}
         aria-selected={isSelected}
       >
@@ -117,7 +122,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, level, onSelect, selectedType
         </span>
       </div>
       {expanded && hasChildren && (
-        <div role="group">
+        <div>
           {node.children.map((child) => (
             <TreeItem
               key={child.id}

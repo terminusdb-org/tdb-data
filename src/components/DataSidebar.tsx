@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAppDispatch, logout, useAppSelector, selectLatestCommitId, selectConnectionStatus } from "@/store";
 
 interface NavItem {
@@ -127,6 +127,7 @@ export const DataSidebar: React.FC = () => {
   const username = useAppSelector((state) => state.auth.username);
   const latestCommitId = useAppSelector(selectLatestCommitId);
   const connectionStatus = useAppSelector(selectConnectionStatus);
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const { org, team, branch, commitId } = params;
@@ -147,9 +148,13 @@ export const DataSidebar: React.FC = () => {
   };
 
   const currentSegment = (() => {
-    if (!params["*"]) return "";
-    const parts = params["*"].split("/");
-    return parts[0] ?? "";
+    const parts = location.pathname.split("/");
+    const localIdx = parts.indexOf("local");
+    if (localIdx === -1) return "";
+    // After 'local' comes 'branch/{name}' or 'commit/{id}', then the segment
+    const segmentIdx = localIdx + 3;
+    if (segmentIdx >= parts.length) return "";
+    return parts[segmentIdx] ?? "";
   })();
 
   return (

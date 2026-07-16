@@ -1,4 +1,6 @@
 export { ProtectedRoute } from "./ProtectedRoute";
+export { ErrorBoundary } from "./ErrorBoundary";
+export { ConfirmDialog } from "./ConfirmDialog";
 export { DataLayout } from "./DataLayout";
 export { DataSidebar } from "./DataSidebar";
 export { IconRail } from "./IconRail";

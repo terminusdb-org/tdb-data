@@ -1,11 +1,12 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { ProtectedRoute, DataLayout } from "@/components";
+import { ProtectedRoute, DataLayout, ErrorBoundary } from "@/components";
 import { LoginPage, DataProductPickerPage, MainPage, DoctypesPage, RawJsonPage, DocumentsPage, GraphQLPage, SchemaPage, ContextPage, VectorSearchPage, EmbeddingsPage, IndexStatsPage, EntityResolutionPage, BranchHistoryPage, ProjectionPage } from "@/pages";
 import { config } from "@/config";
 
 export const App: React.FC = () => {
   return (
+    <ErrorBoundary>
     <BrowserRouter basename={config.basePath || "/"}>
       <Routes>
         <Route path="/*" element={<Outlet />}>
@@ -60,5 +61,6 @@ export const App: React.FC = () => {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 };

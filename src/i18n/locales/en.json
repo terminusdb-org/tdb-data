@@ -77,7 +77,9 @@
     "page": "Page",
     "hide": "Hide",
     "enable": "Enable",
-    "disable": "Disable"
+    "disable": "Disable",
+    "yes": "Yes",
+    "no": "No"
   },
   "nav": {
     "search": "Search",
@@ -668,7 +670,7 @@
     "documentsSent": "Documents Sent",
     "searchableDocuments": "Searchable Documents",
     "commitsReceived": "Commits Received",
-    "pendingUpdates": "Pending Updates",
+    "pendingIndexing": "Pending Indexing",
     "documentsByType": "Documents by Type",
     "indexStatus": "Index Status",
     "clustering": "Clustering",
@@ -705,6 +707,20 @@
     "toggleClusteringMessage": "{{action}} clustering for {{org}}/{{team}}? This will modify the schema metadata on main.",
     "failedToToggleClustering": "Failed to {{action}} clustering",
     "triggerIndexFailed": "Trigger index failed:"
+  },
+  "indexer": {
+    "title": "Indexer Status",
+    "configured": "Configured",
+    "notConfigured": "Not Configured",
+    "available": "Available",
+    "notAvailable": "Not Available",
+    "operational": "Operational",
+    "backend": "Backend",
+    "notConfiguredMessage": "No semantic indexer is configured. Indexing, search, vector search, entity resolution, and duplicate detection features are disabled. Configure TERMINUSDB_INDEXER_BACKEND and the corresponding endpoint to enable these features.",
+    "notAvailableMessage": "The indexer backend is configured ({{backend}}) but the indexer runtime is not available. This may indicate the Rust indexer FFI is not loaded. Please check the server configuration.",
+    "operationalMessage": "The indexer is configured and operational.",
+    "loadingStatus": "Loading indexer status…",
+    "featuresDisabled": "Indexer-dependent features are disabled."
   },
   "branchHistory": {
     "title": "Commit History",

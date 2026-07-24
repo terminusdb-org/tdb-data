@@ -60,6 +60,8 @@ export { useGetClusteringQuery, useToggleClusteringMutation } from "./api/cluste
 export { setClusteringToggling, setClusteringError, clearClusteringError, selectClusteringToggling, selectClusteringError } from "./clusteringSlice";
 export { useGetEmbeddingsByTypeQuery } from "./api/projectionApi";
 export type { EmbeddingsByTypeParams } from "./api/projectionApi";
+export { useGetInfoQuery } from "./api/infoApi";
+export type { ServerInfo, IndexerInfo } from "./api/infoApi";
 export {
   setConnectionStatus, setCommitStreamError, addCommitEntry, clearCommitHistory,
   startCommitStream, stopCommitStream,

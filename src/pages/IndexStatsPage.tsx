@@ -6,7 +6,7 @@ import {
   useGraphqlDocumentCountQuery,
 } from "@/store";
 import { isSubdocument } from "@/types/terminusdb";
-import { PageShell, PageHeader, PagePlaceholder, btnSecondary, useRouteParams, ConfirmDialog } from "@/components";
+import { PageShell, PageHeader, PagePlaceholder, btnSecondary, useRouteParams, ConfirmDialog, IndexerStatusPanel, useIndexerDisabled } from "@/components";
 import { buildApiPath } from "@/utils/routes";
 import type { SchemaClass, IndexStatus } from "@/types/terminusdb";
 
@@ -43,6 +43,7 @@ function truncateId(id: string | null | undefined, maxLen = 24): string {
 export const IndexStatsPage: React.FC = () => {
   const { t } = useTranslation();
   const routeParams = useRouteParams();
+  const indexerDisabled = useIndexerDisabled();
   const [triggerIndex] = useTriggerIndexMutation();
   const [deleteIndex] = useDeleteIndexMutation();
   const [triggerStatus, setTriggerStatus] = useState<"" | "indexing" | "success" | "error">("");
@@ -194,13 +195,13 @@ export const IndexStatsPage: React.FC = () => {
     <PageShell
       header={
         <PageHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-gray-900">{t("indexStats.title")}</h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleTriggerIndex}
-                disabled={triggerStatus === "indexing" || reindexStatus === "deleting" || reindexStatus === "indexing"}
+                disabled={indexerDisabled || triggerStatus === "indexing" || reindexStatus === "deleting" || reindexStatus === "indexing"}
                 className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                   triggerStatus === "success"
                     ? "bg-green-100 text-green-700"
@@ -214,7 +215,7 @@ export const IndexStatsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleReindex}
-                disabled={triggerStatus === "indexing" || reindexStatus === "deleting" || reindexStatus === "indexing"}
+                disabled={indexerDisabled || triggerStatus === "indexing" || reindexStatus === "deleting" || reindexStatus === "indexing"}
                 className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                   reindexStatus === "success"
                     ? "bg-green-100 text-green-700"
@@ -239,6 +240,9 @@ export const IndexStatsPage: React.FC = () => {
       }
     >
       <div className="space-y-6 p-4">
+        {/* Indexer status panel */}
+        <IndexerStatusPanel />
+
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard label={t("indexStats.totalDocuments")} value={totalDocs !== null ? totalDocs : "—"} />
@@ -417,9 +421,9 @@ export const IndexStatsPage: React.FC = () => {
               <StatCard label={t("indexStats.textSegmentsIndexed")} value={eng.text_segments_indexed ?? "—"} />
               <StatCard label={t("indexStats.commitsReceived")} value={eng.commits_received ?? "—"} />
               <StatCard
-                label={t("indexStats.pendingUpdates")}
-                value={eng.pending_updates ?? 0}
-                highlight={(eng.pending_updates ?? 0) > 0}
+                label={t("indexStats.pendingIndexing")}
+                value={eng.pending_indexing ?? 0}
+                highlight={(eng.pending_indexing ?? 0) > 0}
               />
             </div>
           </div>

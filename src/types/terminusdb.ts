@@ -109,7 +109,7 @@ export interface IndexStatus {
   };
   readonly engine?: {
     readonly commits_received?: number;
-    readonly pending_updates?: number;
+    readonly pending_indexing?: number;
     readonly processed_documents?: number;
     readonly documents_sent?: number;
     readonly searchable_documents?: number;

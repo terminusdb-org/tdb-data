@@ -23,6 +23,8 @@ export interface Scatter3DProps {
   readonly onHover?: (id: string | null) => void;
   readonly width: number;
   readonly height: number;
+  readonly savedViewState?: { target: [number, number, number]; zoom: number; rotationX?: number; rotationOrbit?: number } | null;
+  readonly onViewStateChange?: (viewState: { target: [number, number, number]; zoom: number; rotationX?: number; rotationOrbit?: number }) => void;
 }
 
 export const Scatter3D: React.FC<Scatter3DProps> = ({
@@ -37,6 +39,8 @@ export const Scatter3D: React.FC<Scatter3DProps> = ({
   onHover,
   width,
   height,
+  savedViewState,
+  onViewStateChange,
 }) => {
   const selectionSet = useMemo(() => selectionIds ?? new Set<string>(), [selectionIds]);
   const wsSet = useMemo(() => workingSetIds ?? new Set<string>(), [workingSetIds]);
@@ -164,15 +168,15 @@ export const Scatter3D: React.FC<Scatter3DProps> = ({
 
   const initialViewState = useMemo(() => ({
     main: {
-      target: [0, 0, 0] as [number, number, number],
-      zoom: 1,
+      target: (savedViewState?.target ?? [0, 0, 0]) as [number, number, number],
+      zoom: savedViewState?.zoom ?? 1,
       minZoom: -10,
       maxZoom: 20,
-      rotationX: 45,
-      rotationOrbit: 30,
+      rotationX: savedViewState?.rotationX ?? 45,
+      rotationOrbit: savedViewState?.rotationOrbit ?? 30,
     },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any, []);
+  }) as any, [savedViewState]);
 
   // 3D cross-hair at world origin [0,0,0] — stays visible as user navigates
   const crossHairLayers = useMemo(() => {
@@ -235,6 +239,18 @@ export const Scatter3D: React.FC<Scatter3DProps> = ({
         initialViewState={initialViewState}
         width={width}
         height={height}
+        onViewStateChange={
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (e: any) => {
+            const vs = e.viewState;
+            onViewStateChange?.({
+              target: [vs.target[0], vs.target[1], vs.target[2] ?? 0],
+              zoom: vs.zoom,
+              rotationX: vs.rotationX ?? 45,
+              rotationOrbit: vs.rotationOrbit ?? 30,
+            });
+          }
+        }
       />
     </div>
   );

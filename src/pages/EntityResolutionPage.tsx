@@ -15,7 +15,7 @@ import {
   selectERResultsTab, selectERStageFilter, selectERSortBy, selectERSortDir,
 } from "@/store";
 import type { StageFilter, SortBy } from "@/store";
-import { PageShell, PageHeader, PagePlaceholder, useRouteParams, DocumentPreviewModal, MatchComparisonModal } from "@/components";
+import { PageShell, PageHeader, PagePlaceholder, useRouteParams, DocumentPreviewModal, MatchComparisonModal, IndexerDisabledNotice, useIndexerDisabled } from "@/components";
 import { buildApiPath } from "@/utils/routes";
 import type { CandidatesResult, SchemaClass } from "@/types/terminusdb";
 import { isSubdocument } from "@/types/terminusdb";
@@ -245,6 +245,7 @@ export const EntityResolutionPage: React.FC = () => {
   const [candidatesMutation] = useCandidatesMutation();
   const [replaceTrial] = useReplaceRawJsonDocumentMutation();
   const [insertTrial] = useInsertRawJsonDocumentMutation();
+  const indexerDisabled = useIndexerDisabled();
 
   const candidatesPath = routeParams ? buildApiPath(routeParams, "plugin/search-candidates") : "";
   const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
@@ -663,7 +664,7 @@ export const EntityResolutionPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleLoadCandidates}
-                disabled={candidatesLoading}
+                disabled={indexerDisabled || candidatesLoading}
                 className="flex-1 rounded-md bg-dfrntBlue-500 px-4 py-2 text-sm font-medium text-white hover:bg-dfrntBlue-400 disabled:bg-gray-300"
               >
                 {candidatesLoading ? `${t("common.loading")} ${loadElapsed}s` : candidates ? t("entityResolution.reloadCandidates") : t("entityResolution.loadCandidates")}
@@ -721,6 +722,7 @@ export const EntityResolutionPage: React.FC = () => {
 
         {/* Right panel: Results */}
         <div className="flex-1 overflow-auto p-6">
+          {indexerDisabled && <IndexerDisabledNotice className="mb-4" />}
           {!candidates && !candidatesLoading && (
             <div className="flex h-full items-center justify-center text-sm text-gray-500">
               {t("entityResolution.selectToBegin")}

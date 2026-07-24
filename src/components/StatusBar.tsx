@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetIndexStatusQuery, useGetSchemaQuery, useGraphqlDocumentCountQuery } from "@/store";
+import { useIndexerDisabled } from "@/components/IndexerStatusPanel";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import { isSubdocument, type SchemaClass } from "@/types/terminusdb";
 
@@ -9,6 +10,7 @@ export const StatusBar: React.FC = () => {
   const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
+  const indexerDisabled = useIndexerDisabled();
 
   const org = params.org;
   const team = params.team;
@@ -86,7 +88,11 @@ export const StatusBar: React.FC = () => {
       <button type="button" onClick={handleClick("index-stats")} className="hidden hover:text-dfrntBlue-600 hover:underline sm:inline">
         {t("statusBar.indexedLabel")}{" "}
         <span className="font-data font-medium text-gray-700">
-          {indexStatus?.engine?.searchable_documents != null ? indexStatus.engine.searchable_documents.toLocaleString() : "—"}
+          {(() => {
+            if (indexerDisabled) return "N/A";
+            if (indexStatus?.engine?.searchable_documents != null) return indexStatus.engine.searchable_documents.toLocaleString();
+            return "—";
+          })()}
         </span>
       </button>
       <span className="hidden text-gray-300 sm:inline">|</span>

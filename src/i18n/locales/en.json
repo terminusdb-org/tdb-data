@@ -79,7 +79,10 @@
     "enable": "Enable",
     "disable": "Disable",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "format": "Format",
+    "formatting": "Formatting…",
+    "loadingSchema": "Loading schema…"
   },
   "nav": {
     "search": "Search",
@@ -357,7 +360,17 @@
     "selectDocForBackend": "Select a document to fetch backend embedding text.",
     "loadingSchema": "Loading schema…",
     "shownOfTotal": "({{shown}} shown of {{total}})",
-    "error": "Error"
+    "error": "Error",
+    "failedToSaveConfig": "Failed to save embedding config",
+    "fetchingEmbeddingText": "Fetching embedding text…",
+    "formatEmbeddingFromServer": "(format=embedding from server)",
+    "previewDescription": "Runs the GraphQL query, then renders the Handlebars template in-browser.",
+    "saveMetadataToSeeOutput": "Save embedding metadata and ensure the backend has embedding queries defined to see output.",
+    "selectDocumentToFetch": "Select a document to fetch backend embedding text.",
+    "selectDocumentToPreview": "Select a document to preview embedding text.",
+    "selected": "Selected",
+    "selectTypeToBegin": "Select a document type to begin editing embedding configuration.",
+    "updatedEmbedding": "Updated embedding {{field}} for {{type}}"
   },
   "graphql": {
     "title": "GraphQL",
@@ -365,7 +378,8 @@
     "results": "Results",
     "run": "Run Query",
     "selectDataProduct": "Select a data product first.",
-    "failedToLoad": "Failed to load GraphiQL. Make sure the package is installed."
+    "failedToLoad": "Failed to load GraphiQL. Make sure the package is installed.",
+    "loadFailedMsg": "Failed to load GraphiQL. Make sure the package is installed."
   },
   "projection": {
     "title2d": "2D Projection",
@@ -398,7 +412,16 @@
     "duplicates": "Duplicates",
     "workingSet": "Working Set",
     "streamingError": "Streaming embeddings error: {{message}}",
-    "noDocType": "Unknown"
+    "noDocType": "Unknown",
+    "2dTitle": "2D Projection",
+    "3dTitle": "3D Projection",
+    "clickToViewDetails": "Click a point to view document details",
+    "noDocumentFound": "No document found for {{id}}",
+    "noEmbeddingsFound": "No embeddings found. Index your documents first.",
+    "points": "points",
+    "selected": "selected",
+    "selectTypeOrWorkingSet": "Select a document type or enable Working Set union to load embeddings.",
+    "umapDescription": "UMAP dimension reduction of document embeddings"
   },
   "projectionSearchBar": {
     "placeholder": "Search documents to highlight in projection…",
@@ -532,7 +555,23 @@
     "comparisonFailed": "Comparison failed",
     "similarity": "Similarity",
     "distance": "Distance",
-    "selectDataProduct": "Select a data product first."
+    "selectDataProduct": "Select a data product first.",
+    "compareFailed": "Comparison failed",
+    "compareTabDescription": "Compare two documents or text snippets by embedding distance.",
+    "comparing": "Comparing…",
+    "duplicateGroup": "{{count}} duplicate group(s)",
+    "duplicatesTabDescription": "Find near-identical document pairs across the dataset.",
+    "enterTextToFind": "Enter text to find similar documents…",
+    "failedToFindSimilar": "Failed to find similar documents",
+    "finding": "Finding…",
+    "noDuplicatesFound": "No duplicates found.",
+    "noSimilarFound": "No similar documents found.",
+    "searchForDocument": "Search for a document…",
+    "selectSourceDocument": "Select source document…",
+    "selectTargetDocument": "Select target document…",
+    "similarDocument": "{{count}} similar document(s)",
+    "similarTabDescription": "Find documents semantically similar to a specific document or to raw text.",
+    "targetDocument": "Target document"
   },
   "entityResolution": {
     "title": "Entity Resolution Tuning",
@@ -645,7 +684,9 @@
     "loading": "Loading… {{n}}s",
     "set": "set",
     "target": "target",
-    "edges": "edges"
+    "edges": "edges",
+    "compare": "Compare",
+    "savedTrials": "Saved Trials"
   },
   "indexStats": {
     "title": "Index & Document Statistics",

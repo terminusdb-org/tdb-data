@@ -34,4 +34,5 @@ export type { ProjectionSearchBarProps } from "./ProjectionSearchBar";
 export { WorkingSetPanel } from "./WorkingSetPanel";
 export type { WorkingSetPanelProps } from "./WorkingSetPanel";
 export { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, btnSecondary, inputClass, selectClass, errorBanner } from "./ui";
+export { IndexerStatusPanel, IndexerDisabledNotice, useIndexerDisabled } from "./IndexerStatusPanel";
 export { useRouteParams } from "@/hooks/useRouteParams";

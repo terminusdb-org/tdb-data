@@ -23,6 +23,8 @@ export interface Scatter2DProps {
   readonly onHover?: (id: string | null) => void;
   readonly width: number;
   readonly height: number;
+  readonly savedViewState?: { target: [number, number, number]; zoom: number } | null;
+  readonly onViewStateChange?: (viewState: { target: [number, number, number]; zoom: number }) => void;
 }
 
 export const Scatter2D: React.FC<Scatter2DProps> = ({
@@ -37,6 +39,8 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
   onHover,
   width,
   height,
+  savedViewState,
+  onViewStateChange,
 }) => {
   const selectionSet = useMemo(() => selectionIds ?? new Set<string>(), [selectionIds]);
   const wsSet = useMemo(() => workingSetIds ?? new Set<string>(), [workingSetIds]);
@@ -176,13 +180,13 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
 
   const initialViewState = useMemo(() => ({
     main: {
-      target: [0, 0, 0] as [number, number, number],
-      zoom: 1,
+      target: (savedViewState?.target ?? [0, 0, 0]) as [number, number, number],
+      zoom: savedViewState?.zoom ?? 1,
       minZoom: -10,
       maxZoom: 20,
     },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any, []);
+  }) as any, [savedViewState]);
 
   return (
     <div className={hoveredId ? "scatter-cursor-pointer" : "scatter-cursor-grab"} style={{ width, height, background: "#fafafa" }}>
@@ -196,6 +200,16 @@ export const Scatter2D: React.FC<Scatter2DProps> = ({
         initialViewState={initialViewState}
         width={width}
         height={height}
+        onViewStateChange={
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (e: any) => {
+            const vs = e.viewState;
+            onViewStateChange?.({
+              target: [vs.target[0], vs.target[1], vs.target[2] ?? 0],
+              zoom: vs.zoom,
+            });
+          }
+        }
       />
     </div>
   );

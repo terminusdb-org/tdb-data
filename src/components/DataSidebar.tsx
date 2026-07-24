@@ -9,9 +9,10 @@ interface NavItem {
   readonly segment: string;
 }
 
-interface NavSection {
-  readonly title: string;
+interface NavGroup {
+  readonly title?: string;
   readonly items: ReadonlyArray<NavItem>;
+  readonly spaced?: boolean;
 }
 
 const searchIcon = (
@@ -85,11 +86,12 @@ const historyIcon = (
   </svg>
 );
 
-const topItems: ReadonlyArray<NavItem> = [
-  { label: "nav.search", segment: "", icon: searchIcon },
-];
-
-const navSections: ReadonlyArray<NavSection> = [
+const navGroups: ReadonlyArray<NavGroup> = [
+  {
+    items: [
+      { label: "nav.search", segment: "", icon: searchIcon },
+    ],
+  },
   {
     title: "nav.types",
     items: [
@@ -114,11 +116,13 @@ const navSections: ReadonlyArray<NavSection> = [
       { label: "nav.projection", segment: "projection", icon: embeddingsIcon },
     ],
   },
-];
-
-const bottomItems: ReadonlyArray<NavItem> = [
-  { label: "nav.context", segment: "context", icon: contextIcon },
-  { label: "nav.history", segment: "history", icon: historyIcon },
+  {
+    spaced: true,
+    items: [
+      { label: "nav.context", segment: "context", icon: contextIcon },
+      { label: "nav.history", segment: "history", icon: historyIcon },
+    ],
+  },
 ];
 
 export const DataSidebar: React.FC = () => {
@@ -210,36 +214,14 @@ export const DataSidebar: React.FC = () => {
       )}
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        {topItems.map((item) => {
-          const isActive = currentSegment === item.segment;
-          const path = buildPath(item.segment);
-          const isDisabled = !hasContext;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={isDisabled}
-              onClick={() => navigate(path)}
-              className={`mb-1 flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-dfrntBlue-50 text-dfrntBlue-700"
-                  : isDisabled
-                    ? "cursor-not-allowed text-gray-300"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              {item.icon}
-              {t(item.label)}
-            </button>
-          );
-        })}
-
-        {navSections.map((section) => (
-          <div key={section.title} className="mt-3">
-            <div className="mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              {t(section.title)}
-            </div>
-            {section.items.map((item) => {
+        {navGroups.map((group) => (
+          <div key={group.title ?? group.items[0]?.label ?? ""} className={group.spaced ? "mt-3" : ""}>
+            {group.title && (
+              <div className="mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                {t(group.title)}
+              </div>
+            )}
+            {group.items.map((item) => {
               const isActive = currentSegment === item.segment;
               const path = buildPath(item.segment);
               const isDisabled = !hasContext;
@@ -258,36 +240,12 @@ export const DataSidebar: React.FC = () => {
                   }`}
                 >
                   {item.icon}
-                  {item.label}
+                  {t(item.label)}
                 </button>
               );
             })}
           </div>
         ))}
-
-        {bottomItems.map((item) => {
-          const isActive = currentSegment === item.segment;
-          const path = buildPath(item.segment);
-          const isDisabled = !hasContext;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={isDisabled}
-              onClick={() => navigate(path)}
-              className={`mt-3 mb-1 flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-dfrntBlue-50 text-dfrntBlue-700"
-                  : isDisabled
-                    ? "cursor-not-allowed text-gray-300"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          );
-        })}
       </nav>
 
       <div className="border-t border-gray-200 px-3 py-3">

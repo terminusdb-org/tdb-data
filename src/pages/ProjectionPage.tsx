@@ -29,7 +29,9 @@ import {
   setSelectedId,
   setHighlightedIds,
   toggleShowDuplicates,
-  addLoadedEmbeddings,
+  setServedCommit,
+  setStoreClustering,
+  addLoadedTypes,
   clearLoadedEmbeddings,
   clearProjectionCache,
   toggleProjectionSelectionId,
@@ -46,6 +48,7 @@ import {
   setDimensions,
   setEmbeddingRole,
   setProjectionResult,
+  setCameraState,
   selectSelectedTypes,
   selectFilterMode,
   selectSelectedId,
@@ -62,9 +65,9 @@ import {
   selectProjectionCacheKey,
   selectProjectionPoints2d,
   selectProjectionPoints3d,
-  selectLoadedEmbeddings,
   selectServedCommit,
   selectStoreClustering,
+  selectCameraState,
   setError,
 } from "@/store";
 import { buildApiPath } from "@/utils/routes";
@@ -73,6 +76,7 @@ import { filterEmbeddings } from "@/utils/filterEmbeddings";
 import { useUmapProjection, type UmapProjectionPoint } from "@/hooks/useUmapProjection";
 import { useStreamingEmbeddings } from "@/hooks/useStreamingEmbeddings";
 import { isSubdocument } from "@/types/terminusdb";
+import { getCachedEmbeddingsForTypes, setCachedEmbeddings } from "@/utils/embeddingCache";
 
 export const ProjectionPage: React.FC = () => {
   const { t } = useTranslation();
@@ -128,7 +132,6 @@ export const ProjectionPage: React.FC = () => {
   const projectionCacheKey = useAppSelector(selectProjectionCacheKey);
   const projectionPoints2d = useAppSelector(selectProjectionPoints2d);
   const projectionPoints3d = useAppSelector(selectProjectionPoints3d);
-  const loadedEmbeddings = useAppSelector(selectLoadedEmbeddings);
   const servedCommit = useAppSelector(selectServedCommit);
   const storeClustering = useAppSelector(selectStoreClustering);
 
@@ -138,11 +141,12 @@ export const ProjectionPage: React.FC = () => {
   const workingSetIds = useMemo(() => new Set(workingSetIdsArr), [workingSetIdsArr]);
   const projectionSelectionIds = useMemo(() => new Set(projectionSelectionIdsArr), [projectionSelectionIdsArr]);
 
-  const allEmbeddings = loadedEmbeddings as Record<string, number[]>;
+  const [allEmbeddings, setAllEmbeddings] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
     dispatch(clearLoadedEmbeddings());
     dispatch(clearProjectionCache());
+    setAllEmbeddings({});
   }, [dispatch, embeddingsPath]);
 
   const typesToLoad = useMemo(() => {
@@ -151,6 +155,18 @@ export const ProjectionPage: React.FC = () => {
     }
     return [...selectedTypes].filter((t) => !loadedTypes.has(t));
   }, [selectedTypes, loadedTypes, projectSelectionOnly, projectionSelectionIds]);
+
+  const cachedTypesFromStorage = useMemo(() => {
+    if (!servedCommit || typesToLoad.length === 0) return { found: {} as Record<string, number[]>, missing: typesToLoad };
+    return getCachedEmbeddingsForTypes(servedCommit, embeddingRole, typesToLoad);
+  }, [servedCommit, embeddingRole, typesToLoad]);
+
+  useEffect(() => {
+    if (Object.keys(cachedTypesFromStorage.found).length > 0) {
+      setAllEmbeddings((prev) => ({ ...prev, ...cachedTypesFromStorage.found }));
+      dispatch(addLoadedTypes(typesToLoad.filter((t) => !cachedTypesFromStorage.missing.includes(t))));
+    }
+  }, [cachedTypesFromStorage, dispatch, typesToLoad]);
 
   const docIdsToFetch = useMemo(() => {
     const ids = new Set<string>();
@@ -167,16 +183,16 @@ export const ProjectionPage: React.FC = () => {
     return result;
   }, [projectWorkingSet, workingSetIds, projectSelectionOnly, projectionSelectionIds, allEmbeddings]);
 
-  const hasTypesToLoad = typesToLoad.length > 0;
+  const hasTypesToLoad = cachedTypesFromStorage.missing.length > 0;
   const hasDocIdsToFetch = docIdsToFetch.length > 0;
   const hasActiveQuery = hasTypesToLoad || hasDocIdsToFetch;
 
   const streamingParams = useMemo(() => ({
     path: embeddingsPath,
-    docTypes: typesToLoad,
+    docTypes: cachedTypesFromStorage.missing,
     docIds: docIdsToFetch,
     skip: !routeParams || !embeddingsPath || !hasActiveQuery,
-  }), [embeddingsPath, typesToLoad, docIdsToFetch, routeParams, hasActiveQuery]);
+  }), [embeddingsPath, cachedTypesFromStorage.missing, docIdsToFetch, routeParams, hasActiveQuery]);
 
   const { stream: streamEmbeddings, state: streamState } = useStreamingEmbeddings(
     streamingParams,
@@ -187,16 +203,25 @@ export const ProjectionPage: React.FC = () => {
             ? result.clusteringEmbeddings
             : result.docEmbeddings)
           : result.docEmbeddings;
-        const embeddingsRecord: Record<string, number[]> = {};
+        const embRecord: Record<string, number[]> = {};
         for (const [id, emb] of Object.entries(roleEmbeddings)) {
-          embeddingsRecord[id] = [...emb];
+          embRecord[id] = [...emb];
         }
-        dispatch(addLoadedEmbeddings({
-          embeddings: embeddingsRecord,
-          types: typesToLoad,
-          servedCommit: result.servedCommit,
-          storeClustering: result.storeClustering,
-        }));
+        setAllEmbeddings((prev) => ({ ...prev, ...embRecord }));
+        dispatch(setServedCommit(result.servedCommit));
+        dispatch(setStoreClustering(result.storeClustering));
+        dispatch(addLoadedTypes(cachedTypesFromStorage.missing));
+        for (const docType of cachedTypesFromStorage.missing) {
+          const typeEmbeddings: Record<string, number[]> = {};
+          for (const [id, emb] of Object.entries(embRecord)) {
+            const parts = id.split("/");
+            const typePart = parts.at(-2);
+            if (typePart === docType) typeEmbeddings[id] = emb;
+          }
+          if (Object.keys(typeEmbeddings).length > 0) {
+            setCachedEmbeddings(result.servedCommit, embeddingRole, docType, typeEmbeddings);
+          }
+        }
       },
       onError: (err) => {
         dispatch(setError({ message: t("projection.streamingError", { message: err.message }) }));
@@ -457,6 +482,13 @@ export const ProjectionPage: React.FC = () => {
     dispatch(setEmbeddingRole(embeddingRole === "document" ? "clustering" : "document"));
   }, [dispatch, embeddingRole]);
 
+  const cameraKey = useMemo(() => `${embeddingRole}-${dimensions}`, [embeddingRole, dimensions]);
+  const savedCamera = useAppSelector((s) => selectCameraState(s, cameraKey));
+
+  const handleViewStateChange = useCallback((vs: { target: [number, number, number]; zoom: number; rotationX?: number; rotationOrbit?: number }) => {
+    dispatch(setCameraState({ key: cameraKey, camera: vs }));
+  }, [dispatch, cameraKey]);
+
   if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
   if (schemaLoading) return <PagePlaceholder>{t("common.loadingSchema")}</PagePlaceholder>;
 
@@ -488,7 +520,7 @@ export const ProjectionPage: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {Object.keys(loadedEmbeddings).length > 0 && (
+              {Object.keys(allEmbeddings).length > 0 && (
                 <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
                   {scatterPoints.length} {t("projection.points")}
                 </span>
@@ -535,7 +567,7 @@ export const ProjectionPage: React.FC = () => {
               <div className="flex h-full items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
                   <div className="text-sm text-base-content/60">
-                    {t("projection.loadingEmbeddings")} {streamState.loadedCount}/{streamState.totalCount || "?"}
+                    {t("projection.loadingEmbeddings", { loaded: streamState.loadedCount, total: streamState.totalCount || "?" })}
                   </div>
                   {streamState.totalCount > 0 && (
                     <progress
@@ -546,13 +578,14 @@ export const ProjectionPage: React.FC = () => {
                   )}
                 </div>
               </div>
-            ) : Object.keys(loadedEmbeddings).length === 0 ? (
+            ) : Object.keys(allEmbeddings).length === 0 ? (
               <PagePlaceholder>{t("projection.noEmbeddingsFound")}</PagePlaceholder>
             ) : isProjecting ? (
               <PagePlaceholder>{t("projection.runningUmap")}</PagePlaceholder>
             ) : scatterPoints.length > 0 ? (
               dimensions === 3 ? (
                 <Scatter3D
+                  key={cameraKey}
                   points={scatterPoints as unknown as Point3D[]}
                   selectedId={selectedId}
                   highlightedIds={combinedHighlightedIds}
@@ -564,9 +597,12 @@ export const ProjectionPage: React.FC = () => {
                   onHover={handleHover}
                   width={800}
                   height={500}
+                  savedViewState={savedCamera ?? null}
+                  onViewStateChange={handleViewStateChange}
                 />
               ) : (
                 <Scatter2D
+                  key={cameraKey}
                   points={scatterPoints as unknown as ScatterPoint[]}
                   selectedId={selectedId}
                   highlightedIds={combinedHighlightedIds}
@@ -578,6 +614,8 @@ export const ProjectionPage: React.FC = () => {
                   onHover={handleHover}
                   width={800}
                   height={500}
+                  savedViewState={savedCamera ?? null}
+                  onViewStateChange={handleViewStateChange}
                 />
               )
             ) : (

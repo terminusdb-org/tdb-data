@@ -8,7 +8,7 @@ import {
   useGetSchemaQuery,
   useGetEmbeddingTextQuery,
 } from "@/store";
-import { PageShell, PageHeader, PagePlaceholder, useRouteParams, SimilarityBadge, SearchResultCard, DocumentPicker } from "@/components";
+import { PageShell, PageHeader, PagePlaceholder, useRouteParams, SimilarityBadge, SearchResultCard, DocumentPicker, IndexerDisabledNotice, useIndexerDisabled } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { DuplicatesResponse, SearchHit, CompareResponse, SchemaClass } from "@/types/terminusdb";
 import { isSubdocument } from "@/types/terminusdb";
@@ -566,6 +566,7 @@ const CompareTab: React.FC<{ routeParams: RouteParams; urlSearchParams: URLSearc
 export const VectorSearchPage: React.FC = () => {
   const { t } = useTranslation();
   const routeParams = useRouteParams();
+  const indexerDisabled = useIndexerDisabled();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const tab = (urlSearchParams.get("mode") as Tab) ?? "similar";
 
@@ -643,6 +644,7 @@ export const VectorSearchPage: React.FC = () => {
           ))}
         </div>
         <div className="flex-1 overflow-auto p-6">
+          {indexerDisabled && <IndexerDisabledNotice className="mb-4" />}
           {tab === "similar" && <SimilarTab routeParams={routeParams} urlSearchParams={urlSearchParams} setUrlSearchParams={setUrlSearchParams} />}
           {tab === "duplicates" && <DuplicatesTab routeParams={routeParams} urlSearchParams={urlSearchParams} setUrlSearchParams={setUrlSearchParams} />}
           {tab === "compare" && <CompareTab routeParams={routeParams} urlSearchParams={urlSearchParams} setUrlSearchParams={setUrlSearchParams} />}

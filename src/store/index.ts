@@ -71,15 +71,16 @@ export type { CommitEntry } from "./commitStreamSlice";
 export {
   toggleType, setSelectedTypes, setFilterMode, setSelectedId, setHighlightedIds,
   toggleShowDuplicates, setShowDuplicates, setLoadedTypes,
-  addLoadedEmbeddings, clearLoadedEmbeddings,
+  setServedCommit, setStoreClustering, addLoadedTypes, clearLoadedEmbeddings,
   toggleProjectionSelectionId, setProjectionSelectionIds, clearProjectionSelection,
   addToWorkingSet, removeFromWorkingSet, setWorkingSetIds, clearWorkingSet,
   toggleWorkingSetVisible, setWorkingSetVisible,
-  toggleProjectSelectionOnly, setProjectSelectionOnly, toggleProjectWorkingSet, setProjectWorkingSet, setDimensions, setEmbeddingRole, setProjectionResult, clearProjectionCache, clearProjectionState,
+  toggleProjectSelectionOnly, setProjectSelectionOnly, toggleProjectWorkingSet, setProjectWorkingSet, setDimensions, setEmbeddingRole, setProjectionResult, clearProjectionCache, setCameraState, clearProjectionState,
   selectSelectedTypes, selectFilterMode, selectSelectedId, selectHighlightedIds,
   selectShowDuplicates, selectLoadedTypes,
-  selectLoadedEmbeddings, selectServedCommit, selectStoreClustering,
+  selectServedCommit, selectStoreClustering,
   selectWorkingSetIds, selectWorkingSetVisible, selectProjectionSelectionIds, selectProjectSelectionOnly, selectProjectWorkingSet,
   selectDimensions, selectEmbeddingRole, selectProjectionCacheKey, selectProjectionPoints2d, selectProjectionPoints3d,
+  selectCameraState,
 } from "./projectionSlice";
-export type { FilterMode, EmbeddingRole, CachedProjectionPoint } from "./projectionSlice";
+export type { FilterMode, EmbeddingRole, CachedProjectionPoint, CameraState } from "./projectionSlice";

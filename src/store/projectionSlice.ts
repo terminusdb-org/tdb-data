@@ -8,6 +8,19 @@ export interface CachedProjectionPoint {
   readonly position: number[];
 }
 
+export interface CameraState {
+  target: [number, number, number];
+  zoom: number;
+  rotationX?: number;
+  rotationOrbit?: number;
+}
+
+interface RoleProjectionCache {
+  cacheKey: string | null;
+  points2d: CachedProjectionPoint[];
+  points3d: CachedProjectionPoint[];
+}
+
 interface ProjectionState {
   selectedTypes: string[];
   filterMode: FilterMode;
@@ -15,7 +28,6 @@ interface ProjectionState {
   highlightedIds: string[];
   showDuplicates: boolean;
   loadedTypes: string[];
-  loadedEmbeddings: Record<string, number[]>;
   servedCommit: string | null;
   storeClustering: boolean;
   workingSetIds: string[];
@@ -25,9 +37,9 @@ interface ProjectionState {
   projectWorkingSet: boolean;
   dimensions: 2 | 3;
   embeddingRole: EmbeddingRole;
-  projectionCacheKey: string | null;
-  projectionPoints2d: CachedProjectionPoint[];
-  projectionPoints3d: CachedProjectionPoint[];
+  docProjection: RoleProjectionCache;
+  clusteringProjection: RoleProjectionCache;
+  cameraStates: Record<string, CameraState>;
 }
 
 const initialState: ProjectionState = {
@@ -37,7 +49,6 @@ const initialState: ProjectionState = {
   highlightedIds: [],
   showDuplicates: false,
   loadedTypes: [],
-  loadedEmbeddings: {},
   servedCommit: null,
   storeClustering: false,
   workingSetIds: [],
@@ -47,9 +58,9 @@ const initialState: ProjectionState = {
   projectWorkingSet: false,
   dimensions: 2,
   embeddingRole: "clustering",
-  projectionCacheKey: null,
-  projectionPoints2d: [],
-  projectionPoints3d: [],
+  docProjection: { cacheKey: null, points2d: [], points3d: [] },
+  clusteringProjection: { cacheKey: null, points2d: [], points3d: [] },
+  cameraStates: {},
 };
 
 export const projectionSlice = createSlice({
@@ -86,21 +97,20 @@ export const projectionSlice = createSlice({
     setLoadedTypes(state, action: PayloadAction<string[]>) {
       state.loadedTypes = action.payload;
     },
-    addLoadedEmbeddings(state, action: PayloadAction<{ embeddings: Record<string, number[]>; types: string[]; servedCommit: string; storeClustering: boolean }>) {
-      const { embeddings, types, servedCommit, storeClustering } = action.payload;
-      for (const [id, emb] of Object.entries(embeddings)) {
-        state.loadedEmbeddings[id] = [...emb];
-      }
-      for (const t of types) {
+    setServedCommit(state, action: PayloadAction<string>) {
+      state.servedCommit = action.payload;
+    },
+    setStoreClustering(state, action: PayloadAction<boolean>) {
+      state.storeClustering = action.payload;
+    },
+    addLoadedTypes(state, action: PayloadAction<string[]>) {
+      for (const t of action.payload) {
         if (!state.loadedTypes.includes(t)) {
           state.loadedTypes.push(t);
         }
       }
-      state.servedCommit = servedCommit;
-      state.storeClustering = storeClustering;
     },
     clearLoadedEmbeddings(state) {
-      state.loadedEmbeddings = {};
       state.loadedTypes = [];
       state.servedCommit = null;
       state.storeClustering = false;
@@ -162,34 +172,28 @@ export const projectionSlice = createSlice({
       state.dimensions = action.payload;
     },
     setEmbeddingRole(state, action: PayloadAction<EmbeddingRole>) {
-      if (state.embeddingRole !== action.payload) {
-        state.embeddingRole = action.payload;
-        state.loadedEmbeddings = {};
-        state.loadedTypes = [];
-        state.servedCommit = null;
-        state.storeClustering = false;
-        state.projectionCacheKey = null;
-        state.projectionPoints2d = [];
-        state.projectionPoints3d = [];
-      }
+      state.embeddingRole = action.payload;
     },
     setProjectionResult(state, action: PayloadAction<{ dimension: 2 | 3; points: CachedProjectionPoint[]; cacheKey: string }>) {
       const { dimension, points, cacheKey } = action.payload;
-      if (state.projectionCacheKey !== cacheKey) {
-        state.projectionCacheKey = cacheKey;
-        state.projectionPoints2d = [];
-        state.projectionPoints3d = [];
+      const cache = state.embeddingRole === "clustering" ? state.clusteringProjection : state.docProjection;
+      if (cache.cacheKey !== cacheKey) {
+        cache.cacheKey = cacheKey;
+        cache.points2d = [];
+        cache.points3d = [];
       }
       if (dimension === 2) {
-        state.projectionPoints2d = points;
+        cache.points2d = points;
       } else {
-        state.projectionPoints3d = points;
+        cache.points3d = points;
       }
     },
     clearProjectionCache(state) {
-      state.projectionCacheKey = null;
-      state.projectionPoints2d = [];
-      state.projectionPoints3d = [];
+      state.docProjection = { cacheKey: null, points2d: [], points3d: [] };
+      state.clusteringProjection = { cacheKey: null, points2d: [], points3d: [] };
+    },
+    setCameraState(state, action: PayloadAction<{ key: string; camera: CameraState }>) {
+      state.cameraStates[action.payload.key] = action.payload.camera;
     },
     clearProjectionState() {
       return initialState;
@@ -206,7 +210,9 @@ export const {
   toggleShowDuplicates,
   setShowDuplicates,
   setLoadedTypes,
-  addLoadedEmbeddings,
+  setServedCommit,
+  setStoreClustering,
+  addLoadedTypes,
   clearLoadedEmbeddings,
   toggleProjectionSelectionId,
   setProjectionSelectionIds,
@@ -225,6 +231,7 @@ export const {
   setEmbeddingRole,
   setProjectionResult,
   clearProjectionCache,
+  setCameraState,
   clearProjectionState,
 } = projectionSlice.actions;
 
@@ -261,14 +268,20 @@ export const selectDimensions = (state: ProjectionRootState): 2 | 3 =>
 export const selectEmbeddingRole = (state: ProjectionRootState): EmbeddingRole =>
   state.projection.embeddingRole;
 export const selectProjectionCacheKey = (state: ProjectionRootState): string | null =>
-  state.projection.projectionCacheKey;
+  state.projection.embeddingRole === "clustering"
+    ? state.projection.clusteringProjection.cacheKey
+    : state.projection.docProjection.cacheKey;
 export const selectProjectionPoints2d = (state: ProjectionRootState): ReadonlyArray<CachedProjectionPoint> =>
-  state.projection.projectionPoints2d;
+  state.projection.embeddingRole === "clustering"
+    ? state.projection.clusteringProjection.points2d
+    : state.projection.docProjection.points2d;
 export const selectProjectionPoints3d = (state: ProjectionRootState): ReadonlyArray<CachedProjectionPoint> =>
-  state.projection.projectionPoints3d;
-export const selectLoadedEmbeddings = (state: ProjectionRootState): Readonly<Record<string, number[]>> =>
-  state.projection.loadedEmbeddings;
+  state.projection.embeddingRole === "clustering"
+    ? state.projection.clusteringProjection.points3d
+    : state.projection.docProjection.points3d;
 export const selectServedCommit = (state: ProjectionRootState): string | null =>
   state.projection.servedCommit;
 export const selectStoreClustering = (state: ProjectionRootState): boolean =>
   state.projection.storeClustering;
+export const selectCameraState = (state: ProjectionRootState, key: string): CameraState | undefined =>
+  state.projection.cameraStates[key];

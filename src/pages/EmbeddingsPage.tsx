@@ -440,7 +440,7 @@ export const EmbeddingsPage: React.FC = () => {
               <div className="mb-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t("embeddings.graphqlQuery")}</h3>
-                  <span className="text-xs text-gray-400">(metadata.embedding.query)</span>
+                  <span className="text-xs text-gray-400">{t("embeddings.graphqlQueryMeta")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -485,7 +485,7 @@ export const EmbeddingsPage: React.FC = () => {
               <div className="mb-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t("embeddings.handlebarsTemplate")}</h3>
-                  <span className="text-xs text-gray-400">(metadata.embedding.template)</span>
+                  <span className="text-xs text-gray-400">{t("embeddings.handlebarsTemplateMeta")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button

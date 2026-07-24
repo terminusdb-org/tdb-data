@@ -113,6 +113,9 @@ async function connectStream(
                   deleted: toStrArray(changesRaw.deleted),
                 }
               : undefined,
+            added_count: typeof obj.added_count === "number" ? obj.added_count : undefined,
+            changed_count: typeof obj.changed_count === "number" ? obj.changed_count : undefined,
+            deleted_count: typeof obj.deleted_count === "number" ? obj.deleted_count : undefined,
           };
           if (entry.id) {
             lastCommitId = entry.id;

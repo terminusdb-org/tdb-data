@@ -31,10 +31,8 @@ export const DataLayout: React.FC = () => {
     const branch = params.branch;
     const commitId = params.commitId;
 
-    const refType = branch ? "branch" : commitId ? "commit" : null;
-    const refName = branch ?? commitId ?? null;
-    const dataProductKey = org && team && refType && refName
-      ? `${org}/${team}/${refType}/${refName}`
+    const dataProductKey = org && team
+      ? `${org}/${team}`
       : null;
 
     if (prevDataProductKey.current !== null && prevDataProductKey.current !== dataProductKey) {

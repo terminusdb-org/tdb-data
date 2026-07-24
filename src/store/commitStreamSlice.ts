@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import type { LogCommit } from "./api/logApi";
 
 export interface CommitChanges {
   added: string[];
@@ -13,6 +14,14 @@ export interface CommitEntry {
   timestamp: string;
   user?: string;
   changes?: CommitChanges;
+  added_count?: number;
+  changed_count?: number;
+  deleted_count?: number;
+}
+
+interface LogPaginationEntry {
+  extraCommits: LogCommit[];
+  loadedAll: boolean;
 }
 
 interface CommitStreamState {
@@ -21,6 +30,7 @@ interface CommitStreamState {
   error: string | null;
   history: CommitEntry[];
   activeParams: { org: string; team: string; branch: string } | null;
+  logPagination: Record<string, LogPaginationEntry>;
 }
 
 const initialState: CommitStreamState = {
@@ -29,6 +39,7 @@ const initialState: CommitStreamState = {
   error: null,
   history: [],
   activeParams: null,
+  logPagination: {},
 };
 
 export const commitStreamSlice = createSlice({
@@ -65,6 +76,17 @@ export const commitStreamSlice = createSlice({
       state.activeParams = null;
       state.connectionStatus = "disconnected";
     },
+    appendExtraCommits(state, action: PayloadAction<{ logPath: string; commits: readonly LogCommit[]; loadedAll: boolean }>) {
+      const { logPath, commits, loadedAll } = action.payload;
+      const existing = state.logPagination[logPath] ?? { extraCommits: [], loadedAll: false };
+      state.logPagination[logPath] = {
+        extraCommits: [...existing.extraCommits, ...commits],
+        loadedAll,
+      };
+    },
+    clearLogPagination(state, action: PayloadAction<string>) {
+      delete state.logPagination[action.payload];
+    },
   },
 });
 
@@ -75,6 +97,8 @@ export const {
   clearCommitHistory,
   startCommitStream,
   stopCommitStream,
+  appendExtraCommits,
+  clearLogPagination,
 } = commitStreamSlice.actions;
 
 export default commitStreamSlice.reducer;
@@ -87,3 +111,5 @@ export const selectLatestCommitId = (state: CommitStreamRootState) => state.comm
 export const selectConnectionStatus = (state: CommitStreamRootState) => state.commitStream.connectionStatus;
 export const selectCommitHistory = (state: CommitStreamRootState) => state.commitStream.history;
 export const selectCommitStreamError = (state: CommitStreamRootState) => state.commitStream.error;
+export const selectLogPagination = (state: CommitStreamRootState, logPath: string) =>
+  state.commitStream.logPagination[logPath] ?? { extraCommits: [], loadedAll: false };

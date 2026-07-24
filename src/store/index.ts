@@ -65,7 +65,9 @@ export type { ServerInfo, IndexerInfo } from "./api/infoApi";
 export {
   setConnectionStatus, setCommitStreamError, addCommitEntry, clearCommitHistory,
   startCommitStream, stopCommitStream,
+  appendExtraCommits, clearLogPagination,
   selectLatestCommitId, selectConnectionStatus, selectCommitHistory, selectCommitStreamError,
+  selectLogPagination,
 } from "./commitStreamSlice";
 export type { CommitEntry } from "./commitStreamSlice";
 export {

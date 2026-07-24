@@ -37,6 +37,8 @@ const baseQueryWithErrorHandling: BaseQueryFn<
   if (result.error) {
     if (result.error.status === 401) {
       api.dispatch(logout());
+    } else if (result.error.status === "FETCH_ERROR") {
+      // Aborted requests (e.g. from navigation) produce FETCH_ERROR — skip
     } else {
       const message =
         typeof result.error.data === "object" && result.error.data !== null

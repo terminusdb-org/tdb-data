@@ -1,16 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useAppSelector } from "@/store";
+import { useAppSelector, useAppDispatch, appendExtraCommits, selectLogPagination } from "@/store";
 import { useRouteParams, PageShell, PageHeader, btnSecondary } from "@/components";
-import { config } from "@/config";
-
-interface LogCommit {
-  readonly identifier: string;
-  readonly timestamp: string;
-  readonly author: string;
-  readonly message: string;
-}
+import { useCommitChanges } from "@/hooks/useCommitChanges";
+import { useGetLogQuery, useLazyGetLogQuery, type LogCommit } from "@/store/api/logApi";
 
 function formatTimestamp(ts: string): string {
   const num = Number(ts);
@@ -21,14 +15,13 @@ function formatTimestamp(ts: string): string {
   return ts;
 }
 
-const INITIAL_COUNT = 1000;
-const LOAD_MORE_COUNT = 1000;
+const INITIAL_COUNT = 100;
+const LOAD_MORE_COUNT = 100;
 
 export const BranchHistoryPage: React.FC = () => {
   const { t } = useTranslation();
   const routeParams = useRouteParams();
   const navigate = useNavigate();
-  const credentials = useAppSelector((state) => state.auth.credentials);
   const [searchParams] = useSearchParams();
   const urlParams = useParams();
 
@@ -41,129 +34,97 @@ export const BranchHistoryPage: React.FC = () => {
     : (searchParams.get("from-branch") ?? "main");
   const currentCommitId = urlParams.commitId ?? null;
 
-  const [commits, setCommits] = useState<LogCommit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadedAll, setLoadedAll] = useState(false);
-  const [currentCount, setCurrentCount] = useState(INITIAL_COUNT);
+  const logPath = org && team ? `${org}/${team}/local/branch/${branchName}` : null;
 
-  // Always fetch log from the branch, not from the commit descriptor.
-  // The commit history is the same regardless of which commit we're viewing.
-  const buildLogPath = useCallback(() => {
-    if (!org || !team) return null;
-    return `${org}/${team}/local/branch/${branchName}`;
-  }, [org, team, branchName]);
+  // Initial page load via RTK Query (auto-fetches when logPath changes)
+  const { data: initialData, isLoading: initialLoading, error: initialError } = useGetLogQuery(
+    { path: logPath ?? "", start: 0, count: INITIAL_COUNT },
+    { skip: !logPath },
+  );
 
-  const fetchCommits = useCallback(async (count: number, isInitialLoad: boolean = true) => {
-    const logPath = buildLogPath();
-    if (!logPath) return;
+  // Lazy query for "load more" requests
+  const [triggerGetLog] = useLazyGetLogQuery();
+  const dispatch = useAppDispatch();
+  const pagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : { extraCommits: [], loadedAll: false });
+  const extraCommits = pagination.extraCommits;
+  const loadedAll = pagination.loadedAll;
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [expandedCommits, setExpandedCommits] = useState<Set<string>>(new Set());
 
-    setLoading(true);
-    if (isInitialLoad) {
-      setCommits([]);
-      setError(null);
-    }
-    try {
-      const url = `${config.apiUrl}/api/log/${logPath}?start=0&count=${count}&stream=true`;
-      const headers: Record<string, string> = {
-        Accept: "application/x-ndjson",
-      };
-      if (credentials) {
-        headers.Authorization = `Basic ${credentials}`;
-      }
-      const res = await fetch(url, { headers });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`HTTP ${res.status}: ${body}`);
-      }
-      if (!res.body) {
-        throw new Error("No response body");
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      const collected: LogCommit[] = [];
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const obj = JSON.parse(trimmed) as LogCommit;
-            if (obj.identifier) {
-              collected.push(obj);
-            }
-          } catch {
-            // skip malformed lines
-          }
+  const { changesCache, loadingIds, fetchChanges } = useCommitChanges(org, team);
+
+  const toggleExpand = useCallback(
+    (commitId: string) => {
+      setExpandedCommits((prev) => {
+        const next = new Set(prev);
+        if (next.has(commitId)) {
+          next.delete(commitId);
+        } else {
+          next.add(commitId);
+          void fetchChanges(commitId);
         }
-        // Update state incrementally as commits arrive
-        setCommits([...collected]);
-      }
-      // Process any remaining buffered data
-      if (buffer.trim()) {
-        try {
-          const obj = JSON.parse(buffer.trim()) as LogCommit;
-          if (obj.identifier) {
-            collected.push(obj);
-            setCommits([...collected]);
-          }
-        } catch {
-          // skip
-        }
-      }
-      setHasMore(collected.length >= count);
-      setLoadedAll(collected.length < count);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [buildLogPath, credentials]);
+        return next;
+      });
+    },
+    [fetchChanges],
+  );
 
-  // Only refetch when org/team/branchName changes — NOT when commitId changes.
-  // The history is always the branch history; switching commits just changes
-  // which one is highlighted.
-  useEffect(() => {
-    setCommits([]);
-    setHasMore(false);
-    setLoadedAll(false);
-    setCurrentCount(INITIAL_COUNT);
-    fetchCommits(INITIAL_COUNT);
-  }, [fetchCommits, org, team, branchName]);
+  const loadMore = useCallback(
+    async (count: number) => {
+      if (!logPath) return;
+      const start = (initialData?.commits.length ?? 0) + extraCommits.length;
+      setLoadingMore(true);
+      try {
+        const result = await triggerGetLog({ path: logPath, start, count }).unwrap();
+        dispatch(appendExtraCommits({ logPath, commits: result.commits, loadedAll: !result.hasMore }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Failed to load more commits:", msg);
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [logPath, triggerGetLog, initialData, extraCommits.length, dispatch],
+  );
 
   const handleLoadMore = () => {
-    const nextCount = currentCount + LOAD_MORE_COUNT;
-    setCurrentCount(nextCount);
-    fetchCommits(nextCount, false);
+    void loadMore(LOAD_MORE_COUNT);
   };
 
   const handleLoadAll = () => {
-    // count=-1 means all in the API
-    fetchCommits(-1, false);
+    void loadMore(-1);
   };
 
   // Live commit stream from Redux — new commits are prepended by the stream
   const liveCommits = useAppSelector((state) => state.commitStream.history);
 
   // Merge: prepend live commits that aren't already in the log results
+  const allCommits = useMemo(() => {
+    const base = [...(initialData?.commits ?? []), ...extraCommits];
+    return base;
+  }, [initialData, extraCommits]);
+
   const mergedCommits = useMemo(() => {
-    const logIds = new Set(commits.map((c) => c.identifier));
+    const logIds = new Set(allCommits.map((c) => c.identifier));
     const newLive = liveCommits.filter((c) => !logIds.has(c.id));
     const liveMapped: LogCommit[] = newLive.map((c) => ({
       identifier: c.id,
       timestamp: c.timestamp,
       author: c.author,
       message: c.message,
+      added_count: c.added_count,
+      changed_count: c.changed_count,
+      deleted_count: c.deleted_count,
     }));
-    return [...liveMapped, ...commits];
-  }, [commits, liveCommits]);
+    return [...liveMapped, ...allCommits];
+  }, [allCommits, liveCommits]);
+
+  const hasMore = initialData?.hasMore ?? false;
+  const isStreaming = initialData != null && initialData.commits.length === 0 && hasMore;
+  const loading = initialLoading || isStreaming || loadingMore;
+  const error = initialError
+    ? (initialError instanceof Error ? initialError.message : "Failed to load commit history")
+    : null;
 
   // Navigate to a commit while staying on the history page.
   // Include from-branch so the history page knows which branch to show.
@@ -246,6 +207,22 @@ export const BranchHistoryPage: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
+                          onClick={() => toggleExpand(entry.identifier)}
+                          className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          aria-label={expandedCommits.has(entry.identifier) ? "Collapse" : "Expand"}
+                        >
+                          <svg
+                            className={`h-3 w-3 transition-transform ${expandedCommits.has(entry.identifier) ? "rotate-90" : ""}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={2}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => navigateToCommit(entry.identifier)}
                           className={`rounded px-1.5 py-0.5 text-xs font-mono ${
                             isCurrent
@@ -278,7 +255,30 @@ export const BranchHistoryPage: React.FC = () => {
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                         <span className="font-medium text-gray-600">{entry.author}</span>
                         {entry.timestamp && <span>{formatTimestamp(entry.timestamp)}</span>}
+                        {(entry.added_count != null || entry.changed_count != null || entry.deleted_count != null) && (
+                          <span className="flex items-center gap-1.5">
+                            {entry.added_count != null && entry.added_count > 0 && (
+                              <span className="font-medium text-green-700">+{entry.added_count}</span>
+                            )}
+                            {entry.changed_count != null && entry.changed_count > 0 && (
+                              <span className="font-medium text-amber-700">{entry.changed_count} changed</span>
+                            )}
+                            {entry.deleted_count != null && entry.deleted_count > 0 && (
+                              <span className="font-medium text-red-700">-{entry.deleted_count}</span>
+                            )}
+                          </span>
+                        )}
                       </div>
+                      {expandedCommits.has(entry.identifier) && (
+                        <CommitChangesPanel
+                          commitId={entry.identifier}
+                          parentCommitId={entry.parent?.replace("ValidCommit/", "")}
+                          org={org}
+                          team={team}
+                          changes={changesCache[entry.identifier]}
+                          loading={loadingIds.has(entry.identifier)}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -312,5 +312,108 @@ export const BranchHistoryPage: React.FC = () => {
         )}
       </div>
     </PageShell>
+  );
+};
+
+function shortenId(id: string): string {
+  const parts = id.split("/");
+  if (parts.length >= 2) {
+    return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+  }
+  return id;
+}
+
+const CommitChangesPanel: React.FC<{
+  commitId: string;
+  parentCommitId?: string;
+  org: string;
+  team: string;
+  changes?: { added: readonly string[]; changed: readonly string[]; deleted: readonly string[] };
+  loading: boolean;
+}> = ({ commitId, parentCommitId, org, team, changes, loading }) => {
+  const navigate = useNavigate();
+
+  const goToDoc = (docId: string, useParent: boolean = false) => {
+    const targetCommit = useParent && parentCommitId ? parentCommitId : commitId;
+    const fullId = docId.startsWith("terminusdb:///") ? docId.replace("terminusdb:///data/", "") : docId;
+    navigate(`/${org}/${team}/local/commit/${targetCommit}/documents?edit=${encodeURIComponent(fullId)}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="mt-2 ml-2 text-xs text-gray-400">
+        Loading changes…
+      </div>
+    );
+  }
+  if (!changes) {
+    return null;
+  }
+  const hasAny = changes.added.length > 0 || changes.changed.length > 0 || changes.deleted.length > 0;
+  if (!hasAny) {
+    return (
+      <div className="mt-2 ml-2 text-xs text-gray-400">
+        No document changes in this commit.
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 ml-2 space-y-1 text-xs">
+      {changes.added.length > 0 && (
+        <div>
+          <span className="font-medium text-green-700">Added ({changes.added.length})</span>
+          <ul className="ml-4 list-disc text-gray-600">
+            {changes.added.map((id) => (
+              <li key={id}>
+                <button
+                  type="button"
+                  onClick={() => goToDoc(id)}
+                  className="font-mono text-dfrntBlue-600 hover:underline"
+                >
+                  {shortenId(id)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {changes.changed.length > 0 && (
+        <div>
+          <span className="font-medium text-amber-700">Changed ({changes.changed.length})</span>
+          <ul className="ml-4 list-disc text-gray-600">
+            {changes.changed.map((id) => (
+              <li key={id}>
+                <button
+                  type="button"
+                  onClick={() => goToDoc(id)}
+                  className="font-mono text-dfrntBlue-600 hover:underline"
+                >
+                  {shortenId(id)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {changes.deleted.length > 0 && (
+        <div>
+          <span className="font-medium text-red-700">Deleted ({changes.deleted.length})</span>
+          <ul className="ml-4 list-disc text-gray-600">
+            {changes.deleted.map((id) => (
+              <li key={id}>
+                <button
+                  type="button"
+                  onClick={() => goToDoc(id, true)}
+                  className="font-mono text-dfrntBlue-600 hover:underline"
+                  title="View at previous commit (document was deleted in this commit)"
+                >
+                  {shortenId(id)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 };

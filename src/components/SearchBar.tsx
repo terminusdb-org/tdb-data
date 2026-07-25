@@ -98,7 +98,7 @@ export const SearchBar: React.FC = () => {
   const allItems = useMemo(() => [
     { type: "search" as const, value: debouncedQuery, id: debouncedQuery },
     ...completions.map((c) => ({ type: "completion" as const, value: c, id: c })),
-    ...hits.map((h) => ({ type: "hit" as const, value: h.id, id: h.id, distance: h.distance })),
+    ...hits.map((h) => ({ type: "hit" as const, value: h.id, id: h.id })),
   ], [debouncedQuery, completions, hits]);
 
   useEffect(() => {

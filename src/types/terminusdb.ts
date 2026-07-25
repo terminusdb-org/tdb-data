@@ -81,7 +81,6 @@ export interface SuggestResponse {
 
 export interface SuggestHit {
   readonly id: string;
-  readonly distance: number;
   readonly doc_type?: string;
   readonly [key: string]: unknown;
 }

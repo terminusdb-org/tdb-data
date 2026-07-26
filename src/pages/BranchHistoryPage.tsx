@@ -2,9 +2,10 @@ import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAppSelector, useAppDispatch, appendExtraCommits, selectLogPagination } from "@/store";
+import { config } from "@/config";
 import { useRouteParams, PageShell, PageHeader, btnSecondary } from "@/components";
 import { useCommitChanges } from "@/hooks/useCommitChanges";
-import { useGetLogQuery, useLazyGetLogQuery, type LogCommit } from "@/store/api/logApi";
+import { useGetLogQuery, streamLog, type LogCommit } from "@/store/api/logApi";
 
 function formatTimestamp(ts: string): string {
   const num = Number(ts);
@@ -42,9 +43,8 @@ export const BranchHistoryPage: React.FC = () => {
     { skip: !logPath },
   );
 
-  // Lazy query for "load more" requests
-  const [triggerGetLog] = useLazyGetLogQuery();
   const dispatch = useAppDispatch();
+  const credentials = useAppSelector((state) => state.auth.credentials);
   const pagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : { extraCommits: [], loadedAll: false });
   const extraCommits = pagination.extraCommits;
   const loadedAll = pagination.loadedAll;
@@ -75,7 +75,14 @@ export const BranchHistoryPage: React.FC = () => {
       const start = (initialData?.commits.length ?? 0) + extraCommits.length;
       setLoadingMore(true);
       try {
-        const result = await triggerGetLog({ path: logPath, start, count }).unwrap();
+        const result = await streamLog(
+          config.apiUrl,
+          logPath,
+          start,
+          count,
+          credentials,
+          undefined,
+        );
         dispatch(appendExtraCommits({ logPath, commits: result.commits, loadedAll: !result.hasMore }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -84,7 +91,7 @@ export const BranchHistoryPage: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [logPath, triggerGetLog, initialData, extraCommits.length, dispatch],
+    [logPath, initialData, extraCommits.length, dispatch, credentials],
   );
 
   const handleLoadMore = () => {

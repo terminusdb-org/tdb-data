@@ -25,7 +25,7 @@ export interface GetLogResult {
   hasMore: boolean;
 }
 
-async function streamLog(
+export async function streamLog(
   baseUrl: string,
   path: string,
   start: number,

@@ -1,6 +1,40 @@
 import { baseApi } from "../baseApi";
 import type { SchemaClass, Frame } from "@/types/terminusdb";
 
+const SCHEMA_RESERVED_KEYS = new Set([
+  "@id", "@type", "@key", "@base", "@inherits", "@documentation",
+  "@subdocument", "@abstract", "@unfoldable", "@unfold", "@shared",
+  "@metadata", "@oneOf", "@cardinality", "@min_cardinality",
+  "@max_cardinality", "@dimensions", "@class",
+]);
+
+function normalizeSchemaClass(cls: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(cls)) {
+    if (SCHEMA_RESERVED_KEYS.has(key)) {
+      result[key] = value;
+      continue;
+    }
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      const propObj = value as Record<string, unknown>;
+      const normalized: Record<string, unknown> = {};
+      for (const [propKey, propVal] of Object.entries(propObj)) {
+        if (propKey === "@subdocument") continue;
+        if (propKey === "@class" && typeof propVal === "object" && propVal !== null) {
+          const inner = propVal as Record<string, unknown>;
+          normalized["@class"] = inner["@class"] ?? inner["@id"] ?? JSON.stringify(propVal);
+        } else {
+          normalized[propKey] = propVal;
+        }
+      }
+      result[key] = normalized;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 export const schemaApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getSchema: builder.query<SchemaClass[], { path: string; asList?: boolean }>({
@@ -20,10 +54,11 @@ export const schemaApi = baseApi.injectEndpoints({
           }
           if (typeof value === "object" && value !== null) {
             const cls = value as Record<string, unknown>;
+            const normalized = normalizeSchemaClass(cls);
             classes.push({
               "@id": key,
-              "@type": (cls["@type"] as string) ?? "Class",
-              ...cls,
+              "@type": (normalized["@type"] as string) ?? "Class",
+              ...normalized,
             });
           }
         }

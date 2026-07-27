@@ -97,7 +97,10 @@ export const SchemaPage: React.FC = () => {
       const parsed = JSON.parse(text);
       if (selectedClassId || isNewClass) {
         const docId = parsed["@id"] ?? selectedClassId;
-        const doc: SchemaClass = { "@id": docId, ...parsed };
+        const isContext = docId === "@context";
+        const doc: SchemaClass = isContext
+          ? { ...parsed, "@type": "@context" }
+          : { "@id": docId, ...parsed };
         const isNew = !classes?.some((c) => c["@id"] === docId);
         if (isNew) {
           await insertSchemaDocument({

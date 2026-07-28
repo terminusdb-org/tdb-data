@@ -24,7 +24,9 @@ export const ContextPage: React.FC = () => {
   useEffect(() => {
     if (schemaData) {
       const raw = schemaData as unknown as Record<string, unknown>;
-      const ctx = raw["@type"] === "@context" ? raw : (raw["@context"] ?? raw);
+      const ctx = raw["@type"] === "@context" || raw["@type"] === "Context"
+        ? { ...raw, "@type": "@context" }
+        : (raw["@context"] ?? raw);
       setText(JSON.stringify(ctx, null, 2));
       setValid(true);
     }
@@ -43,10 +45,12 @@ export const ContextPage: React.FC = () => {
     if (!valid) return;
     try {
       const parsed = JSON.parse(text) as Record<string, unknown>;
+      const { "@id": _stripId, ...rest } = parsed;
+      const normalized = { ...rest, "@type": "@context" };
       setSaveStatus("saving");
       await replaceContext({
         path: schemaPath,
-        context: parsed,
+        context: normalized,
         author: username,
         message: t("common.updatedContextVia"),
       }).unwrap();

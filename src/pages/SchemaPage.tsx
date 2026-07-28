@@ -99,7 +99,7 @@ export const SchemaPage: React.FC = () => {
         const docId = parsed["@id"] ?? selectedClassId;
         const isContext = docId === "@context";
         const doc: SchemaClass = isContext
-          ? { ...parsed, "@type": "@context" }
+          ? (() => { const { "@id": _stripId, ...rest } = parsed; return { ...rest, "@type": "@context" }; })()
           : { "@id": docId, ...parsed };
         const isNew = !classes?.some((c) => c["@id"] === docId);
         if (isNew) {

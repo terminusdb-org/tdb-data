@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Draft version (e.g. v0.1.0-rc1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-draft:
+    name: Build and draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build and package
+        run: npm run package
+
+      - name: Determine version
+        id: ver
+        run: |
+          TAG="${{ inputs.version }}"
+          # Ensure leading 'v'
+          TAG="v${TAG#v}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Rename tarball with version
+        run: |
+          mv dist.tar.gz "tdb-data-${{ steps.ver.outputs.version }}.tar.gz"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            "tdb-data-${{ steps.ver.outputs.version }}.tar.gz" \
+            --title "Release ${{ steps.ver.outputs.tag }}" \
+            --notes "Data explorer dist package ${{ steps.ver.outputs.tag }}. Contains only the built dist/ folder." \
+            --draft

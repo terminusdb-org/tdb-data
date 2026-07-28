@@ -50,6 +50,6 @@ jobs:
         run: |
           gh release create "${{ steps.ver.outputs.tag }}" \
             "tdb-data-${{ steps.ver.outputs.version }}.tar.gz" \
-            --title "Release ${{ steps.ver.outputs.tag }}" \
+            --title "TerminusDB Data Explorer ${{ steps.ver.outputs.tag }}" \
             --notes "Data explorer dist package ${{ steps.ver.outputs.tag }}. Contains only the built dist/ folder." \
             --draft

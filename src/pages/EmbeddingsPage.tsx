@@ -28,7 +28,7 @@ import { isSubdocument } from "@/types/terminusdb";
 
 const EDITOR_HEIGHT = 240;
 
-const GRAPHQL_PLACEHOLDER = `{ example {\n  Product(id: "Product/Product01") {\n    name\n    description\n  }\n}`;
+const GRAPHQL_PLACEHOLDER = `query ($id: ID!) {\n  Person(id: $id) {\n    _id\n    name\n    description\n  }\n}`;
 
 const HANDLEBARS_PLACEHOLDER = `{{ name }}\n{{ description }}`;
 

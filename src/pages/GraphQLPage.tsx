@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/store";
 import { PagePlaceholder, useRouteParams } from "@/components";
 import { buildApiPath } from "@/utils/routes";
+import { createTdbGraphiQLFetcher } from "@/utils/graphqlFetcher";
 import { config } from "@/config";
 import "graphiql/style.css";
 
@@ -24,9 +25,8 @@ export const GraphQLPage: React.FC = () => {
     const renderGraphiQL = async () => {
       try {
         const GraphiQL = (await import("graphiql")).default;
-        const { createGraphiQLFetcher } = await import("@graphiql/toolkit");
 
-        const fetcher = createGraphiQLFetcher({
+        const fetcher = createTdbGraphiQLFetcher({
           url: graphqlUrl,
           headers: credentials ? { Authorization: `Basic ${credentials}` } : {},
         });

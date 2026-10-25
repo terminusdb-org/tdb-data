@@ -29,6 +29,8 @@ export {
   useDeleteDocumentMutation,
 } from "./api/documentApi";
 
+export { isNoEmbeddingQueriesError, isEndpointNotConfiguredError } from "../utils/apiErrors";
+
 export {
   useGetSchemaQuery,
   useGetJsonSchemaQuery,

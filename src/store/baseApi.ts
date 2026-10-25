@@ -8,6 +8,7 @@ import {
 import { config } from "@/config";
 import { setError } from "./errorSlice";
 import { logout } from "./authSlice";
+import { isAcceptedApiError } from "@/utils/apiErrors";
 
 interface AuthStateShape {
   readonly auth: {
@@ -39,6 +40,9 @@ const baseQueryWithErrorHandling: BaseQueryFn<
       api.dispatch(logout());
     } else if (result.error.status === "FETCH_ERROR") {
       // Aborted requests (e.g. from navigation) produce FETCH_ERROR — skip
+    } else if (isAcceptedApiError(result.error)) {
+      // Recognized guidance payloads (e.g. api:NoEmbeddingQueriesDefined,
+      // api:EndpointNotConfigured) — call sites render direction, no banner
     } else {
       const message =
         typeof result.error.data === "object" && result.error.data !== null

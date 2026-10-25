@@ -190,6 +190,7 @@
     "failedToSave": "Failed to save context:"
   },
   "documents": {
+    "savedSuccess": "Document {{id}} saved.",
     "title": "Documents",
     "newDocument": "New Document",
     "addToWorkingSet": "Add to Working Set",
@@ -211,6 +212,11 @@
     "deleteFailed": "Delete failed"
   },
   "documentEditor": {
+    "form": "Form",
+    "loadingSchema": "Loading form schema…",
+    "noSchema": "No form schema available for this type — use the JSON tab.",
+    "schemaErrors": "{{count}} schema validation problem",
+    "schemaErrors_plural": "{{count}} schema validation problems",
     "json": "JSON",
     "markdown": "Markdown",
     "embedding": "Embedding",
@@ -226,6 +232,8 @@
     "fetchingEmbedding": "Fetching embedding text…",
     "noEmbeddingText": "No embedding text available for this document.",
     "saveFirst": "Save the document first to find similar documents.",
+    "noEmbeddingQueriesDefined": "No embedding queries are defined for this type.",
+    "configureEmbeddings": "Set up embeddings for {{type}}",
     "failedToLoadEmbedding": "Failed to load embedding: ",
     "loadingMarkdown": "Loading markdown…"
   },

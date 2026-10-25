@@ -4,6 +4,13 @@ export interface TerminusDBDocument {
   readonly [key: string]: unknown;
 }
 
+// Documents in the editor may not have been persisted yet, so @id can be absent.
+export interface EditableDocument {
+  readonly "@id"?: string;
+  readonly "@type": string;
+  readonly [key: string]: unknown;
+}
+
 export interface SchemaClass {
   readonly "@id": string;
   readonly "@type": string;

@@ -72,6 +72,23 @@ export const schemaApi = baseApi.injectEndpoints({
       providesTags: ["Schema"],
     }),
 
+    getJsonSchema: builder.query<Record<string, unknown>, { path: string; type: string }>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("type", params.type);
+        searchParams.set("format", "jsonschema");
+        searchParams.set("compress_ids", "true");
+        return `${params.path}?${searchParams.toString()}`;
+      },
+      transformResponse: (response: Record<string, unknown>) => {
+        // ajv6 resolves the draft-07 meta via the http:// URI while the
+        // endpoint advertises https:// — drop $schema like the test suite does.
+        const { $schema: _dropped, ...schema } = response;
+        return schema;
+      },
+      providesTags: ["Schema"],
+    }),
+
     getFrame: builder.query<Frame, { path: string; type?: string }>({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -166,6 +183,7 @@ export const schemaApi = baseApi.injectEndpoints({
 
 export const {
   useGetSchemaQuery,
+  useGetJsonSchemaQuery,
   useGetFrameQuery,
   useGetPrefixesQuery,
   useReplaceSchemaMutation,

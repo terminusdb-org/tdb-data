@@ -1,5 +1,7 @@
 import { baseApi } from "../baseApi";
 import type { SearchHit, SuggestResponse, SearchStats, DuplicatesResponse, ResolveResponse, CompareResponse, CandidatesResult } from "@/types/terminusdb";
+// Hit ids are server literals (possibly percent-encoded IRI fragments) —
+// keep them verbatim; they are re-encoded on egress.
 
 export interface SearchParams {
   readonly path: string;
@@ -104,7 +106,7 @@ export const searchApi = baseApi.injectEndpoints({
         for (const t of params.targetDocTypes ?? []) parts.push(`target_doc_type=${encodeURIComponent(t)}`);
         for (const id of params.targetDocIds ?? []) parts.push(`target_doc_id=${encodeURIComponent(id)}`);
         const qs = parts.join("&");
-        return `${params.path}${qs ? `?${qs}` : ""}`;
+        return qs ? `${params.path}?${qs}` : params.path;
       },
     }),
 

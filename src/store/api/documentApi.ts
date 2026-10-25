@@ -1,5 +1,8 @@
 import { baseApi } from "../baseApi";
-import type { TerminusDBDocument } from "@/types/terminusdb";
+import type { EditableDocument, TerminusDBDocument } from "@/types/terminusdb";
+// Server ids are literal strings (e.g. "Person/Kurt%20G%C3%B6del") — never
+// decode them in-app; query params are decoded once server-side, so
+// encodeURIComponent on egress produces the right wire form.
 
 export interface GetDocumentsParams {
   readonly path: string;
@@ -30,14 +33,15 @@ export const documentApi = baseApi.injectEndpoints({
         if (params.rawJson) searchParams.set("raw_json", "true");
         searchParams.set("compress_ids", "true");
         const qs = searchParams.toString();
-        return `${params.path}${qs ? `?${qs}` : ""}`;
+        return qs ? `${params.path}?${qs}` : params.path;
       },
-      providesTags: (result, _error, params) =>
-        result
-          ? Array.isArray(result)
-            ? result.map((doc) => ({ type: "Document" as const, id: doc["@id"] }))
-            : [{ type: "Document" as const, id: result["@id"] }]
-          : [{ type: "Document" as const, id: params.path }],
+      providesTags: (result, _error, params) => {
+        if (!result) return [{ type: "Document" as const, id: params.path }];
+        if (Array.isArray(result)) {
+          return result.map((doc) => ({ type: "Document" as const, id: doc["@id"] }));
+        }
+        return [{ type: "Document" as const, id: result["@id"] }];
+      },
     }),
 
     getDocument: builder.query<TerminusDBDocument, { path: string; id: string; graphType?: "instance" | "schema" }>({
@@ -81,7 +85,7 @@ export const documentApi = baseApi.injectEndpoints({
 
     replaceDocument: builder.mutation<
       unknown,
-      { path: string; id: string; document: TerminusDBDocument; author: string; message: string }
+      { path: string; id: string; document: EditableDocument; author: string; message: string }
     >({
       query: (params) => ({
         url: `${params.path}?id=${encodeURIComponent(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance`,
@@ -105,7 +109,7 @@ export const documentApi = baseApi.injectEndpoints({
 
     insertDocument: builder.mutation<
       unknown,
-      { path: string; document: TerminusDBDocument; author: string; message: string }
+      { path: string; document: EditableDocument; author: string; message: string }
     >({
       query: (params) => ({
         url: `${params.path}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance`,

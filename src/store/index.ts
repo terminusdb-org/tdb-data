@@ -31,6 +31,7 @@ export {
 
 export {
   useGetSchemaQuery,
+  useGetJsonSchemaQuery,
   useGetFrameQuery,
   useGetPrefixesQuery,
   useReplaceSchemaMutation,

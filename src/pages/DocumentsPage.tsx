@@ -4,10 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useGetDocumentsQuery, useGetDocumentQuery, useReplaceDocumentMutation, useInsertDocumentMutation, useDeleteDocumentMutation, useGetSchemaQuery, useAppSelector, useAppDispatch, addToWorkingSet } from "@/store";
 import { DocumentEditor, PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, useRouteParams, ConfirmDialog } from "@/components";
 import { buildApiPath } from "@/utils/routes";
-import type { TerminusDBDocument, PageSizes, SchemaClass } from "@/types/terminusdb";
-import { isSubdocument } from "@/types/terminusdb";
-import { PAGE_SIZE_OPTIONS } from "@/types/terminusdb";
-import { truncate } from "@/utils/validation";
+import { isSubdocument, PAGE_SIZE_OPTIONS, type EditableDocument, type TerminusDBDocument, type PageSizes, type SchemaClass } from "@/types/terminusdb";
+import { displayId, normalizeDocId, truncate } from "@/utils/validation";
 
 function extractErrorMessage(err: unknown): string {
   if (err && typeof err === "object" && "data" in err) {
@@ -27,6 +25,7 @@ export const DocumentsPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const editId = searchParams.get("edit");
+  const savedId = searchParams.get("id");
   const initialType = searchParams.get("type") ?? "";
   const [selectedType, setSelectedType] = useState(initialType);
   const [page, setPage] = useState(0);
@@ -103,28 +102,53 @@ export const DocumentsPage: React.FC = () => {
     setSelectedIds(next);
   };
 
-  const handleSave = async (doc: TerminusDBDocument) => {
-    await replaceDoc({
+  // The server returns the ids it wrote — open the first one in the editor
+  // instead of dropping back to the list.
+  const openSavedDocument = (result: unknown) => {
+    const first = Array.isArray(result) ? result[0] : result;
+    let id: string | null = null;
+    if (typeof first === "string") {
+      id = first;
+    } else if (typeof first === "object" && first !== null) {
+      const maybeId = (first as Record<string, unknown>)["@id"];
+      if (typeof maybeId === "string") id = maybeId;
+    }
+    const next = new URLSearchParams();
+    if (selectedType) next.set("type", selectedType);
+    if (id) next.set("id", id);
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleSave = async (doc: EditableDocument) => {
+    if (!doc["@id"]) throw new Error("Internal error: cannot replace a document without @id");
+    const result = await replaceDoc({
       path: docPath,
       id: doc["@id"],
       document: doc,
       author: username,
       message: t("common.updatedVia", { id: doc["@id"] }),
     }).unwrap();
-    setSearchParams({}, { replace: true });
+    openSavedDocument(result);
   };
 
-  const handleInsert = async (doc: TerminusDBDocument) => {
-    await insertDoc({
+  const handleInsert = async (doc: EditableDocument) => {
+    // An empty @id means "let the server mint one" — never send "".
+    const payload = { ...doc };
+    if (payload["@id"] === "") {
+      delete payload["@id"];
+    } else if (typeof payload["@id"] === "string") {
+      payload["@id"] = normalizeDocId(payload["@id"]);
+    }
+    const result = await insertDoc({
       path: docPath,
-      document: doc,
+      document: payload,
       author: username,
       message: t("common.createdVia", { id: doc["@id"] }),
     }).unwrap();
-    setSearchParams({}, { replace: true });
+    openSavedDocument(result);
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
     setConfirmState({
       title: t("common.deleteDocs"),
@@ -139,9 +163,11 @@ export const DocumentsPage: React.FC = () => {
   const doDeleteSelected = async () => {
     setDeleteError(null);
     try {
-      for (const id of selectedIds) {
-        await deleteDoc({ path: docPath, id, author: username, message: t("common.deletedVia", { id }) }).unwrap();
-      }
+      await Promise.all(
+        [...selectedIds].map((id) =>
+          deleteDoc({ path: docPath, id, author: username, message: t("common.deletedVia", { id }) }).unwrap()
+        )
+      );
       setSelectedIds(new Set());
     } catch (err) {
       setDeleteError(extractErrorMessage(err));
@@ -175,11 +201,11 @@ export const DocumentsPage: React.FC = () => {
   };
 
   const closeEditor = () => {
-    setSearchParams({}, { replace: false });
+    setSearchParams(selectedType ? { type: selectedType } : {}, { replace: false });
   };
 
   const handleNewDocument = () => {
-    setSearchParams({ edit: "new" });
+    setSearchParams(selectedType ? { edit: "new", type: selectedType } : { edit: "new" });
   };
 
   const renderContent = (): React.ReactNode => {
@@ -210,7 +236,7 @@ export const DocumentsPage: React.FC = () => {
           {docList.map((doc) => (
             <tr
               key={doc["@id"]}
-              className="cursor-pointer hover:bg-gray-50"
+              className={`cursor-pointer hover:bg-gray-50 ${doc["@id"] === savedId ? "bg-green-50" : ""}`}
               onClick={() => setSearchParams({ edit: doc["@id"] })}
             >
               <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
@@ -219,11 +245,11 @@ export const DocumentsPage: React.FC = () => {
                   checked={selectedIds.has(doc["@id"])}
                   onChange={() => handleSelect(doc["@id"])}
                   className="rounded border-gray-300"
-                  aria-label={t("documents.selectDocumentAria", { id: doc["@id"] })}
+                  aria-label={t("documents.selectDocumentAria", { id: displayId(doc["@id"]) })}
                 />
               </td>
               <td className="px-4 py-2 font-data text-sm font-medium text-gray-900">
-                {truncate(doc["@id"], 40)}
+                {truncate(displayId(doc["@id"]), 40)}
               </td>
               <td className="px-4 py-2 text-sm text-gray-600">{doc["@type"]}</td>
               <td className="px-4 py-2 text-xs text-gray-400">
@@ -248,8 +274,7 @@ export const DocumentsPage: React.FC = () => {
 
   if (editId) {
     if (editId === "new") {
-      const newDoc: TerminusDBDocument = {
-        "@id": "",
+      const newDoc: EditableDocument = {
         "@type": selectedType || docTypes[0] || "",
       };
       return (
@@ -258,6 +283,7 @@ export const DocumentsPage: React.FC = () => {
             document={newDoc}
             onSave={handleInsert}
             onCancel={closeEditor}
+            isNew
           />
         </div>
       );
@@ -283,7 +309,12 @@ export const DocumentsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900">{t("documents.title")}</h2>
             <select
               value={selectedType}
-              onChange={(e) => { setSelectedType(e.target.value); setPage(0); }}
+              onChange={(e) => {
+                const type = e.target.value;
+                setSelectedType(type);
+                setPage(0);
+                setSearchParams(type ? { type } : {});
+              }}
               className={selectClass}
             >
               <option value="">{t("common.allTypes")}</option>
@@ -353,6 +384,23 @@ export const DocumentsPage: React.FC = () => {
         </PageFooter>
       }
     >
+      {savedId && (
+        <div className="mb-2 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-2 text-xs text-green-800">
+          <span>{t("documents.savedSuccess", { id: displayId(savedId) })}</span>
+          <button
+            type="button"
+            aria-label={t("common.close")}
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("id");
+              setSearchParams(next, { replace: true });
+            }}
+            className="font-medium hover:text-green-900"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {deleteError && (
         <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-600">{deleteError}</div>
       )}

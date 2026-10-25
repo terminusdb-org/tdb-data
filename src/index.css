@@ -16,3 +16,45 @@
     @apply font-headline;
   }
 }
+
+/* Minimal skin for RJSF document forms. */
+.tdb-form .form-group { margin-bottom: 0.75rem; }
+.tdb-form label.control-label { display: block; font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; }
+.tdb-form input.form-control, .tdb-form select.form-control, .tdb-form textarea.form-control {
+  width: 100%; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.4rem 0.6rem; font-size: 0.875rem;
+}
+.tdb-form input[type="checkbox"] { width: auto; margin-right: 0.4rem; }
+.tdb-form .field-error .text-danger { color: #b91c1c; font-size: 0.75rem; }
+.tdb-form .btn { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; margin-left: 0.25rem; }
+.tdb-form .panel.panel-danger.errors { display: none; }
+.tdb-form fieldset { border: 0; }
+.tdb-form .btn.btn-add, .tdb-form .array-item-move-up, .tdb-form .array-item-move-down,
+.tdb-form .array-item-remove, .tdb-form button[class*="btn-"], .tdb-form button.btn {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  border: 1px solid #d1d5db; border-radius: 0.375rem; background: #fff;
+  padding: 0.15rem 0.5rem; font-size: 0.8rem; line-height: 1.2; color: #374151;
+}
+.tdb-form .btn:hover { background: #f3f4f6; }
+.tdb-form .tdb-form-btn, .tdb-form .array-item-add {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.6rem; border: 1px solid #d1d5db; border-radius: 0.375rem;
+  background: #fff; padding: 0.15rem 0.5rem; font-size: 0.85rem; color: #374151;
+}
+.tdb-form .tdb-form-btn:hover, .tdb-form .array-item-add:hover { background: #f3f4f6; }
+.tdb-form .tdb-form-btn:disabled { opacity: 0.4; }
+
+/* Studio-style form layout (ported from zebra RecordJsonForm/style.css). */
+.tdb-form .control-label { font-weight: 700; color: #334155; padding: 0.125rem 0; }
+.tdb-form legend { padding: 0.5rem 0; font-weight: 600; color: #1f2937; }
+.tdb-form .form-group { padding-left: 0.15rem; padding-bottom: 0.25rem; border-left: 3px solid #64748b; border-top: 1px solid #e2e8f0; box-shadow: 0 1px 2px 0 #cbd5e1; }
+.tdb-form .form-group > fieldset > .form-group { margin-bottom: 1rem; }
+.tdb-form .field:not(.field-array) { padding-left: 0.375rem; }
+.tdb-form .field-object { padding-left: 0.25rem; border-left: 2px solid #cbd5e1; color: #334155; }
+.tdb-form .array-item { display: flex; flex-direction: row; width: 100%; background: #fff; gap: 0.5rem; }
+.tdb-form .array-item > div > .form-group { border-left: 6px solid #9ca3af; border-right: 6px solid #9ca3af; border-radius: 0.375rem; margin: 0.5rem 0 0.5rem 1rem; padding: 1rem 1rem 1px; box-shadow: 0 1px 3px #94a3b8; }
+.tdb-form .array-item > div > .form-group > .control-label { display: none; }
+.tdb-form .btn-group { display: flex; flex-direction: row; justify-content: space-around; margin: 0.75rem auto; gap: 0.25rem; }
+.tdb-form .array-item-toolbox { margin: auto 0; }
+.tdb-form .textarea-monospace { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.tdb-form .tdb-link-widget { position: relative; }
+.tdb-form .tdb-link-loading { position: absolute; right: 0.5rem; top: 0.5rem; color: #9ca3af; font-size: 0.75rem; }

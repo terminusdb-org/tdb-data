@@ -86,7 +86,7 @@ export const SearchBar: React.FC = () => {
   );
 
   const { data: searchResults, isFetching: isSearching, error: searchErr } = useSearchQuery(
-    { path: searchPath, query: urlQuery, count: 100, snippet: true },
+    { path: searchPath, query: urlQuery, count: 20, snippet: true },
     { skip: !routeParams || !searchTriggered }
   );
 

@@ -81,7 +81,7 @@ const historyIcon = (
 );
 
 const allItems: ReadonlyArray<RailItem> = [
-  { label: "nav.search", segment: "", icon: searchIcon },
+  { label: "nav.search", segment: "search", icon: searchIcon },
   { label: "nav.explore", segment: "doctypes", icon: exploreIcon },
   { label: "nav.schema", segment: "schema", icon: schemaIcon },
   { label: "nav.embeddings", segment: "embeddings", icon: embeddingsIcon },

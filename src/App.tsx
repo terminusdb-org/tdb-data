@@ -22,10 +22,11 @@ export const App: React.FC = () => {
             <Route index element={<DataProductPickerPage />} />
 
             {/* Org/team root — no branch/commit specified */}
-            <Route path=":org/:team" element={<MainPage />} />
+            <Route path=":org/:team" element={<Navigate to="local/branch/main/doctypes" replace />} />
 
             {/* Branch-scoped routes */}
-            <Route path=":org/:team/local/branch/:branch" element={<MainPage />} />
+            <Route path=":org/:team/local/branch/:branch" element={<Navigate to="doctypes" replace />} />
+            <Route path=":org/:team/local/branch/:branch/search" element={<MainPage />} />
             <Route path=":org/:team/local/branch/:branch/doctypes" element={<DoctypesPage />} />
             <Route path=":org/:team/local/branch/:branch/raw" element={<RawJsonPage />} />
             <Route path=":org/:team/local/branch/:branch/documents" element={<DocumentsPage />} />
@@ -41,7 +42,8 @@ export const App: React.FC = () => {
             <Route path=":org/:team/local/branch/:branch/history" element={<BranchHistoryPage />} />
 
             {/* Commit-scoped routes */}
-            <Route path=":org/:team/local/commit/:commitId" element={<MainPage />} />
+            <Route path=":org/:team/local/commit/:commitId" element={<Navigate to="doctypes" replace />} />
+            <Route path=":org/:team/local/commit/:commitId/search" element={<MainPage />} />
             <Route path=":org/:team/local/commit/:commitId/doctypes" element={<DoctypesPage />} />
             <Route path=":org/:team/local/commit/:commitId/raw" element={<RawJsonPage />} />
             <Route path=":org/:team/local/commit/:commitId/documents" element={<DocumentsPage />} />

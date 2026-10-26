@@ -1,24 +1,17 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { normalizeDocId } from "@/utils/validation";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useAppSelector, useAppDispatch, appendExtraCommits, selectLogPagination } from "@/store";
+import { useAppSelector, useAppDispatch, appendExtraCommits, prependNewerCommits, clearLogPagination, selectLogPagination } from "@/store";
 import { config } from "@/config";
 import { useRouteParams, PageShell, PageHeader, btnSecondary } from "@/components";
 import { useCommitChanges } from "@/hooks/useCommitChanges";
 import { useGetLogQuery, streamLog, type LogCommit } from "@/store/api/logApi";
-
-function formatTimestamp(ts: string): string {
-  const num = Number(ts);
-  if (!Number.isNaN(num) && num > 0) {
-    const date = new Date(num * 1000);
-    return date.toLocaleString();
-  }
-  return ts;
-}
+import { formatTimestampNanos } from "@/utils/datetime";
 
 const INITIAL_COUNT = 100;
 const LOAD_MORE_COUNT = 100;
+const LOAD_NEWER_COUNT = 10;
 
 export const BranchHistoryPage: React.FC = () => {
   const { t } = useTranslation();
@@ -38,23 +31,53 @@ export const BranchHistoryPage: React.FC = () => {
 
   const logPath = org && team ? `${org}/${team}/local/branch/${branchName}` : null;
 
+  // Window anchor: `startDateTime` jumps the window mid-history server-side;
+  // `windowStart` is the resolved absolute offset (0 = head) echoed back via
+  // the TerminusDB-Log-Start header.
+  const [anchorIso, setAnchorIso] = useState<string | null>(null);
+  const [windowStart, setWindowStart] = useState(0);
+  const [dateValue, setDateValue] = useState("");
+
   // Initial page load via RTK Query (auto-fetches when logPath changes).
   // Fetch INITIAL_COUNT + 1: the extra commit is a probe — its presence
-  // means more remain; it is never rendered.
+  // means more remain; it is never rendered. `start` and `startDateTime`
+  // are mutually exclusive server-side, so only one is ever sent.
   const { data: initialData, isLoading: initialLoading, error: initialError } = useGetLogQuery(
-    { path: logPath ?? "", start: 0, count: INITIAL_COUNT + 1 },
+    anchorIso
+      ? { path: logPath ?? "", count: INITIAL_COUNT + 1, startDateTime: anchorIso }
+      : { path: logPath ?? "", start: 0, count: INITIAL_COUNT + 1 },
     { skip: !logPath },
   );
 
+  // Adopt the resolved offset once the stream finishes — it is where the
+  // window's top commit actually sits in newest-to-oldest order.
+  useEffect(() => {
+    if (initialData?.resolvedStart != null) {
+      setWindowStart(initialData.resolvedStart);
+    }
+  }, [initialData?.resolvedStart]);
+
   const dispatch = useAppDispatch();
   const credentials = useAppSelector((state) => state.auth.credentials);
-  const pagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : { extraCommits: [], fetched: 0, loadedAll: false });
+  const rawPagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : null);
+  // The stored window may belong to a different start offset than the one
+  // currently queried (e.g. right after a date jump before the first append).
+  const pagination = rawPagination && rawPagination.start === windowStart
+    ? rawPagination
+    : { start: windowStart, extraCommits: [], newerCommits: [], fetched: 0, loadedAll: false };
   const extraCommits = pagination.extraCommits;
+  const newerCommits = pagination.newerCommits;
   const loadedAll = pagination.loadedAll;
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
   const [expandedCommits, setExpandedCommits] = useState<Set<string>>(new Set());
 
   const { changesCache, loadingIds, fetchChanges } = useCommitChanges(org, team);
+
+  // Live commit stream from Redux — new commits are prepended by the stream.
+  // Each live commit shifts every existing commit's offset from head by one.
+  const liveCommits = useAppSelector((state) => state.commitStream.history);
+  const liveLen = liveCommits.length;
 
   const toggleExpand = useCallback(
     (commitId: string) => {
@@ -75,22 +98,21 @@ export const BranchHistoryPage: React.FC = () => {
   const loadMore = useCallback(
     async (count: number) => {
       if (!logPath) return;
-      // start must count raw fetched commits (incl. dropped +1 probes),
-      // not just the displayed ones.
-      const start = (initialData?.commits.length ?? 0) + pagination.fetched;
+      // Absolute offset: anchor + live shift + raw fetched below the anchor
+      // (incl. the dropped +1 probe), not just the displayed ones.
+      const start = windowStart + liveLen + (initialData?.commits.length ?? 0) + pagination.fetched;
       setLoadingMore(true);
       try {
         const result = await streamLog(
           config.apiUrl,
           logPath,
-          start,
-          count === -1 ? -1 : count + 1,
+          { start, count: count === -1 ? -1 : count + 1 },
           credentials,
           undefined,
         );
         const hasMore = count !== -1 && result.commits.length > count;
         const visible = count === -1 ? result.commits : result.commits.slice(0, count);
-        dispatch(appendExtraCommits({ logPath, commits: visible, fetched: result.commits.length, loadedAll: !hasMore }));
+        dispatch(appendExtraCommits({ logPath, start: windowStart, commits: visible, fetched: result.commits.length, loadedAll: !hasMore }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Failed to load more commits:", msg);
@@ -98,7 +120,7 @@ export const BranchHistoryPage: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [logPath, initialData, pagination.fetched, dispatch, credentials],
+    [logPath, windowStart, liveLen, initialData, pagination.fetched, dispatch, credentials],
   );
 
   const handleLoadMore = () => {
@@ -109,16 +131,59 @@ export const BranchHistoryPage: React.FC = () => {
     void loadMore(-1);
   };
 
-  // Live commit stream from Redux — new commits are prepended by the stream
-  const liveCommits = useAppSelector((state) => state.commitStream.history);
+  // Extend the window upward: fetch the commits sitting between the live/
+  // previously-prepended edge and the window's top, newest first.
+  const loadNewer = useCallback(
+    async () => {
+      if (!logPath) return;
+      const topOffset = windowStart + liveLen - newerCommits.length;
+      const count = Math.min(LOAD_NEWER_COUNT, topOffset);
+      if (count <= 0) return;
+      setLoadingNewer(true);
+      try {
+        const result = await streamLog(
+          config.apiUrl,
+          logPath,
+          { start: topOffset - count, count },
+          credentials,
+          undefined,
+        );
+        dispatch(prependNewerCommits({ logPath, start: windowStart, commits: result.commits }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Failed to load newer commits:", msg);
+      } finally {
+        setLoadingNewer(false);
+      }
+    },
+    [logPath, windowStart, liveLen, newerCommits.length, dispatch, credentials],
+  );
 
-  // Merge: prepend live commits that aren't already in the log results.
-  // The initial fetch's (count+1)th probe commit is sliced off — it only
+  const handleDateJump = () => {
+    if (!logPath || !dateValue) return;
+    const iso = new Date(dateValue).toISOString();
+    if (logPath) dispatch(clearLogPagination(logPath));
+    setWindowStart(0);
+    setAnchorIso(iso);
+  };
+
+  const handleBackToHead = () => {
+    if (logPath) dispatch(clearLogPagination(logPath));
+    setWindowStart(0);
+    setDateValue("");
+    setAnchorIso(null);
+  };
+
+  // Merge: live stream commits first, then any newer-than-anchor commits
+  // loaded via "Load newer", then the window (initial + extra pages).
+  // Live commits already rendered above are dropped from newerCommits;
+  // the initial fetch's (count+1)th probe commit is sliced off — it only
   // signals that more pages exist.
   const allCommits = useMemo(() => {
-    const base = [...(initialData?.commits.slice(0, INITIAL_COUNT) ?? []), ...extraCommits];
-    return base;
-  }, [initialData, extraCommits]);
+    const liveIds = new Set(liveCommits.map((c) => c.id));
+    const newer = newerCommits.filter((c) => !liveIds.has(c.identifier));
+    return [...newer, ...(initialData?.commits.slice(0, INITIAL_COUNT) ?? []), ...extraCommits];
+  }, [initialData, extraCommits, newerCommits, liveCommits]);
 
   const mergedCommits = useMemo(() => {
     const logIds = new Set(allCommits.map((c) => c.identifier));
@@ -137,8 +202,11 @@ export const BranchHistoryPage: React.FC = () => {
 
   const initialHasMore = (initialData?.commits.length ?? 0) > INITIAL_COUNT;
   const moreAvailable = extraCommits.length === 0 ? initialHasMore : !loadedAll;
+  // Commits newer than the window's current top exist whenever the resolved
+  // offset (shifted by live arrivals) still exceeds what we've prepended.
+  const newerAvailable = windowStart + liveLen - newerCommits.length > 0;
   const isStreaming = initialData != null && initialData.commits.length === 0 && (initialData?.hasMore ?? false);
-  const loading = initialLoading || isStreaming || loadingMore;
+  const loading = initialLoading || isStreaming || loadingMore || loadingNewer;
   const error = initialError
     ? (initialError instanceof Error ? initialError.message : "Failed to load commit history")
     : null;
@@ -172,6 +240,33 @@ export const BranchHistoryPage: React.FC = () => {
               {org}/{team} — {t("branchHistory.branch")} {branchName}
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="datetime-local"
+              step={0.001}
+              value={dateValue}
+              onChange={(e) => setDateValue(e.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700 focus:border-dfrntBlue-500 focus:outline-none"
+              aria-label={t("branchHistory.jumpToDate")}
+            />
+            <button
+              type="button"
+              onClick={handleDateJump}
+              disabled={!dateValue}
+              className={btnSecondary}
+            >
+              {t("branchHistory.jumpToDate")}
+            </button>
+            {anchorIso && (
+              <button
+                type="button"
+                onClick={handleBackToHead}
+                className={btnSecondary}
+              >
+                {t("branchHistory.backToHead")}
+              </button>
+            )}
+          </div>
           {currentCommitId && (
             <button
               type="button"
@@ -199,8 +294,24 @@ export const BranchHistoryPage: React.FC = () => {
           <>
             <div className="mb-3 text-xs text-gray-500">
               {t("branchHistory.showingCommits", { count: mergedCommits.length })}
+              {anchorIso && <span className="ml-2 text-dfrntBlue-600">— {t("branchHistory.anchoredAt", { date: new Date(anchorIso).toLocaleString() })}</span>}
               {currentCommitId && <span className="ml-2 text-amber-600">— {t("branchHistory.viewingCommit", { id: currentCommitId.slice(0, 12) })}</span>}
             </div>
+
+            {/* Load newer — shown while commits exist above the window's top */}
+            {newerAvailable && (
+              <div className="mb-4 flex items-center gap-3 border-b border-gray-200 pb-4">
+                <button
+                  type="button"
+                  onClick={() => void loadNewer()}
+                  disabled={loading}
+                  className={btnSecondary}
+                >
+                  {loadingNewer ? t("common.loading") : t("branchHistory.loadNewer", { count: Math.min(LOAD_NEWER_COUNT, windowStart + liveLen - newerCommits.length) })}
+                </button>
+              </div>
+            )}
+
             <div className="space-y-0">
               {mergedCommits.map((entry, idx) => {
                 const isLatest = idx === 0;
@@ -271,7 +382,7 @@ export const BranchHistoryPage: React.FC = () => {
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                         <span className="font-medium text-gray-600">{entry.author}</span>
-                        {entry.timestamp && <span>{formatTimestamp(entry.timestamp)}</span>}
+                        {entry.timestamp && <span className="tabular-nums">{formatTimestampNanos(entry.timestamp)}</span>}
                         {(entry.added_count != null || entry.changed_count != null || entry.deleted_count != null) && (
                           <span className="flex items-center gap-1.5">
                             {entry.added_count != null && entry.added_count > 0 && (

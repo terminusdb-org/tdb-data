@@ -29,7 +29,7 @@ export {
   useDeleteDocumentMutation,
 } from "./api/documentApi";
 
-export { isNoEmbeddingQueriesError, isEndpointNotConfiguredError } from "../utils/apiErrors";
+export { isNoEmbeddingQueriesError, isEndpointNotConfiguredError, apiErrorMessage } from "../utils/apiErrors";
 
 export {
   useGetSchemaQuery,
@@ -68,7 +68,7 @@ export type { ServerInfo, IndexerInfo } from "./api/infoApi";
 export {
   setConnectionStatus, setCommitStreamError, addCommitEntry, clearCommitHistory,
   startCommitStream, stopCommitStream,
-  appendExtraCommits, clearLogPagination,
+  appendExtraCommits, prependNewerCommits, clearLogPagination,
   selectLatestCommitId, selectConnectionStatus, selectCommitHistory, selectCommitStreamError,
   selectLogPagination,
 } from "./commitStreamSlice";

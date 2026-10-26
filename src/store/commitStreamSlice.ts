@@ -20,7 +20,9 @@ export interface CommitEntry {
 }
 
 interface LogPaginationEntry {
+  start: number;
   extraCommits: LogCommit[];
+  newerCommits: LogCommit[];
   fetched: number;
   loadedAll: boolean;
 }
@@ -77,13 +79,30 @@ export const commitStreamSlice = createSlice({
       state.activeParams = null;
       state.connectionStatus = "disconnected";
     },
-    appendExtraCommits(state, action: PayloadAction<{ logPath: string; commits: readonly LogCommit[]; fetched: number; loadedAll: boolean }>) {
-      const { logPath, commits, fetched, loadedAll } = action.payload;
-      const existing = state.logPagination[logPath] ?? { extraCommits: [], fetched: 0, loadedAll: false };
+    appendExtraCommits(state, action: PayloadAction<{ logPath: string; start: number; commits: readonly LogCommit[]; fetched: number; loadedAll: boolean }>) {
+      const { logPath, start, commits, fetched, loadedAll } = action.payload;
+      const existing = state.logPagination[logPath];
+      const base = existing && existing.start === start
+        ? existing
+        : { start, extraCommits: [], newerCommits: [], fetched: 0, loadedAll: false };
       state.logPagination[logPath] = {
-        extraCommits: [...existing.extraCommits, ...commits],
-        fetched: existing.fetched + fetched,
+        ...base,
+        extraCommits: [...base.extraCommits, ...commits],
+        fetched: base.fetched + fetched,
         loadedAll,
+      };
+    },
+    // Each call fetches the range *above* the previous batch, so batches
+    // arrive newest-range-first; appending keeps newest-to-oldest order.
+    prependNewerCommits(state, action: PayloadAction<{ logPath: string; start: number; commits: readonly LogCommit[] }>) {
+      const { logPath, start, commits } = action.payload;
+      const existing = state.logPagination[logPath];
+      const base = existing && existing.start === start
+        ? existing
+        : { start, extraCommits: [], newerCommits: [], fetched: 0, loadedAll: false };
+      state.logPagination[logPath] = {
+        ...base,
+        newerCommits: [...base.newerCommits, ...commits],
       };
     },
     clearLogPagination(state, action: PayloadAction<string>) {
@@ -100,6 +119,7 @@ export const {
   startCommitStream,
   stopCommitStream,
   appendExtraCommits,
+  prependNewerCommits,
   clearLogPagination,
 } = commitStreamSlice.actions;
 
@@ -114,4 +134,4 @@ export const selectConnectionStatus = (state: CommitStreamRootState) => state.co
 export const selectCommitHistory = (state: CommitStreamRootState) => state.commitStream.history;
 export const selectCommitStreamError = (state: CommitStreamRootState) => state.commitStream.error;
 export const selectLogPagination = (state: CommitStreamRootState, logPath: string) =>
-  state.commitStream.logPagination[logPath] ?? { extraCommits: [], fetched: 0, loadedAll: false };
+  state.commitStream.logPagination[logPath] ?? { start: 0, extraCommits: [], newerCommits: [], fetched: 0, loadedAll: false };

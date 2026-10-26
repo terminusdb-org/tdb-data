@@ -18,23 +18,49 @@ export interface GetLogParams {
   readonly path: string;
   readonly start?: number;
   readonly count?: number;
+  readonly startDateTime?: string;
+  readonly endDateTime?: string;
+}
+
+export interface StreamLogOptions {
+  readonly start?: number;
+  readonly count?: number;
+  readonly startDateTime?: string;
+  readonly endDateTime?: string;
 }
 
 export interface GetLogResult {
   commits: LogCommit[];
   hasMore: boolean;
+  // Absolute offset (from the branch head, newest first) of the first emitted
+  // commit, echoed by the server's TerminusDB-Log-Start header. Lets callers
+  // keep paging with plain `start` after anchoring a window by datetime.
+  resolvedStart?: number;
 }
 
 export async function streamLog(
   baseUrl: string,
   path: string,
-  start: number,
-  count: number,
+  options: StreamLogOptions,
   credentials: string | null,
   signal: AbortSignal | undefined,
   onCommit?: (commit: LogCommit) => void,
 ): Promise<GetLogResult> {
-  const url = `${baseUrl}/api/log/${path}?start=${start}&count=${count}&stream=true&with_counts=true`;
+  const params = new URLSearchParams();
+  // start, startDateTime and endDateTime are mutually exclusive server-side.
+  if (options.startDateTime) {
+    params.set("startDateTime", options.startDateTime);
+  } else if (options.endDateTime) {
+    params.set("endDateTime", options.endDateTime);
+  } else {
+    params.set("start", String(options.start ?? 0));
+  }
+  if (options.count != null) {
+    params.set("count", String(options.count));
+  }
+  params.set("stream", "true");
+  params.set("with_counts", "true");
+  const url = `${baseUrl}/api/log/${path}?${params.toString()}`;
   const headers: Record<string, string> = {
     Accept: "application/x-ndjson",
   };
@@ -87,8 +113,13 @@ export async function streamLog(
     reader.cancel().catch(() => {});
   }
 
+  const count = options.count ?? -1;
   const reachedEnd = count >= 0 && commits.length < count;
-  return { commits, hasMore: !reachedEnd };
+  const headerStart = res.headers.get("TerminusDB-Log-Start");
+  const resolvedStart = headerStart != null && headerStart !== ""
+    ? Number(headerStart)
+    : options.start;
+  return { commits, hasMore: !reachedEnd, resolvedStart };
 }
 
 export const logApi = baseApi.injectEndpoints({
@@ -97,8 +128,6 @@ export const logApi = baseApi.injectEndpoints({
       queryFn: (params, api) => {
         const state = api.getState() as { auth: { credentials: string | null } };
         const credentials = state.auth.credentials;
-        const start = params.start ?? 0;
-        const count = params.count ?? 100;
         const cacheKey = JSON.stringify(params);
 
         // If a stream is already running for these params, don't start another.
@@ -108,8 +137,12 @@ export const logApi = baseApi.injectEndpoints({
           streamLog(
             config.apiUrl,
             params.path,
-            start,
-            count,
+            {
+              start: params.start ?? 0,
+              count: params.count ?? 100,
+              startDateTime: params.startDateTime,
+              endDateTime: params.endDateTime,
+            },
             credentials,
             api.signal,
             (commit) => {
@@ -126,6 +159,7 @@ export const logApi = baseApi.injectEndpoints({
                 logApi.util.updateQueryData("getLog", params, (draft) => {
                   draft.commits = final.commits;
                   draft.hasMore = final.hasMore;
+                  draft.resolvedStart = final.resolvedStart;
                 }),
               );
             },

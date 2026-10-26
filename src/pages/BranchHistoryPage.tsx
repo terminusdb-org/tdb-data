@@ -38,15 +38,17 @@ export const BranchHistoryPage: React.FC = () => {
 
   const logPath = org && team ? `${org}/${team}/local/branch/${branchName}` : null;
 
-  // Initial page load via RTK Query (auto-fetches when logPath changes)
+  // Initial page load via RTK Query (auto-fetches when logPath changes).
+  // Fetch INITIAL_COUNT + 1: the extra commit is a probe — its presence
+  // means more remain; it is never rendered.
   const { data: initialData, isLoading: initialLoading, error: initialError } = useGetLogQuery(
-    { path: logPath ?? "", start: 0, count: INITIAL_COUNT },
+    { path: logPath ?? "", start: 0, count: INITIAL_COUNT + 1 },
     { skip: !logPath },
   );
 
   const dispatch = useAppDispatch();
   const credentials = useAppSelector((state) => state.auth.credentials);
-  const pagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : { extraCommits: [], loadedAll: false });
+  const pagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : { extraCommits: [], fetched: 0, loadedAll: false });
   const extraCommits = pagination.extraCommits;
   const loadedAll = pagination.loadedAll;
   const [loadingMore, setLoadingMore] = useState(false);
@@ -73,18 +75,22 @@ export const BranchHistoryPage: React.FC = () => {
   const loadMore = useCallback(
     async (count: number) => {
       if (!logPath) return;
-      const start = (initialData?.commits.length ?? 0) + extraCommits.length;
+      // start must count raw fetched commits (incl. dropped +1 probes),
+      // not just the displayed ones.
+      const start = (initialData?.commits.length ?? 0) + pagination.fetched;
       setLoadingMore(true);
       try {
         const result = await streamLog(
           config.apiUrl,
           logPath,
           start,
-          count,
+          count === -1 ? -1 : count + 1,
           credentials,
           undefined,
         );
-        dispatch(appendExtraCommits({ logPath, commits: result.commits, loadedAll: !result.hasMore }));
+        const hasMore = count !== -1 && result.commits.length > count;
+        const visible = count === -1 ? result.commits : result.commits.slice(0, count);
+        dispatch(appendExtraCommits({ logPath, commits: visible, fetched: result.commits.length, loadedAll: !hasMore }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Failed to load more commits:", msg);
@@ -92,7 +98,7 @@ export const BranchHistoryPage: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [logPath, initialData, extraCommits.length, dispatch, credentials],
+    [logPath, initialData, pagination.fetched, dispatch, credentials],
   );
 
   const handleLoadMore = () => {
@@ -106,9 +112,11 @@ export const BranchHistoryPage: React.FC = () => {
   // Live commit stream from Redux — new commits are prepended by the stream
   const liveCommits = useAppSelector((state) => state.commitStream.history);
 
-  // Merge: prepend live commits that aren't already in the log results
+  // Merge: prepend live commits that aren't already in the log results.
+  // The initial fetch's (count+1)th probe commit is sliced off — it only
+  // signals that more pages exist.
   const allCommits = useMemo(() => {
-    const base = [...(initialData?.commits ?? []), ...extraCommits];
+    const base = [...(initialData?.commits.slice(0, INITIAL_COUNT) ?? []), ...extraCommits];
     return base;
   }, [initialData, extraCommits]);
 
@@ -127,8 +135,9 @@ export const BranchHistoryPage: React.FC = () => {
     return [...liveMapped, ...allCommits];
   }, [allCommits, liveCommits]);
 
-  const hasMore = initialData?.hasMore ?? false;
-  const isStreaming = initialData != null && initialData.commits.length === 0 && hasMore;
+  const initialHasMore = (initialData?.commits.length ?? 0) > INITIAL_COUNT;
+  const moreAvailable = extraCommits.length === 0 ? initialHasMore : !loadedAll;
+  const isStreaming = initialData != null && initialData.commits.length === 0 && (initialData?.hasMore ?? false);
   const loading = initialLoading || isStreaming || loadingMore;
   const error = initialError
     ? (initialError instanceof Error ? initialError.message : "Failed to load commit history")
@@ -293,19 +302,17 @@ export const BranchHistoryPage: React.FC = () => {
               })}
             </div>
 
-            {/* Load more / Load all */}
-            {!loadedAll && (
+            {/* Load more / Load all — hidden when every commit is loaded */}
+            {moreAvailable && (
               <div className="mt-4 flex items-center gap-3 border-t border-gray-200 pt-4">
-                {hasMore && (
-                  <button
-                    type="button"
-                    onClick={handleLoadMore}
-                    disabled={loading}
-                    className={btnSecondary}
-                  >
-                    {loading ? t("common.loading") : t("branchHistory.loadMore", { count: LOAD_MORE_COUNT })}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  disabled={loading}
+                  className={btnSecondary}
+                >
+                  {loading ? t("common.loading") : t("branchHistory.loadMore", { count: LOAD_MORE_COUNT })}
+                </button>
                 <button
                   type="button"
                   onClick={handleLoadAll}

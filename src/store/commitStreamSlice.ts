@@ -21,6 +21,7 @@ export interface CommitEntry {
 
 interface LogPaginationEntry {
   extraCommits: LogCommit[];
+  fetched: number;
   loadedAll: boolean;
 }
 
@@ -76,11 +77,12 @@ export const commitStreamSlice = createSlice({
       state.activeParams = null;
       state.connectionStatus = "disconnected";
     },
-    appendExtraCommits(state, action: PayloadAction<{ logPath: string; commits: readonly LogCommit[]; loadedAll: boolean }>) {
-      const { logPath, commits, loadedAll } = action.payload;
-      const existing = state.logPagination[logPath] ?? { extraCommits: [], loadedAll: false };
+    appendExtraCommits(state, action: PayloadAction<{ logPath: string; commits: readonly LogCommit[]; fetched: number; loadedAll: boolean }>) {
+      const { logPath, commits, fetched, loadedAll } = action.payload;
+      const existing = state.logPagination[logPath] ?? { extraCommits: [], fetched: 0, loadedAll: false };
       state.logPagination[logPath] = {
         extraCommits: [...existing.extraCommits, ...commits],
+        fetched: existing.fetched + fetched,
         loadedAll,
       };
     },
@@ -112,4 +114,4 @@ export const selectConnectionStatus = (state: CommitStreamRootState) => state.co
 export const selectCommitHistory = (state: CommitStreamRootState) => state.commitStream.history;
 export const selectCommitStreamError = (state: CommitStreamRootState) => state.commitStream.error;
 export const selectLogPagination = (state: CommitStreamRootState, logPath: string) =>
-  state.commitStream.logPagination[logPath] ?? { extraCommits: [], loadedAll: false };
+  state.commitStream.logPagination[logPath] ?? { extraCommits: [], fetched: 0, loadedAll: false };

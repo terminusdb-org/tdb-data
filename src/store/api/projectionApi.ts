@@ -1,5 +1,6 @@
 import { baseApi } from "../baseApi";
 import type { EmbeddingsByTypeResponse } from "@/types/terminusdb";
+import { normalizeDocId } from "@/utils/validation";
 
 export interface EmbeddingsByTypeParams {
   readonly path: string;
@@ -10,7 +11,7 @@ export interface EmbeddingsByTypeParams {
 export function buildEmbeddingsByTypeQuery(params: EmbeddingsByTypeParams): string {
   const parts: string[] = [];
   for (const t of params.docTypes ?? []) parts.push(`doc_type=${encodeURIComponent(t)}`);
-  for (const id of params.docIds ?? []) parts.push(`doc_id=${encodeURIComponent(id)}`);
+  for (const id of params.docIds ?? []) parts.push(`doc_id=${normalizeDocId(id)}`);
   const qs = parts.join("&");
   const queryStr = qs ? "?" + qs : "";
   return params.path + queryStr;

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { normalizeDocId } from "@/utils/validation";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useGetDocumentQuery } from "@/store";
@@ -47,7 +48,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
 
   const navigateToDoc = () => {
     navigate(
-      `/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(hit.id)}`
+      `/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${normalizeDocId(hit.id)}`
     );
   };
 
@@ -132,7 +133,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
             documentId={hit.id}
             onSelectDocument={(id) =>
               navigate(
-                `/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(id)}`
+                `/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${normalizeDocId(id)}`
               )
             }
           />

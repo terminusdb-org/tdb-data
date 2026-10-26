@@ -208,7 +208,7 @@ export const DocumentsPage: React.FC = () => {
   };
 
   const handleNewDocument = () => {
-    setSearchParams(selectedType ? { edit: "new", type: selectedType } : { edit: "new" });
+    setSearchParams(`edit=new${selectedType ? `&type=${encodeURIComponent(selectedType)}` : ""}`);
   };
 
   const renderContent = (): React.ReactNode => {
@@ -240,7 +240,11 @@ export const DocumentsPage: React.FC = () => {
             <tr
               key={doc["@id"]}
               className={`cursor-pointer hover:bg-gray-50 ${doc["@id"] === savedId ? "bg-green-50" : ""}`}
-              onClick={() => setSearchParams(selectedType ? { edit: doc["@id"], type: selectedType } : { edit: doc["@id"] })}
+              onClick={() =>
+                setSearchParams(
+                  `edit=${normalizeDocId(doc["@id"])}${selectedType ? `&type=${encodeURIComponent(selectedType)}` : ""}`
+                )
+              }
             >
               <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                 <input

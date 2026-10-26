@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { normalizeDocId } from "@/utils/validation";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -485,7 +486,7 @@ export const EntityResolutionPage: React.FC = () => {
 
   const navigateToDoc = (id: string) => {
     if (!routeParams) return;
-    navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(id)}`);
+    navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${normalizeDocId(id)}`);
   };
 
   const hasClustering = useMemo(() => {

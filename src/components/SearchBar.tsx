@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { normalizeDocId } from "@/utils/validation";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSuggestQuery, useSearchQuery } from "@/store";
@@ -127,7 +128,7 @@ export const SearchBar: React.FC = () => {
 
   const navigateToDoc = useCallback((docId: string) => {
     if (org && team && refType && refName) {
-      navigate(`/${org}/${team}/local/${refType}/${refName}/documents?edit=${encodeURIComponent(docId)}`);
+      navigate(`/${org}/${team}/local/${refType}/${refName}/documents?edit=${normalizeDocId(docId)}`);
     }
   }, [org, team, refType, refName, navigate]);
 

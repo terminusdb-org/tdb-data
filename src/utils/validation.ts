@@ -16,22 +16,17 @@ export function formatBytes(bytes: number): string {
 
 // Ids are stored/sent verbatim (e.g. "Person/Kurt%20G%C3%B6del") but should
 // render human-readable. Display-only decode — never apply to wire values.
-// Canonicalize a user-entered @id to the server's percent-encoded IRI form:
-// encode each "/"-segment, decoding first so already-encoded input
-// ("Kurt%20G%C3%B6del") and raw input ("Kurt Gödel") normalize identically.
+// Encode an @id for the wire. The stored id is a literal that may itself
+// contain percent-encoding ("Person/Kurt%20Gödel") or be a full IRI
+// ("https://ex.com/data/Person/Kurt%20Gödel") — the server decodes the
+// query param once, so each segment must be encoded as-is (% → %25) while
+// scheme, authority and "/" separators stay literal. This is the one place
+// doc-id wire encoding is defined — call it for every id param.
 export function normalizeDocId(id: string): string {
-  return id
-    .split("/")
-    .map((seg) => {
-      let raw = seg;
-      try {
-        raw = decodeURIComponent(seg);
-      } catch {
-        // stray '%' — keep segment as-is
-      }
-      return encodeURIComponent(raw);
-    })
-    .join("/");
+  const iri = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]*)(\/.*)?$/.exec(id);
+  const prefix = iri ? iri[1] : "";
+  const rest = iri ? (iri[2] ?? "") : id;
+  return prefix + rest.split("/").map(encodeURIComponent).join("/");
 }
 
 export function displayId(id: string): string {

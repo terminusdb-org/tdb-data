@@ -1,8 +1,9 @@
 import { baseApi } from "../baseApi";
 import type { EditableDocument, TerminusDBDocument } from "@/types/terminusdb";
+import { normalizeDocId } from "@/utils/validation";
 // Server ids are literal strings (e.g. "Person/Kurt%20G%C3%B6del") — never
-// decode them in-app; query params are decoded once server-side, so
-// encodeURIComponent on egress produces the right wire form.
+// decode them in-app. On the wire the "/" separators stay literal and only
+// the segments are encoded: use normalizeDocId, not encodeURIComponent.
 
 export interface GetDocumentsParams {
   readonly path: string;
@@ -24,7 +25,6 @@ export const documentApi = baseApi.injectEndpoints({
         const searchParams = new URLSearchParams();
         if (params.graphType) searchParams.set("graph_type", params.graphType);
         if (params.type) searchParams.set("type", params.type);
-        if (params.id) searchParams.set("id", params.id);
         if (params.skip !== undefined) searchParams.set("skip", String(params.skip));
         if (params.count !== undefined) searchParams.set("count", String(params.count));
         if (params.asList) searchParams.set("as_list", "true");
@@ -32,7 +32,9 @@ export const documentApi = baseApi.injectEndpoints({
         if (params.unfold !== undefined) searchParams.set("unfold", String(params.unfold));
         if (params.rawJson) searchParams.set("raw_json", "true");
         searchParams.set("compress_ids", "true");
-        const qs = searchParams.toString();
+        const qs = [searchParams.toString(), params.id ? `id=${normalizeDocId(params.id)}` : ""]
+          .filter(Boolean)
+          .join("&");
         return qs ? `${params.path}?${qs}` : params.path;
       },
       providesTags: (result, _error, params) => {
@@ -47,10 +49,9 @@ export const documentApi = baseApi.injectEndpoints({
     getDocument: builder.query<TerminusDBDocument, { path: string; id: string; graphType?: "instance" | "schema" }>({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        searchParams.set("id", params.id);
         if (params.graphType) searchParams.set("graph_type", params.graphType);
         searchParams.set("compress_ids", "true");
-        return `${params.path}?${searchParams.toString()}`;
+        return `${params.path}?id=${normalizeDocId(params.id)}&${searchParams.toString()}`;
       },
       providesTags: (_result, _error, params) => [{ type: "Document", id: params.id }],
     }),
@@ -58,11 +59,10 @@ export const documentApi = baseApi.injectEndpoints({
     getEmbeddingText: builder.query<string, { path: string; id: string }>({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        searchParams.set("id", params.id);
         searchParams.set("format", "embedding");
         searchParams.set("compress_ids", "true");
         return {
-          url: `${params.path}?${searchParams.toString()}`,
+          url: `${params.path}?id=${normalizeDocId(params.id)}&${searchParams.toString()}`,
           responseHandler: (response: Response) => response.text(),
         };
       },
@@ -72,11 +72,10 @@ export const documentApi = baseApi.injectEndpoints({
     getMarkdownText: builder.query<string, { path: string; id: string }>({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        searchParams.set("id", params.id);
         searchParams.set("format", "markdown");
         searchParams.set("compress_ids", "true");
         return {
-          url: `${params.path}?${searchParams.toString()}`,
+          url: `${params.path}?id=${normalizeDocId(params.id)}&${searchParams.toString()}`,
           responseHandler: (response: Response) => response.text(),
         };
       },
@@ -88,7 +87,7 @@ export const documentApi = baseApi.injectEndpoints({
       { path: string; id: string; document: EditableDocument; author: string; message: string }
     >({
       query: (params) => ({
-        url: `${params.path}?id=${encodeURIComponent(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance`,
+        url: `${params.path}?id=${normalizeDocId(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance`,
         method: "PUT",
         body: params.document,
       }),
@@ -100,7 +99,7 @@ export const documentApi = baseApi.injectEndpoints({
       { path: string; id: string; document: TerminusDBDocument; author: string; message: string }
     >({
       query: (params) => ({
-        url: `${params.path}?id=${encodeURIComponent(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance&raw_json=true`,
+        url: `${params.path}?id=${normalizeDocId(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance&raw_json=true`,
         method: "PUT",
         body: params.document,
       }),
@@ -136,7 +135,7 @@ export const documentApi = baseApi.injectEndpoints({
       { path: string; id: string; author: string; message: string }
     >({
       query: (params) => ({
-        url: `${params.path}?id=${encodeURIComponent(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance`,
+        url: `${params.path}?id=${normalizeDocId(params.id)}&author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=instance`,
         method: "DELETE",
       }),
       invalidatesTags: ["Document"],

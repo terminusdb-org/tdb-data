@@ -16,7 +16,7 @@ const formValidator = customizeValidator();
 
 const FORM_WIDGETS = { textarea: TdbTextareaWidget };
 import type { EditableDocument, TerminusDBDocument } from "@/types/terminusdb";
-import { isValidJson, displayId } from "@/utils/validation";
+import { normalizeDocId, isValidJson, displayId } from "@/utils/validation";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { RefType } from "@/store/dataProductSlice";
 import { useGetEmbeddingTextQuery, useGetMarkdownTextQuery, useGetJsonSchemaQuery, isNoEmbeddingQueriesError } from "@/store";
@@ -382,7 +382,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
             documentId={docId}
             onSelectDocument={(id) => {
               if (org && team && refType && refName) {
-                navigate(`/${org}/${team}/local/${refType}/${refName}/documents?edit=${encodeURIComponent(id)}`);
+                navigate(`/${org}/${team}/local/${refType}/${refName}/documents?edit=${normalizeDocId(id)}`);
               }
             }}
           />

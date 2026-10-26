@@ -1,4 +1,5 @@
 import { baseApi } from "../baseApi";
+import { normalizeDocId } from "@/utils/validation";
 import type { SearchHit, SuggestResponse, SearchStats, DuplicatesResponse, ResolveResponse, CompareResponse, CandidatesResult } from "@/types/terminusdb";
 // Hit ids are server literals (possibly percent-encoded IRI fragments) —
 // keep them verbatim; they are re-encoded on egress.
@@ -81,17 +82,17 @@ export const searchApi = baseApi.injectEndpoints({
     similar: builder.query<SearchHit[], SimilarParams>({
       query: (params) => {
         const sp = new URLSearchParams();
-        if (params.id) sp.set("id", params.id);
         if (params.count) sp.set("count", String(params.count));
         if (params.snippet) sp.set("snippet", "true");
+        const qs = [params.id ? `id=${normalizeDocId(params.id)}` : "", sp.toString()].filter(Boolean).join("&");
         if (params.text) {
           return {
-            url: `${params.path}?${sp.toString()}`,
+            url: `${params.path}?${qs}`,
             method: "POST",
             body: { text: params.text },
           };
         }
-        return `${params.path}?${sp.toString()}`;
+        return `${params.path}?${qs}`;
       },
     }),
 
@@ -102,9 +103,9 @@ export const searchApi = baseApi.injectEndpoints({
         if (params.count) parts.push(`count=${params.count}`);
         if (params.snippet) parts.push("snippet=true");
         for (const t of params.docTypes ?? []) parts.push(`doc_type=${encodeURIComponent(t)}`);
-        for (const id of params.docIds ?? []) parts.push(`doc_id=${encodeURIComponent(id)}`);
+        for (const id of params.docIds ?? []) parts.push(`doc_id=${normalizeDocId(id)}`);
         for (const t of params.targetDocTypes ?? []) parts.push(`target_doc_type=${encodeURIComponent(t)}`);
-        for (const id of params.targetDocIds ?? []) parts.push(`target_doc_id=${encodeURIComponent(id)}`);
+        for (const id of params.targetDocIds ?? []) parts.push(`target_doc_id=${normalizeDocId(id)}`);
         const qs = parts.join("&");
         return qs ? `${params.path}?${qs}` : params.path;
       },

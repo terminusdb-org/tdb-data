@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { normalizeDocId } from "@/utils/validation";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAppSelector, useAppDispatch, appendExtraCommits, selectLogPagination } from "@/store";
@@ -343,7 +344,7 @@ const CommitChangesPanel: React.FC<{
   const goToDoc = (docId: string, useParent: boolean = false) => {
     const targetCommit = useParent && parentCommitId ? parentCommitId : commitId;
     const fullId = docId.startsWith("terminusdb:///") ? docId.replace("terminusdb:///data/", "") : docId;
-    navigate(`/${org}/${team}/local/commit/${targetCommit}/documents?edit=${encodeURIComponent(fullId)}`);
+    navigate(`/${org}/${team}/local/commit/${targetCommit}/documents?edit=${normalizeDocId(fullId)}`);
   };
 
   if (loading) {

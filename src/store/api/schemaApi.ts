@@ -1,5 +1,6 @@
 import { baseApi } from "../baseApi";
 import type { SchemaClass, Frame } from "@/types/terminusdb";
+import { normalizeDocId } from "@/utils/validation";
 
 const SCHEMA_RESERVED_KEYS = new Set([
   "@id", "@type", "@key", "@base", "@inherits", "@documentation",
@@ -137,7 +138,7 @@ export const schemaApi = baseApi.injectEndpoints({
       { path: string; id: string; document: SchemaClass; author: string; message: string }
     >({
       query: (params) => ({
-        url: `${params.path}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=schema&id=${encodeURIComponent(params.id)}`,
+        url: `${params.path}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=schema&id=${normalizeDocId(params.id)}`,
         method: "PUT",
         body: params.document,
       }),
@@ -161,7 +162,7 @@ export const schemaApi = baseApi.injectEndpoints({
       { path: string; id: string; author: string; message: string }
     >({
       query: (params) => ({
-        url: `${params.path}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=schema&id=${encodeURIComponent(params.id)}`,
+        url: `${params.path}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=schema&id=${normalizeDocId(params.id)}`,
         method: "DELETE",
       }),
       invalidatesTags: ["Schema", "Frame"],

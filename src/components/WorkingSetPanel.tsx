@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { normalizeDocId } from "@/utils/validation";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -146,7 +147,7 @@ export const WorkingSetPanel: React.FC<WorkingSetPanelProps> = ({
   const navigateToDoc = useCallback(
     (id: string) => {
       if (routeParams) {
-        navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${encodeURIComponent(id)}`);
+        navigate(`/${routeParams.org}/${routeParams.team}/local/${routeParams.refType}/${routeParams.refName}/documents?edit=${normalizeDocId(id)}`);
       }
     },
     [routeParams, navigate]

@@ -40,7 +40,14 @@ export const DataLayout: React.FC = () => {
       dispatch(clearERState());
       dispatch(clearCommitHistory());
       dispatch(clearError());
-      dispatch(baseApi.util.resetApiState());
+      // Skip the cache reset when leaving for the picker (key becomes
+      // null): it clobbers the picker's getDatabases subscription mounting
+      // in the same commit, leaving it stuck on "Loading" with no request
+      // fired. Cached entries are arg-keyed per product, so retention is
+      // safe.
+      if (dataProductKey !== null) {
+        dispatch(baseApi.util.resetApiState());
+      }
     }
     prevDataProductKey.current = dataProductKey;
 

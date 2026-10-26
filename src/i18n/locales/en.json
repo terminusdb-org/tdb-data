@@ -141,7 +141,8 @@
   },
   "dataLayout": {
     "viewingCommit": "Viewing commit",
-    "readOnlySnapshot": "— read-only snapshot for information."
+    "readOnlySnapshot": "— read-only snapshot for information.",
+    "backToMain": "(back to main)"
   },
   "mainPage": {
     "dataExplorer": "Data Explorer",
@@ -157,7 +158,8 @@
     "loading": "Loading data products…",
     "loadFailed": "Failed to load data products. Check that the server is running at",
     "noProducts": "No data products found",
-    "matching": "matching"
+    "matching": "matching",
+    "adminSettings": "Manage data products"
   },
   "doctypes": {
     "title": "Document Types",

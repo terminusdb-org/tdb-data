@@ -10,6 +10,7 @@ import {
   useRunGraphqlMutation,
   useGraphqlDocumentCountQuery,
   useAppSelector,
+  isNoEmbeddingQueriesError,
 } from "@/store";
 import {
   PageShell,
@@ -257,8 +258,10 @@ export const EmbeddingsPage: React.FC = () => {
     { skip: !shouldFetchEmbedding },
   );
 
+  const noEmbeddingQueries = isNoEmbeddingQueriesError(embeddingErr);
+
   useEffect(() => {
-    if (embeddingErr) {
+    if (embeddingErr && !noEmbeddingQueries) {
       setEmbeddingError(
         typeof embeddingErr === "object" && "data" in embeddingErr
           ? String((embeddingErr as Record<string, unknown>).data ?? embeddingErr)
@@ -267,7 +270,7 @@ export const EmbeddingsPage: React.FC = () => {
     } else {
       setEmbeddingError(null);
     }
-  }, [embeddingErr]);
+  }, [embeddingErr, noEmbeddingQueries]);
 
   const handleSelectType = useCallback((id: string) => {
     setSelectedType(id);
@@ -285,12 +288,15 @@ export const EmbeddingsPage: React.FC = () => {
     const setStatus = field === "query" ? setGraphqlSaveStatus : setTemplateSaveStatus;
     setStatus("saving");
     try {
-      const metadataKey = "@metadata" in selectedClass ? "@metadata" : "metadata";
-      const existingMetadata = (selectedClass[metadataKey] as Record<string, unknown>) ?? {};
+      // @metadata is the system keyword — writing plain "metadata" makes
+      // schema elaboration treat its value as a nested document that
+      // requires @type.
+      const existingMetadata =
+        ((selectedClass["@metadata"] ?? selectedClass["metadata"]) as Record<string, unknown> | undefined) ?? {};
       const existingEmbedding = (existingMetadata["embedding"] as Record<string, unknown>) ?? {};
       const updatedDoc = {
         ...selectedClass,
-        [metadataKey]: {
+        "@metadata": {
           ...existingMetadata,
           embedding: {
             ...existingEmbedding,
@@ -656,10 +662,13 @@ export const EmbeddingsPage: React.FC = () => {
                   {embeddingError && !embeddingFetching && (
                     <pre className="text-xs text-amber-400 whitespace-pre-wrap">{embeddingError}</pre>
                   )}
+                  {noEmbeddingQueries && !embeddingFetching && (
+                    <div className="text-xs text-gray-400">{t("embeddings.noEmbeddingQueriesDefined")}</div>
+                  )}
                   {embeddingText && !embeddingFetching && !embeddingError && (
                     <pre className="text-xs text-gray-200 whitespace-pre-wrap">{embeddingText}</pre>
                   )}
-                  {!embeddingText && !embeddingFetching && !embeddingError && (
+                  {!embeddingText && !embeddingFetching && !embeddingError && !noEmbeddingQueries && (
                     <div className="text-xs text-gray-500">
                       {selectedDocId
                         ? t("embeddings.saveMetadataToSeeOutput")

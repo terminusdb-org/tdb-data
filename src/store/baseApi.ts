@@ -44,13 +44,23 @@ const baseQueryWithErrorHandling: BaseQueryFn<
       // Recognized guidance payloads (e.g. api:NoEmbeddingQueriesDefined,
       // api:EndpointNotConfigured) — call sites render direction, no banner
     } else {
-      const message =
-        typeof result.error.data === "object" && result.error.data !== null
-          ? (result.error.data as Record<string, unknown>)["api:message"] as string ??
-            (result.error.data as Record<string, unknown>).message as string ??
-            (result.error.data as Record<string, unknown>).error as string ??
-            "An error occurred"
-          : String(result.error.data ?? result.error.status);
+      const data = result.error.data;
+      let message: string;
+      if (typeof data === "object" && data !== null) {
+        const record = data as Record<string, unknown>;
+        message = (record["api:message"] ?? record.message ?? record.error ?? "An error occurred") as string;
+      } else if (typeof data === "string") {
+        // text responseHandlers surface the error payload as a JSON string —
+        // pull api:message out of it when present
+        try {
+          const parsed = JSON.parse(data) as Record<string, unknown>;
+          message = String(parsed["api:message"] ?? data);
+        } catch {
+          message = data;
+        }
+      } else {
+        message = String(result.error.status);
+      }
       api.dispatch(
         setError({
           message,

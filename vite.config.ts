@@ -20,6 +20,9 @@ export default defineConfig({
       },
     },
   },
+  worker: {
+    format: "es",
+  },
   build: {
     outDir: "../terminusdb/app/data/dist",
     emptyOutDir: true,

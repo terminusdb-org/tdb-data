@@ -11,6 +11,7 @@ import {
   useGraphqlDocumentCountQuery,
   useAppSelector,
   isNoEmbeddingQueriesError,
+  apiErrorMessage,
 } from "@/store";
 import {
   PageShell,
@@ -23,6 +24,7 @@ import {
   useRouteParams,
 } from "@/components";
 import { buildApiPath } from "@/utils/routes";
+import { loadGraphqlSchemaForMonaco } from "@/utils/graphqlMonaco";
 import { formatGraphql, formatHandlebars, renderHandlebars } from "@/utils/format";
 import type { SchemaClass } from "@/types/terminusdb";
 import { isSubdocument } from "@/types/terminusdb";
@@ -179,6 +181,11 @@ export const EmbeddingsPage: React.FC = () => {
   const docPath = routeParams ? buildApiPath(routeParams, "document") : "";
   const graphqlPath = routeParams ? buildApiPath(routeParams, "graphql") : "";
 
+  const credentials = useAppSelector((state) => state.auth.credentials);
+  useEffect(() => {
+    if (graphqlPath) void loadGraphqlSchemaForMonaco(graphqlPath, credentials);
+  }, [graphqlPath, credentials]);
+
   const { data: schemaClasses, isLoading: schemaLoading } = useGetSchemaQuery(
     { path: schemaReadPath, asList: true },
     { skip: !routeParams, refetchOnMountOrArgChange: true },
@@ -261,15 +268,7 @@ export const EmbeddingsPage: React.FC = () => {
   const noEmbeddingQueries = isNoEmbeddingQueriesError(embeddingErr);
 
   useEffect(() => {
-    if (embeddingErr && !noEmbeddingQueries) {
-      setEmbeddingError(
-        typeof embeddingErr === "object" && "data" in embeddingErr
-          ? String((embeddingErr as Record<string, unknown>).data ?? embeddingErr)
-          : String(embeddingErr),
-      );
-    } else {
-      setEmbeddingError(null);
-    }
+    setEmbeddingError(embeddingErr && !noEmbeddingQueries ? apiErrorMessage(embeddingErr) : null);
   }, [embeddingErr, noEmbeddingQueries]);
 
   const handleSelectType = useCallback((id: string) => {
@@ -295,7 +294,7 @@ export const EmbeddingsPage: React.FC = () => {
       // clobber the sibling field.
       const existingMetadata = (selectedClass["@metadata"] ?? selectedClass["metadata"] ?? {}) as Record<string, unknown>;
       const embedding: Record<string, unknown> = {
-        ...((existingMetadata["embedding"] as Record<string, unknown>) ?? {}),
+        ...(existingMetadata["embedding"] as Record<string, unknown> | undefined),
       };
       if (graphqlQuery) embedding.query = graphqlQuery;
       else delete embedding.query;
@@ -474,7 +473,8 @@ export const EmbeddingsPage: React.FC = () => {
               <div className="rounded-md border border-gray-200">
                 <Editor
                   height={EDITOR_HEIGHT}
-                  defaultLanguage="graphql"
+                  path="embedding-query.graphql"
+                  language="graphql"
                   value={graphqlQuery || GRAPHQL_PLACEHOLDER}
                   onChange={(v) => setGraphqlQuery(v ?? "")}
                   options={{

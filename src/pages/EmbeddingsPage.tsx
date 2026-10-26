@@ -283,25 +283,29 @@ export const EmbeddingsPage: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const handleSaveField = async (field: "query" | "template", value: string) => {
+  const handleSaveField = async (field: "query" | "template") => {
     if (!schemaClasses || !selectedClass) return;
     const setStatus = field === "query" ? setGraphqlSaveStatus : setTemplateSaveStatus;
     setStatus("saving");
     try {
       // @metadata is the system keyword — writing plain "metadata" makes
       // schema elaboration treat its value as a nested document that
-      // requires @type.
-      const existingMetadata =
-        ((selectedClass["@metadata"] ?? selectedClass["metadata"]) as Record<string, unknown> | undefined) ?? {};
-      const existingEmbedding = (existingMetadata["embedding"] as Record<string, unknown>) ?? {};
+      // requires @type. Write both fields from editor state — selectedClass
+      // may be stale between a save and its schema refetch, which would
+      // clobber the sibling field.
+      const existingMetadata = (selectedClass["@metadata"] ?? selectedClass["metadata"] ?? {}) as Record<string, unknown>;
+      const embedding: Record<string, unknown> = {
+        ...((existingMetadata["embedding"] as Record<string, unknown>) ?? {}),
+      };
+      if (graphqlQuery) embedding.query = graphqlQuery;
+      else delete embedding.query;
+      if (handlebarsTemplate) embedding.template = handlebarsTemplate;
+      else delete embedding.template;
       const updatedDoc = {
         ...selectedClass,
         "@metadata": {
           ...existingMetadata,
-          embedding: {
-            ...existingEmbedding,
-            [field]: value || undefined,
-          },
+          embedding,
         },
       } as SchemaClass;
       await replaceSchemaDocument({
@@ -459,7 +463,7 @@ export const EmbeddingsPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSaveField("query", graphqlQuery)}
+                    onClick={() => handleSaveField("query")}
                     disabled={graphqlSaveStatus === "saving"}
                     className={btnPrimary + " text-xs px-2 py-1"}
                   >
@@ -504,7 +508,7 @@ export const EmbeddingsPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSaveField("template", handlebarsTemplate)}
+                    onClick={() => handleSaveField("template")}
                     disabled={templateSaveStatus === "saving"}
                     className={btnPrimary + " text-xs px-2 py-1"}
                   >

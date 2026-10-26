@@ -372,6 +372,7 @@
     "failedToSaveConfig": "Failed to save embedding config",
     "fetchingEmbeddingText": "Fetching embedding text…",
     "formatEmbeddingFromServer": "(format=embedding from server)",
+    "noEmbeddingQueriesDefined": "No embedding queries are defined for this type — set up the metadata above.",
     "previewDescription": "Runs the GraphQL query, then renders the Handlebars template in-browser.",
     "saveMetadataToSeeOutput": "Save embedding metadata and ensure the backend has embedding queries defined to see output.",
     "selectDocumentToFetch": "Select a document to fetch backend embedding text.",

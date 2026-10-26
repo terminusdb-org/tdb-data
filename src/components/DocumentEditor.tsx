@@ -19,7 +19,7 @@ import type { EditableDocument, TerminusDBDocument } from "@/types/terminusdb";
 import { isValidJson, displayId } from "@/utils/validation";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { RefType } from "@/store/dataProductSlice";
-import { useGetEmbeddingTextQuery, useGetMarkdownTextQuery, useGetJsonSchemaQuery } from "@/store";
+import { useGetEmbeddingTextQuery, useGetMarkdownTextQuery, useGetJsonSchemaQuery, isNoEmbeddingQueriesError } from "@/store";
 import { SimilarDocumentsPanel } from "./SimilarDocumentsPanel";
 
 type EditorTab = "form" | "json" | "markdown" | "embedding" | "similar";
@@ -120,17 +120,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
 
   // The server reports api:NoEmbeddingQueriesDefined when the type has no
   // embedding metadata — the Embeddings page can configure it.
-  const noEmbeddingQueries = useMemo(() => {
-    if (!embeddingErr || typeof embeddingErr !== "object" || !("data" in embeddingErr)) return false;
-    const data = (embeddingErr as { data: unknown }).data;
-    if (typeof data !== "object" || data === null) return false;
-    const apiError = (data as Record<string, unknown>)["api:error"];
-    const errorType =
-      typeof apiError === "object" && apiError !== null
-        ? (apiError as Record<string, unknown>)["@type"]
-        : (data as Record<string, unknown>)["@type"];
-    return errorType === "api:NoEmbeddingQueriesDefined";
-  }, [embeddingErr]);
+  const noEmbeddingQueries = isNoEmbeddingQueriesError(embeddingErr);
 
   useEffect(() => {
     setText(JSON.stringify(document, null, 2));
@@ -353,7 +343,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
         {activeTab === "embedding" && (
           <div className="flex-1 overflow-auto p-4">
             {embeddingFetching && <div className="text-sm text-gray-500">{t("documentEditor.fetchingEmbedding")}</div>}
-            {embeddingErr && !embeddingFetching && (
+            {embeddingErr && !noEmbeddingQueries && !embeddingFetching && (
               <div className="text-sm text-red-600">
                 {t("documentEditor.failedToLoadEmbedding")} {"status" in embeddingErr ? String(embeddingErr.status) : t("common.unknown")}
               </div>

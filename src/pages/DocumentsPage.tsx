@@ -201,7 +201,10 @@ export const DocumentsPage: React.FC = () => {
   };
 
   const closeEditor = () => {
-    setSearchParams(selectedType ? { type: selectedType } : {}, { replace: false });
+    // Deep links may carry ?edit= without ?type= — fall back to the loaded
+    // document's type so cancel returns to a filtered list.
+    const type = selectedType || editDoc?.["@type"] || "";
+    setSearchParams(type ? { type } : {}, { replace: false });
   };
 
   const handleNewDocument = () => {
@@ -237,7 +240,7 @@ export const DocumentsPage: React.FC = () => {
             <tr
               key={doc["@id"]}
               className={`cursor-pointer hover:bg-gray-50 ${doc["@id"] === savedId ? "bg-green-50" : ""}`}
-              onClick={() => setSearchParams({ edit: doc["@id"] })}
+              onClick={() => setSearchParams(selectedType ? { edit: doc["@id"], type: selectedType } : { edit: doc["@id"] })}
             >
               <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                 <input

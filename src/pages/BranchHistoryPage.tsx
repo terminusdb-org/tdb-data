@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { normalizeDocId } from "@/utils/validation";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -7,17 +7,20 @@ import { config } from "@/config";
 import { useRouteParams, PageShell, PageHeader, btnSecondary } from "@/components";
 import { useCommitChanges } from "@/hooks/useCommitChanges";
 import { useGetLogQuery, streamLog, type LogCommit } from "@/store/api/logApi";
-import { formatTimestampNanos } from "@/utils/datetime";
+import { epochDecimalToIso, formatTimestampNanos, isoToLocalInput } from "@/utils/datetime";
+import * as Slider from "@radix-ui/react-slider";
 
 const INITIAL_COUNT = 100;
 const LOAD_MORE_COUNT = 100;
 const LOAD_NEWER_COUNT = 10;
+const NEWER_POLL_MS = 15000;
+const VIEW_COUNT = 50;
 
 export const BranchHistoryPage: React.FC = () => {
   const { t } = useTranslation();
   const routeParams = useRouteParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlParams = useParams();
 
   // The branch we're showing history for. When on a branch URL, it's the branch
@@ -31,21 +34,27 @@ export const BranchHistoryPage: React.FC = () => {
 
   const logPath = org && team ? `${org}/${team}/local/branch/${branchName}` : null;
 
-  // Window anchor: `startDateTime` jumps the window mid-history server-side;
-  // `windowStart` is the resolved absolute offset (0 = head) echoed back via
-  // the TerminusDB-Log-Start header.
-  const [anchorIso, setAnchorIso] = useState<string | null>(null);
+  // Window bounds live in the URL: `to` anchors the newest edge
+  // (startDateTime) and `from` bounds the oldest edge (endDateTime). Every
+  // navigational change writes the view configuration to the URL so it is
+  // shareable and survives back/forward navigation.
+  const anchorIso = searchParams.get("to");
+  const endIso = searchParams.get("from");
   const [windowStart, setWindowStart] = useState(0);
-  const [dateValue, setDateValue] = useState("");
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  // Which window edge label is being edited in place, and its raw input.
+  const [editEdge, setEditEdge] = useState<"oldest" | "newest" | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   // Initial page load via RTK Query (auto-fetches when logPath changes).
   // Fetch INITIAL_COUNT + 1: the extra commit is a probe — its presence
   // means more remain; it is never rendered. `start` and `startDateTime`
-  // are mutually exclusive server-side, so only one is ever sent.
+  // are mutually exclusive server-side, so only one is ever sent; the
+  // endDateTime bottom bound combines with either.
   const { data: initialData, isLoading: initialLoading, error: initialError } = useGetLogQuery(
     anchorIso
-      ? { path: logPath ?? "", count: INITIAL_COUNT + 1, startDateTime: anchorIso }
-      : { path: logPath ?? "", start: 0, count: INITIAL_COUNT + 1 },
+      ? { path: logPath ?? "", count: INITIAL_COUNT + 1, startDateTime: anchorIso, endDateTime: endIso ?? undefined }
+      : { path: logPath ?? "", start: 0, count: INITIAL_COUNT + 1, endDateTime: endIso ?? undefined },
     { skip: !logPath },
   );
 
@@ -57,7 +66,19 @@ export const BranchHistoryPage: React.FC = () => {
     }
   }, [initialData?.resolvedStart]);
 
+  // A new window (branch or bounds change) resets paging state; the initial
+  // mount keeps any stored pagination for this path.
   const dispatch = useAppDispatch();
+  const boundsKey = `${logPath}|${anchorIso ?? ""}|${endIso ?? ""}`;
+  const lastBoundsRef = useRef(boundsKey);
+  useEffect(() => {
+    if (lastBoundsRef.current === boundsKey) return;
+    lastBoundsRef.current = boundsKey;
+    if (logPath) dispatch(clearLogPagination(logPath));
+    setWindowStart(0);
+    setPollNewer(null);
+  }, [boundsKey, logPath, dispatch]);
+
   const credentials = useAppSelector((state) => state.auth.credentials);
   const rawPagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : null);
   // The stored window may belong to a different start offset than the one
@@ -75,9 +96,47 @@ export const BranchHistoryPage: React.FC = () => {
   const { changesCache, loadingIds, fetchChanges } = useCommitChanges(org, team);
 
   // Live commit stream from Redux — new commits are prepended by the stream.
-  // Each live commit shifts every existing commit's offset from head by one.
   const liveCommits = useAppSelector((state) => state.commitStream.history);
-  const liveLen = liveCommits.length;
+  // Commits newer than the window's top as last reported by the head poll,
+  // plus the live-above-top count at that moment. The SSE stream can miss
+  // or lag; polling head makes "Load newer" appear even when the stream is
+  // quiet.
+  const [pollNewer, setPollNewer] = useState<{ count: number; liveAtPoll: number } | null>(null);
+  const liveAboveTopRef = useRef(0);
+  const windowTopId = initialData?.commits[0]?.identifier;
+
+  // Poll head for new commits — catches commits the SSE stream missed. The
+  // count is how many head commits sit above the window's top commit.
+  useEffect(() => {
+    if (!logPath || !windowTopId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const result = await streamLog(
+          config.apiUrl,
+          logPath,
+          { start: 0, count: LOAD_NEWER_COUNT },
+          credentials,
+          undefined,
+        );
+        if (!cancelled && result.commits.length > 0) {
+          const idx = result.commits.findIndex((c) => c.identifier === windowTopId);
+          setPollNewer({
+            count: idx < 0 ? result.commits.length : idx,
+            liveAtPoll: liveAboveTopRef.current,
+          });
+        }
+      } catch {
+        // Poll failures are silent — the stream and manual loads still work.
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), NEWER_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [logPath, windowTopId, credentials]);
 
   const toggleExpand = useCallback(
     (commitId: string) => {
@@ -95,18 +154,46 @@ export const BranchHistoryPage: React.FC = () => {
     [fetchChanges],
   );
 
+  // Offset bookkeeping. A commit "above the window top" is one the server
+  // counts between head and the window's first commit — reported by the
+  // live stream or by the head poll, minus ids already inside the window
+  // (SSE replays the head commit on connect, which must not inflate the
+  // count — the "Load 1 newer" phantom).
+  const windowIds = useMemo(
+    () => new Set([...(initialData?.commits ?? []), ...extraCommits].map((c) => c.identifier)),
+    [initialData, extraCommits],
+  );
+  const liveIds = useMemo(() => new Set(liveCommits.map((c) => c.id)), [liveCommits]);
+  const liveAboveTop = useMemo(
+    () => liveCommits.filter((c) => !windowIds.has(c.id)).length,
+    [liveCommits, windowIds],
+  );
+  useEffect(() => {
+    liveAboveTopRef.current = liveAboveTop;
+  }, [liveAboveTop]);
+  // Commits above the window top now. The poll reports the true count at
+  // poll time; live arrivals since then add to it. Before the first poll,
+  // the resolved anchor offset shifted by live arrivals approximates it.
+  const topAbs = pollNewer == null
+    ? windowStart + liveAboveTop
+    : pollNewer.count + Math.max(0, liveAboveTop - pollNewer.liveAtPoll);
+  // Above-top commits not yet fetched: fetched ones are the newer pages plus
+  // every live commit rendered above the window — subtracted from the
+  // above-top total.
+  const unfetchedNewer = Math.max(0, topAbs - liveAboveTop - newerCommits.length);
+
   const loadMore = useCallback(
     async (count: number) => {
       if (!logPath) return;
-      // Absolute offset: anchor + live shift + raw fetched below the anchor
-      // (incl. the dropped +1 probe), not just the displayed ones.
-      const start = windowStart + liveLen + (initialData?.commits.length ?? 0) + pagination.fetched;
+      // Absolute offset: anchor + live/poll shift + raw fetched below the
+      // anchor (incl. the dropped +1 probe), not just the displayed ones.
+      const start = topAbs + (initialData?.commits.length ?? 0) + pagination.fetched;
       setLoadingMore(true);
       try {
         const result = await streamLog(
           config.apiUrl,
           logPath,
-          { start, count: count === -1 ? -1 : count + 1 },
+          { start, count: count === -1 ? -1 : count + 1, endDateTime: endIso ?? undefined },
           credentials,
           undefined,
         );
@@ -120,7 +207,7 @@ export const BranchHistoryPage: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [logPath, windowStart, liveLen, initialData, pagination.fetched, dispatch, credentials],
+    [logPath, topAbs, endIso, initialData, pagination.fetched, dispatch, credentials],
   );
 
   const handleLoadMore = () => {
@@ -132,19 +219,20 @@ export const BranchHistoryPage: React.FC = () => {
   };
 
   // Extend the window upward: fetch the commits sitting between the live/
-  // previously-prepended edge and the window's top, newest first.
+  // previously-prepended edge and the window's top, newest first. The
+  // unfetched band's bottom edge is at topAbs - newerCommits.length.
   const loadNewer = useCallback(
     async () => {
       if (!logPath) return;
-      const topOffset = windowStart + liveLen - newerCommits.length;
-      const count = Math.min(LOAD_NEWER_COUNT, topOffset);
+      const bottom = topAbs - newerCommits.length;
+      const count = Math.min(LOAD_NEWER_COUNT, unfetchedNewer);
       if (count <= 0) return;
       setLoadingNewer(true);
       try {
         const result = await streamLog(
           config.apiUrl,
           logPath,
-          { start: topOffset - count, count },
+          { start: bottom - count, count, endDateTime: endIso ?? undefined },
           credentials,
           undefined,
         );
@@ -156,22 +244,38 @@ export const BranchHistoryPage: React.FC = () => {
         setLoadingNewer(false);
       }
     },
-    [logPath, windowStart, liveLen, newerCommits.length, dispatch, credentials],
+    [logPath, topAbs, endIso, newerCommits.length, unfetchedNewer, dispatch, credentials],
   );
 
-  const handleDateJump = () => {
-    if (!logPath || !dateValue) return;
-    const iso = new Date(dateValue).toISOString();
-    if (logPath) dispatch(clearLogPagination(logPath));
-    setWindowStart(0);
-    setAnchorIso(iso);
+  // Write the range bounds to the URL — every navigational change carries
+  // the view configuration. `to` anchors the newest edge (startDateTime),
+  // `from` bounds the oldest edge (endDateTime); unrelated params like
+  // from-branch are preserved.
+  const writeBounds = useCallback(
+    (from: string | null, to: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (from) next.set("from", from); else next.delete("from");
+        if (to) next.set("to", to); else next.delete("to");
+        next.delete("w");
+        next.delete("n");
+        next.delete("wl");
+        next.delete("wr");
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const clearRange = () => {
+    setRangeError(null);
+    writeBounds(null, null);
   };
 
-  const handleBackToHead = () => {
-    if (logPath) dispatch(clearLogPagination(logPath));
-    setWindowStart(0);
-    setDateValue("");
-    setAnchorIso(null);
+  // Clicking a commit's date anchors the window's newest edge there.
+  const jumpToTimestamp = (ts: string) => {
+    const iso = epochDecimalToIso(ts);
+    if (iso) writeBounds(endIso, iso);
   };
 
   // Merge: live stream commits first, then any newer-than-anchor commits
@@ -180,10 +284,9 @@ export const BranchHistoryPage: React.FC = () => {
   // the initial fetch's (count+1)th probe commit is sliced off — it only
   // signals that more pages exist.
   const allCommits = useMemo(() => {
-    const liveIds = new Set(liveCommits.map((c) => c.id));
     const newer = newerCommits.filter((c) => !liveIds.has(c.identifier));
     return [...newer, ...(initialData?.commits.slice(0, INITIAL_COUNT) ?? []), ...extraCommits];
-  }, [initialData, extraCommits, newerCommits, liveCommits]);
+  }, [initialData, extraCommits, newerCommits, liveIds]);
 
   const mergedCommits = useMemo(() => {
     const logIds = new Set(allCommits.map((c) => c.identifier));
@@ -200,11 +303,150 @@ export const BranchHistoryPage: React.FC = () => {
     return [...liveMapped, ...allCommits];
   }, [allCommits, liveCommits]);
 
+  // Viewport window: the list renders only the slice [viewTop, viewTop +
+  // viewCount) of the loaded commits. `w` carries the position and `n` the
+  // size; both live in the URL so drags and pans are navigable state.
+  // Overview axis: a linear time span over the loaded range — left is the
+  // oldest loaded commit, right the newest. Each commit is a thin band at
+  // its relative time position; band opacity encodes how many documents the
+  // commit touched (log scale).
+  const SLIDER_RES = 10000;
+  const timeAxis = useMemo(() => {
+    if (mergedCommits.length === 0) return null;
+    const t1 = Number(mergedCommits[0].timestamp);
+    const t0 = Number(mergedCommits[mergedCommits.length - 1].timestamp);
+    const span = Math.max(t1 - t0, 1e-9);
+    const docCount = (c: LogCommit) => (c.added_count ?? 0) + (c.changed_count ?? 0) + (c.deleted_count ?? 0);
+    // Opacity: 1 document → 0.30, 10k documents → 1.0 (capped), log between.
+    const alphaOf = (c: LogCommit) =>
+      0.3 + (0.7 * Math.log10(Math.min(Math.max(docCount(c), 1), 10000))) / 4;
+    return {
+      t0,
+      span,
+      bands: mergedCommits.map((c) => ({
+        pos: (Number(c.timestamp) - t0) / span,
+        alpha: alphaOf(c),
+      })),
+    };
+  }, [mergedCommits]);
+  const timeOfPos = (v: number) => (timeAxis ? timeAxis.t0 + (v / SLIDER_RES) * timeAxis.span : 0);
+  const posOfTime = (ts: number) => (timeAxis ? Math.round(((ts - timeAxis.t0) / timeAxis.span) * SLIDER_RES) : 0);
+  const axisLo = timeAxis?.t0 ?? 0;
+  const axisHi = timeAxis ? timeAxis.t0 + timeAxis.span : 0;
+
+  // Viewport window: two free positions on the time axis — thumbs rest
+  // anywhere, not on commit bands. `wl`/`wr` carry the oldest/newest edge
+  // in decimal epoch seconds; the list shows loaded commits between them.
+  // Defaults put the newest edge at the axis end and the oldest edge on the
+  // VIEW_COUNT-th commit — the same 50-wide view as before.
+  const defWr = axisHi;
+  const defWl = mergedCommits.length
+    ? Number(mergedCommits[Math.min(VIEW_COUNT - 1, mergedCommits.length - 1)].timestamp)
+    : 0;
+  const wlParam = Number(searchParams.get("wl"));
+  const wrParam = Number(searchParams.get("wr"));
+  const wlTs = wlParam > 0 ? wlParam : defWl;
+  const wrTs = wrParam > 0 ? wrParam : defWr;
+  // Thumb drags preview locally and commit to the URL on release — pushing
+  // per-pointermove would flood the history stack.
+  const [dragEdges, setDragEdges] = useState<{ wl: number; wr: number } | null>(null);
+  const effWl = dragEdges?.wl ?? wlTs;
+  const effWr = dragEdges?.wr ?? wrTs;
+  const visibleCommits = mergedCommits.filter((c) => {
+    const ts = Number(c.timestamp);
+    return ts >= effWl && ts <= effWr;
+  });
+
+  const writeWindow = useCallback(
+    (wl: number, wr: number) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("w");
+        next.delete("n");
+        // Within half a slider tick of the default, drop the param — position
+        // quantization shifts below that are representational noise.
+        const tick = (timeAxis?.span ?? 0) / SLIDER_RES / 2;
+        if (Math.abs(wl - defWl) > tick) next.set("wl", String(wl)); else next.delete("wl");
+        if (Math.abs(wr - defWr) > tick) next.set("wr", String(wr)); else next.delete("wr");
+        return next;
+      });
+    },
+    [defWl, defWr, setSearchParams],
+  );
+
+  // Pan by one window width, clamped to the loaded axis.
+  const panWindow = (newer: boolean) => {
+    const w = effWr - effWl;
+    const shift = Math.min(w, newer ? axisHi - effWr : effWl - axisLo);
+    writeWindow(effWl + (newer ? shift : -shift), effWr + (newer ? shift : -shift));
+  };
+
+  // Edge label: local date/time lines plus the fraction (dropping a zero or
+  // absent fraction — shown only where relevant).
+  const edgeLabelParts = (ts: number) => {
+    const d = new Date(ts * 1000);
+    const p = (n: number) => String(n).padStart(2, "0");
+    // Edge positions are continuous — shortest-repr digits, capped at
+    // nanosecond precision, with trailing zeros stripped.
+    const frac = (String(ts).split(".")[1] ?? "").slice(0, 9).replace(/0+$/, "");
+    return {
+      date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+      time: `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
+      frac: frac ? `.${frac}` : null,
+    };
+  };
+
+  // Commit an edited edge label: inside the loaded range the edge moves to
+  // that exact time (wl/wr); outside it becomes a fetch bound so the server
+  // loads that edge. Order violations surface, never silently apply.
+  const commitEdgeEdit = () => {
+    const edge = editEdge;
+    setEditEdge(null);
+    if (!edge) return;
+    const ms = Date.parse(editValue);
+    if (Number.isNaN(ms)) {
+      setRangeError(t("branchHistory.invalidDate"));
+      return;
+    }
+    setRangeError(null);
+    const ts = ms / 1000;
+    const iso = new Date(ms).toISOString();
+    if (timeAxis && ts >= axisLo && ts <= axisHi) {
+      if (edge === "newest") {
+        if (ts <= effWl) {
+          setRangeError(t("branchHistory.rangeOrderError"));
+          return;
+        }
+        writeWindow(effWl, ts);
+      } else {
+        if (ts >= effWr) {
+          setRangeError(t("branchHistory.rangeOrderError"));
+          return;
+        }
+        writeWindow(ts, effWr);
+      }
+      return;
+    }
+    if (edge === "newest") {
+      if (endIso && endIso > iso) {
+        setRangeError(t("branchHistory.rangeOrderError"));
+        return;
+      }
+      writeBounds(endIso, iso);
+    } else {
+      if (anchorIso && iso > anchorIso) {
+        setRangeError(t("branchHistory.rangeOrderError"));
+        return;
+      }
+      writeBounds(iso, anchorIso);
+    }
+  };
+
   const initialHasMore = (initialData?.commits.length ?? 0) > INITIAL_COUNT;
   const moreAvailable = extraCommits.length === 0 ? initialHasMore : !loadedAll;
-  // Commits newer than the window's current top exist whenever the resolved
-  // offset (shifted by live arrivals) still exceeds what we've prepended.
-  const newerAvailable = windowStart + liveLen - newerCommits.length > 0;
+  // "Load newer" only while commits above the window top remain unfetched —
+  // live-stream commits are already rendered, so they don't count.
+  const newerAvailable = unfetchedNewer > 0;
   const isStreaming = initialData != null && initialData.commits.length === 0 && (initialData?.hasMore ?? false);
   const loading = initialLoading || isStreaming || loadingMore || loadingNewer;
   const error = initialError
@@ -240,27 +482,11 @@ export const BranchHistoryPage: React.FC = () => {
               {org}/{team} — {t("branchHistory.branch")} {branchName}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="datetime-local"
-              step={0.001}
-              value={dateValue}
-              onChange={(e) => setDateValue(e.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700 focus:border-dfrntBlue-500 focus:outline-none"
-              aria-label={t("branchHistory.jumpToDate")}
-            />
-            <button
-              type="button"
-              onClick={handleDateJump}
-              disabled={!dateValue}
-              className={btnSecondary}
-            >
-              {t("branchHistory.jumpToDate")}
-            </button>
-            {anchorIso && (
+          <div className="flex flex-wrap items-end gap-2">
+            {(anchorIso || endIso) && (
               <button
                 type="button"
-                onClick={handleBackToHead}
+                onClick={clearRange}
                 className={btnSecondary}
               >
                 {t("branchHistory.backToHead")}
@@ -293,28 +519,167 @@ export const BranchHistoryPage: React.FC = () => {
         ) : (
           <>
             <div className="mb-3 text-xs text-gray-500">
-              {t("branchHistory.showingCommits", { count: mergedCommits.length })}
-              {anchorIso && <span className="ml-2 text-dfrntBlue-600">— {t("branchHistory.anchoredAt", { date: new Date(anchorIso).toLocaleString() })}</span>}
+              {t("branchHistory.showingCommits", { count: `${visibleCommits.length}/${mergedCommits.length}` })}
+              {endIso && <span className="ml-2 text-dfrntBlue-600">— {t("branchHistory.fromDate", { date: new Date(endIso).toLocaleString() })}</span>}
+              {anchorIso && <span className="ml-2 text-dfrntBlue-600">— {t("branchHistory.untilDate", { date: new Date(anchorIso).toLocaleString() })}</span>}
               {currentCommitId && <span className="ml-2 text-amber-600">— {t("branchHistory.viewingCommit", { id: currentCommitId.slice(0, 12) })}</span>}
             </div>
 
-            {/* Load newer — shown while commits exist above the window's top */}
-            {newerAvailable && (
-              <div className="mb-4 flex items-center gap-3 border-b border-gray-200 pb-4">
+            {/* Navigable time window: overview of the loaded range. Left is
+                newest, right is oldest; the highlighted span is the slice the
+                list shows. Pagination controls are navigation next to it. */}
+            {mergedCommits.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                {newerAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => void loadNewer()}
+                    disabled={loading}
+                    className={btnSecondary}
+                  >
+                    {loadingNewer ? t("common.loading") : t("branchHistory.loadNewer", { count: Math.min(LOAD_NEWER_COUNT, unfetchedNewer) })}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => void loadNewer()}
-                  disabled={loading}
+                  onClick={() => panWindow(false)}
+                  disabled={effWl <= axisLo}
                   className={btnSecondary}
+                  title={t("branchHistory.panOlder")}
                 >
-                  {loadingNewer ? t("common.loading") : t("branchHistory.loadNewer", { count: Math.min(LOAD_NEWER_COUNT, windowStart + liveLen - newerCommits.length) })}
+                  ‹
                 </button>
+                <div className="min-w-32 flex-1 pt-11">
+                  <div className="relative">
+                    {/* Edge labels float above their thumbs — stacked
+                        date/time/fraction keeps them narrow; click edits the
+                        edge in place. */}
+                    {(["oldest", "newest"] as const).map((edge) => {
+                      if (!timeAxis) return null;
+                      const edgeTs = edge === "oldest" ? effWl : effWr;
+                      const pos = ((edgeTs - timeAxis.t0) / timeAxis.span) * 100;
+                      const parts = edgeLabelParts(edgeTs);
+                      return (
+                        <div
+                          key={edge}
+                          className="absolute -top-11 z-10"
+                          style={{ left: `${pos}%`, transform: pos > 55 ? "translateX(-100%)" : undefined }}
+                        >
+                          {editEdge === edge ? (
+                            <input
+                              autoFocus
+                              type="datetime-local"
+                              step={0.001}
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={commitEdgeEdit}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitEdgeEdit();
+                                if (e.key === "Escape") setEditEdge(null);
+                              }}
+                              className="w-40 rounded border border-dfrntBlue-300 px-1 py-0.5 text-[10px] text-gray-700 focus:outline-none"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditEdge(edge);
+                                setEditValue(isoToLocalInput(new Date(edgeTs * 1000).toISOString()));
+                              }}
+                              className="block text-left text-[9px] leading-tight text-gray-500 hover:text-dfrntBlue-700"
+                              title={t("branchHistory.editEdge")}
+                            >
+                              <span className="block whitespace-nowrap">{parts.date}</span>
+                              <span className="block whitespace-nowrap tabular-nums">{parts.time}</span>
+                              {parts.frac && (
+                                <span className="block whitespace-nowrap tabular-nums text-gray-400">{parts.frac}</span>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <Slider.Root
+                    className="relative flex h-5 touch-none select-none items-center"
+                    min={0}
+                    max={SLIDER_RES}
+                    step={1}
+                    minStepsBetweenThumbs={1}
+                    value={[posOfTime(effWl), posOfTime(effWr)]}
+                    onValueChange={([lo, hi]) =>
+                      setDragEdges({ wl: timeOfPos(lo), wr: timeOfPos(hi) })
+                    }
+                    onValueCommit={([lo, hi]) => {
+                      setDragEdges(null);
+                      writeWindow(timeOfPos(lo), timeOfPos(hi));
+                    }}
+                  >
+                    <Slider.Track className="relative h-full grow overflow-hidden rounded border border-gray-200 bg-gray-100">
+                      <Slider.Range className="absolute h-full bg-dfrntBlue-300/30" />
+                      {timeAxis?.bands.map((band, i) => {
+                        const ts = Number(mergedCommits[i].timestamp);
+                        const inWindow = ts >= effWl && ts <= effWr;
+                        return (
+                          <div
+                            key={mergedCommits[i].identifier}
+                            className={`absolute top-0 bottom-0 w-0.5 ${inWindow ? "bg-dfrntBlue-500" : "bg-gray-400"}`}
+                            style={{ left: `${band.pos * 100}%`, opacity: band.alpha }}
+                          />
+                        );
+                      })}
+                    </Slider.Track>
+                    <Slider.Thumb
+                      className="block h-5 w-1.5 cursor-ew-resize rounded-sm bg-dfrntBlue-600 hover:bg-dfrntBlue-700 focus:outline-none focus:ring-2 focus:ring-dfrntBlue-400"
+                      aria-label={t("branchHistory.windowOldest")}
+                    />
+                    <Slider.Thumb
+                      className="block h-5 w-1.5 cursor-ew-resize rounded-sm bg-dfrntBlue-600 hover:bg-dfrntBlue-700 focus:outline-none focus:ring-2 focus:ring-dfrntBlue-400"
+                      aria-label={t("branchHistory.windowNewest")}
+                    />
+                    </Slider.Root>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-gray-400">
+                    <span className="tabular-nums">{mergedCommits[mergedCommits.length - 1] ? formatTimestampNanos(mergedCommits[mergedCommits.length - 1].timestamp) : ""}</span>
+                    <span>{t("branchHistory.windowCount", { count: visibleCommits.length, total: mergedCommits.length })}</span>
+                    <span className="tabular-nums">{mergedCommits[0] ? formatTimestampNanos(mergedCommits[0].timestamp) : ""}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => panWindow(true)}
+                  disabled={effWr >= axisHi}
+                  className={btnSecondary}
+                  title={t("branchHistory.panNewer")}
+                >
+                  ›
+                </button>
+                {rangeError && <span className="text-xs text-red-600">{rangeError}</span>}
+                {moreAvailable && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      disabled={loading}
+                      className={btnSecondary}
+                    >
+                      {loadingMore ? t("common.loading") : t("branchHistory.loadMore", { count: LOAD_MORE_COUNT })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLoadAll}
+                      disabled={loading}
+                      className={btnSecondary}
+                    >
+                      {loading ? t("common.loading") : t("branchHistory.loadAll")}
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
             <div className="space-y-0">
-              {mergedCommits.map((entry, idx) => {
-                const isLatest = idx === 0;
+              {visibleCommits.map((entry, idx) => {
+                const isLatest = entry.identifier === mergedCommits[0]?.identifier;
                 const isCurrent = currentCommitId === entry.identifier;
                 return (
                   <div key={entry.identifier} className="relative flex gap-4 pb-6">
@@ -325,7 +690,7 @@ export const BranchHistoryPage: React.FC = () => {
                           isCurrent ? "border-amber-500 bg-amber-100" : isLatest ? "border-dfrntBlue-500 bg-dfrntBlue-100" : "border-gray-300 bg-white"
                         }`}
                       />
-                      {idx < mergedCommits.length - 1 && (
+                      {idx < visibleCommits.length - 1 && (
                         <div className="mt-1 w-0.5 flex-1 bg-gray-200" />
                       )}
                     </div>
@@ -382,7 +747,16 @@ export const BranchHistoryPage: React.FC = () => {
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                         <span className="font-medium text-gray-600">{entry.author}</span>
-                        {entry.timestamp && <span className="tabular-nums">{formatTimestampNanos(entry.timestamp)}</span>}
+                        {entry.timestamp && (
+                          <button
+                            type="button"
+                            onClick={() => jumpToTimestamp(entry.timestamp)}
+                            className="tabular-nums hover:text-dfrntBlue-700 hover:underline"
+                            title={t("branchHistory.jumpToThisDate")}
+                          >
+                            {formatTimestampNanos(entry.timestamp)}
+                          </button>
+                        )}
                         {(entry.added_count != null || entry.changed_count != null || entry.deleted_count != null) && (
                           <span className="flex items-center gap-1.5">
                             {entry.added_count != null && entry.added_count > 0 && (
@@ -413,25 +787,11 @@ export const BranchHistoryPage: React.FC = () => {
               })}
             </div>
 
-            {/* Load more / Load all — hidden when every commit is loaded */}
-            {moreAvailable && (
-              <div className="mt-4 flex items-center gap-3 border-t border-gray-200 pt-4">
-                <button
-                  type="button"
-                  onClick={handleLoadMore}
-                  disabled={loading}
-                  className={btnSecondary}
-                >
-                  {loading ? t("common.loading") : t("branchHistory.loadMore", { count: LOAD_MORE_COUNT })}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLoadAll}
-                  disabled={loading}
-                  className={btnSecondary}
-                >
-                  {loading ? t("common.loading") : t("branchHistory.loadAll")}
-                </button>
+            {/* Below-the-window hint when the viewport doesn't reach the
+                loaded tail — pan or widen via the window controls above. */}
+            {mergedCommits.some((c) => Number(c.timestamp) < effWl) && (
+              <div className="mt-4 border-t border-gray-200 pt-3 text-xs text-gray-400">
+                {t("branchHistory.belowWindow", { count: mergedCommits.filter((c) => Number(c.timestamp) < effWl).length })}
               </div>
             )}
           </>

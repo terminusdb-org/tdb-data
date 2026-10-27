@@ -832,8 +832,8 @@ export const BranchHistoryPage: React.FC = () => {
                         return (
                           <div
                             key={mergedCommits[i].identifier}
-                            className={`pointer-events-none absolute top-1 bottom-1 w-0.5 rounded-full ${inWindow ? "bg-dfrntBlue-600" : "bg-gray-300"}`}
-                            style={{ left: `${band.pos * 100}%`, marginLeft: -1, opacity: band.alpha }}
+                            className={`pointer-events-none absolute top-1 bottom-1 w-1 rounded-full ${inWindow ? "bg-dfrntBlue-600" : "bg-gray-300"}`}
+                            style={{ left: `${band.pos * 100}%`, marginLeft: -2, opacity: band.alpha * 0.5 }}
                           />
                         );
                       })}

@@ -43,6 +43,20 @@ export function epochDecimalToIso(ts: string | number): string | null {
 }
 
 /**
+ * Convert an ISO 8601 instant to epoch seconds, preserving fractional
+ * digits beyond milliseconds — the inverse of epochDecimalToIso. Commit
+ * timestamps are decimal strings; comparing bounds to them needs the
+ * same resolution, which Date.parse (ms-only) cannot give.
+ */
+export function isoToEpochDecimal(iso: string): number | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const frac = /\.(\d+)/.exec(iso)?.[1] ?? "";
+  const nanos = frac ? Number(frac.padEnd(9, "0").slice(0, 9)) : 0;
+  return Math.floor(d.getTime() / 1000) + nanos / 1e9;
+}
+
+/**
  * Convert an ISO 8601 instant to the `YYYY-MM-DDTHH:mm:ss.sss` local-time
  * form a datetime-local input expects. Returns "" for invalid input.
  */

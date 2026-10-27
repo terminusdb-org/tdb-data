@@ -810,6 +810,11 @@
     "windowOldest": "Oldest edge of window",
     "editEdge": "Click to edit this bound",
     "invalidDate": "Enter a valid date and time.",
+    "zoomIn": "Zoom the loaded range into the selected span",
+    "zoomOutOlder": "Load 50% more history on the older side",
+"zoomOutNewer": "Load 50% more history on the newer side",
+"atLogStart": "At the first commit — nothing older to load",
+"atLogEnd": "At the newest commit — nothing newer to load",
     "belowWindow": "{{count}} more loaded below — pan down or load more"
   },
   "statusBar": {

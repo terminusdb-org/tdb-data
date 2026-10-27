@@ -350,10 +350,19 @@ export const BranchHistoryPage: React.FC = () => {
   // Minimum displayed axis span (s): a lone commit keeps a visible area
   // around it instead of the axis collapsing onto the item.
   const MIN_AXIS_SPAN = 1e-3;
+  // Explicit `from`/`to` bounds are authoritative for the axis: zoom-out
+  // keeps expanding the bar even past the loaded commit extent, into
+  // time that may hold no (or not-yet-loaded) commits.
+  const boundLo = endIso ? isoToEpochDecimal(endIso) : null;
+  const boundHi = anchorIso ? isoToEpochDecimal(anchorIso) : null;
   const timeAxis = useMemo(() => {
-    if (mergedCommits.length === 0) return null;
-    const t1 = Number(mergedCommits[0].timestamp);
-    const rawT0 = Number(mergedCommits[mergedCommits.length - 1].timestamp);
+    const commitHi = mergedCommits.length ? Number(mergedCommits[0].timestamp) : null;
+    const commitLo = mergedCommits.length ? Number(mergedCommits[mergedCommits.length - 1].timestamp) : null;
+    const rawHi = boundHi ?? commitHi;
+    const rawLo = boundLo ?? commitLo;
+    if (rawHi == null || rawLo == null) return null;
+    const t1 = Math.max(rawHi, commitHi ?? rawHi);
+    const rawT0 = Math.min(rawLo, commitLo ?? rawLo);
     const rawSpan = t1 - rawT0;
     const span = Math.max(rawSpan, MIN_AXIS_SPAN);
     const t0 = rawSpan >= MIN_AXIS_SPAN ? rawT0 : rawT0 - (MIN_AXIS_SPAN - rawSpan) / 2;
@@ -369,7 +378,7 @@ export const BranchHistoryPage: React.FC = () => {
         alpha: alphaOf(c),
       })),
     };
-  }, [mergedCommits]);
+  }, [mergedCommits, boundLo, boundHi]);
   const timeOfPos = (v: number) => (timeAxis ? timeAxis.t0 + (v / SLIDER_RES) * timeAxis.span : 0);
   const posOfTime = (ts: number) => (timeAxis ? Math.round(((ts - timeAxis.t0) / timeAxis.span) * SLIDER_RES) : 0);
   const axisLo = timeAxis?.t0 ?? 0;
@@ -383,7 +392,7 @@ export const BranchHistoryPage: React.FC = () => {
   const defWr = axisHi;
   const defWl = mergedCommits.length
     ? Number(mergedCommits[Math.min(VIEW_COUNT - 1, mergedCommits.length - 1)].timestamp)
-    : 0;
+    : axisLo;
   const wlParam = Number(searchParams.get("wl"));
   const wrParam = Number(searchParams.get("wr"));
   const wlTs = wlParam > 0 ? wlParam : defWl;
@@ -686,9 +695,9 @@ export const BranchHistoryPage: React.FC = () => {
             </div>
 
             {/* Navigable time window: overview of the loaded range. Left is
-                newest, right is oldest; the highlighted span is the slice the
+                oldest, right is newest; the highlighted span is the slice the
                 list shows. Pagination controls are navigation next to it. */}
-            {mergedCommits.length > 0 && (
+            {timeAxis && (
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 {newerAvailable && (
                   <button
@@ -723,7 +732,7 @@ export const BranchHistoryPage: React.FC = () => {
                         <div
                           key={edge}
                           className="absolute -top-11 z-10"
-                          style={{ left: `${pos}%`, transform: pos > 55 ? "translateX(-100%)" : undefined }}
+                          style={{ left: `${pos}%`, transform: pos <= 12 ? "translateX(0)" : pos >= 88 ? "translateX(-100%)" : "translateX(-50%)" }}
                         >
                           {editEdge === edge ? (
                             <input
@@ -808,18 +817,24 @@ export const BranchHistoryPage: React.FC = () => {
                       })}
                     </Slider.Track>
                     <Slider.Thumb
-                      className="group relative block h-5 w-5 cursor-ew-resize focus:outline-none"
+                      className="group relative block h-6 w-5 cursor-ew-resize focus:outline-none"
                       aria-label={t("branchHistory.windowOldest")}
                     >
                       <span className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-dfrntBlue-600" />
-                      <span className="absolute -left-1.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-dfrntBlue-600 bg-white shadow-sm transition-colors group-hover:bg-dfrntBlue-50 group-focus:ring-2 group-focus:ring-dfrntBlue-400" />
+                      <span className="absolute right-1/2 top-1/2 mr-0.5 flex h-5 w-3.5 -translate-y-1/2 items-center justify-center gap-[3px] rounded-md border border-gray-300 bg-white shadow-sm transition-colors group-hover:border-dfrntBlue-400 group-hover:bg-dfrntBlue-50 group-focus:border-dfrntBlue-500 group-focus:ring-2 group-focus:ring-dfrntBlue-400">
+                        <span className="h-2.5 w-px bg-gray-400 transition-colors group-hover:bg-dfrntBlue-500" />
+                        <span className="h-2.5 w-px bg-gray-400 transition-colors group-hover:bg-dfrntBlue-500" />
+                      </span>
                     </Slider.Thumb>
                     <Slider.Thumb
-                      className="group relative block h-5 w-5 cursor-ew-resize focus:outline-none"
+                      className="group relative block h-6 w-5 cursor-ew-resize focus:outline-none"
                       aria-label={t("branchHistory.windowNewest")}
                     >
                       <span className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-dfrntBlue-600" />
-                      <span className="absolute -right-1.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-dfrntBlue-600 bg-white shadow-sm transition-colors group-hover:bg-dfrntBlue-50 group-focus:ring-2 group-focus:ring-dfrntBlue-400" />
+                      <span className="absolute left-1/2 top-1/2 ml-0.5 flex h-5 w-3.5 -translate-y-1/2 items-center justify-center gap-[3px] rounded-md border border-gray-300 bg-white shadow-sm transition-colors group-hover:border-dfrntBlue-400 group-hover:bg-dfrntBlue-50 group-focus:border-dfrntBlue-500 group-focus:ring-2 group-focus:ring-dfrntBlue-400">
+                        <span className="h-2.5 w-px bg-gray-400 transition-colors group-hover:bg-dfrntBlue-500" />
+                        <span className="h-2.5 w-px bg-gray-400 transition-colors group-hover:bg-dfrntBlue-500" />
+                      </span>
                     </Slider.Thumb>
                     </Slider.Root>
                     {/* Commit popup on band hover: message, id, time.
@@ -870,8 +885,7 @@ export const BranchHistoryPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => zoomOutSide(true)}
-                        disabled={!endIso && !moreAvailable}
-                        className={iconBtn}
+                        className={`${iconBtn} ${!endIso && !moreAvailable ? "opacity-40" : ""}`}
                         title={t(!endIso && !moreAvailable ? "branchHistory.atLogStart" : "branchHistory.zoomOutOlder")}
                       >
                         <svg {...svgProps} className={svgIcon}>
@@ -898,15 +912,13 @@ export const BranchHistoryPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const c = mergedCommits[mergedCommits.length - 1];
                           setEditEdge("axisLo");
-                          const iso = c ? epochDecimalToIso(c.timestamp) : null;
-                          setEditValue(iso ? isoToLocalInput(iso) : "");
+                          setEditValue(isoToLocalInput(new Date(axisLo * 1000).toISOString()));
                         }}
                         className="min-w-0 max-w-full rounded px-1 py-0.5 text-left tabular-nums transition-colors hover:bg-gray-100 hover:text-dfrntBlue-700"
                         title={t("branchHistory.editEdge")}
                       >
-                        {mergedCommits[mergedCommits.length - 1] ? formatTimestampNanos(mergedCommits[mergedCommits.length - 1].timestamp) : ""}
+                        {formatTimestampNanos(axisLo)}
                       </button>
                     )}
                     </div>
@@ -930,23 +942,20 @@ export const BranchHistoryPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const c = mergedCommits[0];
                           setEditEdge("axisHi");
-                          const iso = c ? epochDecimalToIso(c.timestamp) : null;
-                          setEditValue(iso ? isoToLocalInput(iso) : "");
+                          setEditValue(isoToLocalInput(new Date(axisHi * 1000).toISOString()));
                         }}
                         className="min-w-0 max-w-full rounded px-1 py-0.5 text-right tabular-nums transition-colors hover:bg-gray-100 hover:text-dfrntBlue-700"
                         title={t("branchHistory.editEdge")}
                       >
-                        {mergedCommits[0] ? formatTimestampNanos(mergedCommits[0].timestamp) : ""}
+                        {formatTimestampNanos(axisHi)}
                       </button>
                     )}
                       <button
                         type="button"
                         onClick={() => zoomOutSide(false)}
-                        disabled={unfetchedNewer === 0}
-                        className={iconBtn}
-                        title={t(unfetchedNewer === 0 ? "branchHistory.atLogEnd" : "branchHistory.zoomOutNewer")}
+                        className={`${iconBtn} ${!anchorIso && unfetchedNewer === 0 ? "opacity-40" : ""}`}
+                        title={t(!anchorIso && unfetchedNewer === 0 ? "branchHistory.atLogEnd" : "branchHistory.zoomOutNewer")}
                       >
                         <svg {...svgProps} className={svgIcon}>
                           <path d="M3 3v10" />

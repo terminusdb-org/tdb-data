@@ -813,8 +813,8 @@
     "zoomIn": "Zoom the loaded range into the selected span",
     "zoomOutOlder": "Load 50% more history on the older side",
 "zoomOutNewer": "Load 50% more history on the newer side",
-"atLogStart": "At the first commit — nothing older to load",
-"atLogEnd": "At the newest commit — nothing newer to load",
+"atLogStart": "At the first commit — zooming out only expands empty time before it",
+"atLogEnd": "At the newest commit — zooming out only expands empty time after it",
     "belowWindow": "{{count}} more loaded below — pan down or load more"
   },
   "statusBar": {

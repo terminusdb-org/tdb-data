@@ -66,11 +66,14 @@ export const BranchHistoryPage: React.FC = () => {
   // Fetch INITIAL_COUNT + 1: the extra commit is a probe — its presence
   // means more remain; it is never rendered. `start` and `startDateTime`
   // are mutually exclusive server-side, so only one is ever sent; the
-  // endDateTime bottom bound combines with either.
+  // endDateTime bottom bound combines with either. refetchCountRef asks
+  // for a bigger first page when a bounds reset must keep every row
+  // already loaded — consumed once by the bounds-change effect.
+  const refetchCountRef = useRef<number | null>(null);
   const { data: initialData, isLoading: initialLoading, error: initialError } = useGetLogQuery(
     anchorIso
-      ? { path: logPath ?? "", count: INITIAL_COUNT + 1, startDateTime: anchorIso, endDateTime: endIso ?? undefined, withCounts: false }
-      : { path: logPath ?? "", start: 0, count: INITIAL_COUNT + 1, endDateTime: endIso ?? undefined, withCounts: false },
+      ? { path: logPath ?? "", count: (refetchCountRef.current ?? INITIAL_COUNT) + 1, startDateTime: anchorIso, endDateTime: endIso ?? undefined, withCounts: false }
+      : { path: logPath ?? "", start: 0, count: (refetchCountRef.current ?? INITIAL_COUNT) + 1, endDateTime: endIso ?? undefined, withCounts: false },
     { skip: !logPath },
   );
 
@@ -90,6 +93,7 @@ export const BranchHistoryPage: React.FC = () => {
   useEffect(() => {
     if (lastBoundsRef.current === boundsKey) return;
     lastBoundsRef.current = boundsKey;
+    refetchCountRef.current = null;
     if (logPath) dispatch(clearLogPagination(logPath));
     setWindowStart(0);
     setPollNewer(null);
@@ -224,6 +228,21 @@ export const BranchHistoryPage: React.FC = () => {
         const hasMore = count !== -1 && result.commits.length > count;
         const visible = count === -1 ? result.commits : result.commits.slice(0, count);
         dispatch(appendExtraCommits({ logPath, start: windowStart, commits: visible, fetched: result.commits.length, loadedAll: !hasMore }));
+        if (endIso || anchorIso) {
+          // Loading rows should widen the view to cover them — drop the
+          // fetch bounds so the axis follows the loaded extent. The
+          // bounds change refetches and clears paging, so size the first
+          // page to keep every row loaded so far (plus the above-top
+          // band that becomes reachable once `to` is gone).
+          refetchCountRef.current =
+            (initialData?.commits.length ?? 0) + pagination.fetched + result.commits.length + topAbs;
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("from");
+            next.delete("to");
+            return next;
+          });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Failed to load more commits:", msg);
@@ -231,7 +250,7 @@ export const BranchHistoryPage: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [logPath, topAbs, endIso, initialData, pagination.fetched, dispatch, credentials],
+    [logPath, topAbs, endIso, anchorIso, initialData, pagination.fetched, dispatch, credentials, setSearchParams],
   );
 
   const handleLoadMore = () => {
@@ -390,9 +409,9 @@ export const BranchHistoryPage: React.FC = () => {
   // Defaults put the newest edge at the axis end and the oldest edge on the
   // VIEW_COUNT-th commit — the same 50-wide view as before.
   const defWr = axisHi;
-  const defWl = mergedCommits.length
+  const defWl = boundLo ?? (mergedCommits.length
     ? Number(mergedCommits[Math.min(VIEW_COUNT - 1, mergedCommits.length - 1)].timestamp)
-    : axisLo;
+    : axisLo);
   const wlParam = Number(searchParams.get("wl"));
   const wrParam = Number(searchParams.get("wr"));
   const wlTs = wlParam > 0 ? wlParam : defWl;
@@ -683,10 +702,13 @@ export const BranchHistoryPage: React.FC = () => {
 
         {loading && mergedCommits.length === 0 ? (
           <p className="text-sm text-gray-400">{t("branchHistory.loadingCommits")}</p>
-        ) : mergedCommits.length === 0 && !error ? (
+        ) : mergedCommits.length === 0 && !error && !timeAxis ? (
           <p className="text-sm text-gray-400">{t("branchHistory.noCommitsFound")}</p>
         ) : (
           <>
+            {mergedCommits.length === 0 && !error && (
+              <p className="mb-3 text-sm text-gray-400">{t("branchHistory.noCommitsFound")}</p>
+            )}
             <div className="mb-3 text-xs text-gray-500">
               {t("branchHistory.showingCommits", { count: `${visibleCommits.length}/${mergedCommits.length}` })}
               {endIso && <span className="ml-2 text-dfrntBlue-600">— {t("branchHistory.fromDate", { date: new Date(endIso).toLocaleString() })}</span>}
@@ -977,7 +999,7 @@ export const BranchHistoryPage: React.FC = () => {
                 </button>
                 {rangeError && <span className="text-xs text-red-600">{rangeError}</span>}
                 {moreAvailable && (
-                  <>
+                  <div className="ml-auto flex gap-2">
                     <button
                       type="button"
                       onClick={handleLoadMore}
@@ -994,7 +1016,7 @@ export const BranchHistoryPage: React.FC = () => {
                     >
                       {loading ? t("common.loading") : t("branchHistory.loadAll")}
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
             )}

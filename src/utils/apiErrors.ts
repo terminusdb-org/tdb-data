@@ -54,3 +54,27 @@ export function isEndpointNotConfiguredError(error: unknown): boolean {
 export function isAcceptedApiError(error: unknown): boolean {
   return isNoEmbeddingQueriesError(error) || isEndpointNotConfiguredError(error);
 }
+
+// Best-effort human-readable message for the global error banner.
+export function apiErrorMessage(error: { status?: unknown; data?: unknown; message?: string }): string {
+  const data = error.data;
+  if (typeof data === "object" && data !== null) {
+    const record = data as Record<string, unknown>;
+    const msg = record["api:message"] ?? record.message ?? record.error;
+    return typeof msg === "string" ? msg : "An error occurred";
+  }
+  if (typeof data === "string") {
+    // text responseHandlers surface the error payload as a JSON string —
+    // pull api:message out of it when present
+    try {
+      const msg = (JSON.parse(data) as Record<string, unknown>)["api:message"];
+      return typeof msg === "string" ? msg : data;
+    } catch {
+      return data;
+    }
+  }
+  if (typeof error.status === "object" && error.status !== null) {
+    return JSON.stringify(error.status);
+  }
+  return error.status !== undefined ? String(error.status) : (error.message ?? "An error occurred");
+}

@@ -20,6 +20,7 @@ export interface GetLogParams {
   readonly count?: number;
   readonly startDateTime?: string;
   readonly endDateTime?: string;
+  readonly withCounts?: boolean;
 }
 
 export interface StreamLogOptions {
@@ -27,6 +28,7 @@ export interface StreamLogOptions {
   readonly count?: number;
   readonly startDateTime?: string;
   readonly endDateTime?: string;
+  readonly withCounts?: boolean;
 }
 
 export interface GetLogResult {
@@ -47,19 +49,21 @@ export async function streamLog(
   onCommit?: (commit: LogCommit) => void,
 ): Promise<GetLogResult> {
   const params = new URLSearchParams();
-  // start, startDateTime and endDateTime are mutually exclusive server-side.
+  // start and startDateTime anchor the window's top edge — mutually
+  // exclusive. endDateTime bounds the oldest edge and combines with either.
   if (options.startDateTime) {
     params.set("startDateTime", options.startDateTime);
-  } else if (options.endDateTime) {
-    params.set("endDateTime", options.endDateTime);
   } else {
     params.set("start", String(options.start ?? 0));
+  }
+  if (options.endDateTime) {
+    params.set("endDateTime", options.endDateTime);
   }
   if (options.count != null) {
     params.set("count", String(options.count));
   }
   params.set("stream", "true");
-  params.set("with_counts", "true");
+  params.set("with_counts", options.withCounts === false ? "false" : "true");
   const url = `${baseUrl}/api/log/${path}?${params.toString()}`;
   const headers: Record<string, string> = {
     Accept: "application/x-ndjson",
@@ -86,6 +90,12 @@ export async function streamLog(
     if (!trimmed) return;
     try {
       const obj = JSON.parse(trimmed) as LogCommit;
+      // Keep the raw decimal digits: JSON.parse made timestamp a double,
+      // losing nanosecond digits the date-window bounds need.
+      const ts = trimmed.match(/"timestamp":\s*([0-9]+(?:\.[0-9]+)?)/);
+      if (ts) {
+        (obj as { timestamp: string }).timestamp = ts[1];
+      }
       if (obj.identifier) {
         commits.push(obj);
         onCommit?.(obj);
@@ -142,6 +152,7 @@ export const logApi = baseApi.injectEndpoints({
               count: params.count ?? 100,
               startDateTime: params.startDateTime,
               endDateTime: params.endDateTime,
+              withCounts: params.withCounts,
             },
             credentials,
             api.signal,

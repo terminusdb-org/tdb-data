@@ -8,7 +8,7 @@ import {
 import { config } from "@/config";
 import { setError } from "./errorSlice";
 import { logout } from "./authSlice";
-import { isAcceptedApiError } from "@/utils/apiErrors";
+import { isAcceptedApiError, apiErrorMessage } from "@/utils/apiErrors";
 
 interface AuthStateShape {
   readonly auth: {
@@ -44,26 +44,9 @@ const baseQueryWithErrorHandling: BaseQueryFn<
       // Recognized guidance payloads (e.g. api:NoEmbeddingQueriesDefined,
       // api:EndpointNotConfigured) — call sites render direction, no banner
     } else {
-      const data = result.error.data;
-      let message: string;
-      if (typeof data === "object" && data !== null) {
-        const record = data as Record<string, unknown>;
-        message = (record["api:message"] ?? record.message ?? record.error ?? "An error occurred") as string;
-      } else if (typeof data === "string") {
-        // text responseHandlers surface the error payload as a JSON string —
-        // pull api:message out of it when present
-        try {
-          const parsed = JSON.parse(data) as Record<string, unknown>;
-          message = String(parsed["api:message"] ?? data);
-        } catch {
-          message = data;
-        }
-      } else {
-        message = String(result.error.status);
-      }
       api.dispatch(
         setError({
-          message,
+          message: apiErrorMessage(result.error),
           statusCode: typeof result.error.status === "number" ? result.error.status : undefined,
         })
       );

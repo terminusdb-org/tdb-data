@@ -45,7 +45,7 @@ export function MermaidPanel({ model, elementId, onNavigate }: Props) {
           securityLevel: "loose",
           theme: "default",
           class: { useMaxWidth: false },
-          themeVariables: { fontSize: "11px" },
+          themeVariables: { fontSize: "11px", mainBkg: "#e5e7eb", nodeBorder: "#9ca3af" },
         });
         const { svg } = await mermaid.render(`model-mermaid-${elementId}-${Date.now()}`, definition);
         if (cancelled || !containerRef.current) return;

@@ -7,6 +7,8 @@ import erReducer from "./erSlice";
 import clusteringReducer from "./clusteringSlice";
 import commitStreamReducer from "./commitStreamSlice";
 import projectionReducer from "./projectionSlice";
+import modelReducer from "./modelSlice";
+import notificationReducer from "./notificationSlice";
 import { commitStreamListenerMiddleware } from "./commitStreamMiddleware";
 
 export const store = configureStore({
@@ -18,6 +20,8 @@ export const store = configureStore({
     clustering: clusteringReducer,
     commitStream: commitStreamReducer,
     projection: projectionReducer,
+    model: modelReducer,
+    notification: notificationReducer,
     [baseApi.reducerPath]: baseApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>

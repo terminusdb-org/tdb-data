@@ -172,12 +172,42 @@ export const schemaApi = baseApi.injectEndpoints({
       unknown,
       { path: string; context: Record<string, unknown>; author: string; message: string }
     >({
-      query: (params) => ({
-        url: `${params.path}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=schema&id=@context`,
-        method: "PUT",
-        body: params.context,
-      }),
+      query: (params) => {
+        // The document API replaces the context when the body has
+        // "@type": "@context"; an id=@context query param 404s instead.
+        const docPath = params.path.replace("/api/schema/", "/api/document/");
+        return {
+          url: `${docPath}?author=${encodeURIComponent(params.author)}&message=${encodeURIComponent(params.message)}&graph_type=schema`,
+          method: "PUT",
+          body: params.context,
+        };
+      },
       invalidatesTags: ["Schema", "Prefixes"],
+    }),
+
+    // Prefix management API — atomic per-prefix ops against /api/prefix/*.
+    addPrefix: builder.mutation<unknown, { path: string; name: string; uri: string }>({
+      query: (params) => ({
+        url: `${params.path.replace("/api/schema/", "/api/prefix/")}/${encodeURIComponent(params.name)}`,
+        method: "POST",
+        body: { uri: params.uri },
+      }),
+      invalidatesTags: ["Prefixes", "Schema"],
+    }),
+    updatePrefix: builder.mutation<unknown, { path: string; name: string; uri: string }>({
+      query: (params) => ({
+        url: `${params.path.replace("/api/schema/", "/api/prefix/")}/${encodeURIComponent(params.name)}?create=true`,
+        method: "PUT",
+        body: { uri: params.uri },
+      }),
+      invalidatesTags: ["Prefixes", "Schema"],
+    }),
+    deletePrefix: builder.mutation<unknown, { path: string; name: string }>({
+      query: (params) => ({
+        url: `${params.path.replace("/api/schema/", "/api/prefix/")}/${encodeURIComponent(params.name)}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Prefixes", "Schema"],
     }),
   }),
 });
@@ -192,4 +222,7 @@ export const {
   useInsertSchemaDocumentMutation,
   useDeleteSchemaDocumentMutation,
   useReplaceContextMutation,
+  useAddPrefixMutation,
+  useUpdatePrefixMutation,
+  useDeletePrefixMutation,
 } = schemaApi;

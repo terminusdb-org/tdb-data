@@ -41,6 +41,9 @@ export {
   useInsertSchemaDocumentMutation,
   useDeleteSchemaDocumentMutation,
   useReplaceContextMutation,
+  useAddPrefixMutation,
+  useUpdatePrefixMutation,
+  useDeletePrefixMutation,
 } from "./api/schemaApi";
 
 export {
@@ -89,3 +92,9 @@ export {
   selectCameraState,
 } from "./projectionSlice";
 export type { FilterMode, EmbeddingRole, CachedProjectionPoint, CameraState } from "./projectionSlice";
+export { editStarted, editSucceeded, editFailed, editDismissed, selectPendingEdits, selectPendingForElement } from "./modelSlice";
+export type { PendingEdit } from "./modelSlice";
+export { notify, dismissNotification, selectNotifications } from "./notificationSlice";
+export type { AppNotification } from "./notificationSlice";
+export { useRunMigrationMutation, useCheckDocumentMutation } from "./api/migrationApi";
+export type { MigrationResponse } from "./api/migrationApi";

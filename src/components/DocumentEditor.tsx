@@ -21,6 +21,7 @@ import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { RefType } from "@/store/dataProductSlice";
 import { useGetEmbeddingTextQuery, useGetMarkdownTextQuery, useGetJsonSchemaQuery, isNoEmbeddingQueriesError } from "@/store";
 import { SimilarDocumentsPanel } from "./SimilarDocumentsPanel";
+import { PreflightCheck } from "@/features/model/PreflightCheck";
 
 type EditorTab = "form" | "json" | "markdown" | "embedding" | "similar";
 
@@ -75,6 +76,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
   const [errorSchema, setErrorSchema] = useState<ErrorSchema<TerminusDBDocument>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>("form");
+  const [preflightOpen, setPreflightOpen] = useState(false);
   const params = useParams();
   const navigate = useNavigate();
 
@@ -212,6 +214,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
               className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 transition-colors hover:bg-dfrntBlue-100 hover:text-dfrntBlue-700"
             >
               {document["@type"]}
+            </button>
+          )}
+          {docType && (
+            <button
+              type="button"
+              onClick={() => setPreflightOpen(true)}
+              className="rounded-md border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              title={t("documentEditor.preflight")}
+            >
+              {t("documentEditor.preflight")}
             </button>
           )}
         </div>
@@ -392,6 +404,15 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave
           <div className="p-4 text-sm text-gray-400">{t("documentEditor.saveFirst")}</div>
         )}
       </div>
+      {preflightOpen && (
+        <PreflightCheck
+          open
+          type={docType}
+          docPath={docPath}
+          initialDoc={text}
+          onClose={() => setPreflightOpen(false)}
+        />
+      )}
     </div>
   );
 };

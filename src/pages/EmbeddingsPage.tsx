@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Editor from "@monaco-editor/react";
 import {
@@ -23,7 +23,7 @@ import {
   selectClass,
   useRouteParams,
 } from "@/components";
-import { buildApiPath } from "@/utils/routes";
+import { buildApiPath, buildRoutePath } from "@/utils/routes";
 import { loadGraphqlSchemaForMonaco } from "@/utils/graphqlMonaco";
 import { formatGraphql, formatHandlebars, renderHandlebars } from "@/utils/format";
 import type { SchemaClass } from "@/types/terminusdb";
@@ -409,11 +409,21 @@ export const EmbeddingsPage: React.FC = () => {
     <PageShell
       header={
         <PageHeader>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{t("embeddings.title")}</h2>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {t("embeddings.description")}
-            </p>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{t("embeddings.title")}</h2>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {t("embeddings.description")}
+              </p>
+            </div>
+            {routeParams && (
+              <Link
+                to={`${buildRoutePath(routeParams)}/schema${selectedType ? `/class/${encodeURIComponent(selectedType)}` : ""}`}
+                className="shrink-0 rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                {t("embeddings.schemaLink")}
+              </Link>
+            )}
           </div>
         </PageHeader>
       }

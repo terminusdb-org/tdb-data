@@ -209,11 +209,11 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
           <FilterCombobox
             options={PRIMITIVES}
             value={primitive}
-            formatOption={(p) => (zebraToOthersMapping[p]?.tdb ? `${p} (${zebraToOthersMapping[p].tdb})` : p)}
+            formatOption={(p) => (zebraToOthersMapping[p]?.tdb ? `${zebraToOthersMapping[p].tdb} (${p})` : p)}
             onChange={(v) => setPrimitive(v as SupportedZebraTypes)}
             placeholder={t("model.field.primitiveType")}
             aria-label={t("model.field.primitiveType")}
-            className="w-36"
+            className="w-60 max-w-full"
           />
         )}
         {["linkedType", "linkedTrait", "linkedEnum", "linkedForeign", "linkedTaggedUnion"].includes(targetKind) && (
@@ -255,10 +255,10 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             aria-label={t("model.field.default")}
           />
         )}
-        <button type="button" onClick={handleSave} className="rounded bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-700">
+        <button type="button" onClick={handleSave} className="rounded bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700">
           {t("common.save")}
         </button>
-        <button type="button" onClick={onCancel} className="rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
+        <button type="button" onClick={onCancel} className="rounded px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
           {t("common.cancel")}
         </button>
       </div>

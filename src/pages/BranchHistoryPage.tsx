@@ -23,6 +23,7 @@ const iconBtn =
 
 const svgIcon = "h-3.5 w-3.5";
 const svgProps = {
+  "aria-hidden": true,
   viewBox: "0 0 16 16",
   fill: "none",
   stroke: "currentColor",
@@ -104,7 +105,7 @@ export const BranchHistoryPage: React.FC = () => {
   const rawPagination = useAppSelector((state) => logPath ? selectLogPagination(state, logPath) : null);
   // The stored window may belong to a different start offset than the one
   // currently queried (e.g. right after a date jump before the first append).
-  const pagination = rawPagination && rawPagination.start === windowStart
+  const pagination = rawPagination?.start === windowStart
     ? rawPagination
     : { start: windowStart, extraCommits: [], newerCommits: [], fetched: 0, loadedAll: false };
   const extraCommits = pagination.extraCommits;
@@ -376,7 +377,7 @@ export const BranchHistoryPage: React.FC = () => {
   const boundHi = anchorIso ? isoToEpochDecimal(anchorIso) : null;
   const timeAxis = useMemo(() => {
     const commitHi = mergedCommits.length ? Number(mergedCommits[0].timestamp) : null;
-    const commitLo = mergedCommits.length ? Number(mergedCommits[mergedCommits.length - 1].timestamp) : null;
+    const commitLo = mergedCommits.length ? Number(mergedCommits.at(-1)!.timestamp) : null;
     const rawHi = boundHi ?? commitHi;
     const rawLo = boundLo ?? commitLo;
     if (rawHi == null || rawLo == null) return null;
@@ -559,7 +560,10 @@ export const BranchHistoryPage: React.FC = () => {
     const p = (n: number) => String(n).padStart(2, "0");
     // Edge positions are continuous — shortest-repr digits, capped at
     // nanosecond precision, with trailing zeros stripped.
-    const frac = (String(ts).split(".")[1] ?? "").slice(0, 9).replace(/0+$/, "");
+    const fracStr = (String(ts).split(".")[1] ?? "").slice(0, 9);
+    let fracEnd = fracStr.length;
+    while (fracEnd > 0 && fracStr.charAt(fracEnd - 1) === "0") fracEnd--;
+    const frac = fracStr.slice(0, fracEnd);
     return {
       date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
       time: `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
@@ -635,11 +639,16 @@ export const BranchHistoryPage: React.FC = () => {
   // "Load newer" only while commits above the window top remain unfetched —
   // live-stream commits are already rendered, so they don't count.
   const newerAvailable = unfetchedNewer > 0;
-  const isStreaming = initialData != null && initialData.commits.length === 0 && (initialData?.hasMore ?? false);
+  const isStreaming = initialData?.commits.length === 0 && (initialData?.hasMore ?? false);
   const loading = initialLoading || isStreaming || loadingMore || loadingNewer;
-  const error = initialError
-    ? (initialError instanceof Error ? initialError.message : "Failed to load commit history")
-    : null;
+  let error: string | null = null;
+  if (initialError) {
+    error = initialError instanceof Error ? initialError.message : "Failed to load commit history";
+  }
+  const paneEmpty = mergedCommits.length === 0 && !error;
+  const paneLoading = loading && mergedCommits.length === 0;
+  const paneNoCommits = !paneLoading && paneEmpty && !timeAxis;
+  const paneBody = !paneLoading && !paneNoCommits;
 
   // Navigate to a commit while staying on the history page.
   // Include from-branch so the history page knows which branch to show.
@@ -700,11 +709,13 @@ export const BranchHistoryPage: React.FC = () => {
           </div>
         )}
 
-        {loading && mergedCommits.length === 0 ? (
+        {paneLoading && (
           <p className="text-sm text-gray-400">{t("branchHistory.loadingCommits")}</p>
-        ) : mergedCommits.length === 0 && !error && !timeAxis ? (
+        )}
+        {paneNoCommits && (
           <p className="text-sm text-gray-400">{t("branchHistory.noCommitsFound")}</p>
-        ) : (
+        )}
+        {paneBody && (
           <>
             {mergedCommits.length === 0 && !error && (
               <p className="mb-3 text-sm text-gray-400">{t("branchHistory.noCommitsFound")}</p>
@@ -750,15 +761,20 @@ export const BranchHistoryPage: React.FC = () => {
                       const edgeTs = edge === "oldest" ? effWl : effWr;
                       const pos = ((edgeTs - timeAxis.t0) / timeAxis.span) * 100;
                       const parts = edgeLabelParts(edgeTs);
+                      let posTransform = "translateX(-50%)";
+                      if (pos <= 12) {
+                        posTransform = "translateX(0)";
+                      } else if (pos >= 88) {
+                        posTransform = "translateX(-100%)";
+                      }
                       return (
                         <div
                           key={edge}
                           className="absolute -top-11 z-10"
-                          style={{ left: `${pos}%`, transform: pos <= 12 ? "translateX(0)" : pos >= 88 ? "translateX(-100%)" : "translateX(-50%)" }}
+                          style={{ left: `${pos}%`, transform: posTransform }}
                         >
                           {editEdge === edge ? (
                             <input
-                              autoFocus
                               type="datetime-local"
                               step={0.001}
                               value={editValue}
@@ -918,7 +934,6 @@ export const BranchHistoryPage: React.FC = () => {
                       </button>
                     {editEdge === "axisLo" ? (
                       <input
-                        autoFocus
                         type="datetime-local"
                         step={0.001}
                         value={editValue}
@@ -948,7 +963,6 @@ export const BranchHistoryPage: React.FC = () => {
                     <div className="flex items-center gap-1">
                     {editEdge === "axisHi" ? (
                       <input
-                        autoFocus
                         type="datetime-local"
                         step={0.001}
                         value={editValue}
@@ -1049,6 +1063,7 @@ export const BranchHistoryPage: React.FC = () => {
                           aria-label={expandedCommits.has(entry.identifier) ? "Collapse" : "Expand"}
                         >
                           <svg
+                            aria-hidden="true"
                             className={`h-3 w-3 transition-transform ${expandedCommits.has(entry.identifier) ? "rotate-90" : ""}`}
                             fill="none"
                             stroke="currentColor"
@@ -1148,7 +1163,7 @@ export const BranchHistoryPage: React.FC = () => {
 function shortenId(id: string): string {
   const parts = id.split("/");
   if (parts.length >= 2) {
-    return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+    return `${parts.at(-2)}/${parts.at(-1)}`;
   }
   return id;
 }

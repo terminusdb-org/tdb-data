@@ -38,7 +38,12 @@ interface Props {
   /** Raw schema docs + document path — enable the per-field docs modal. */
   classes?: SchemaClass[];
   docPath?: string;
+  /** Per-class document counts — ops on classes over the threshold warn first. */
+  docCounts?: Record<string, number>;
 }
+
+// Classes above this many documents get the confirmation modal before any op.
+const LARGE_CLASS_THRESHOLD = 1000;
 
 const linkedTargetOf = (p: TypePropertyDefinition, model: SchemaModel): { id: string; kind: string } | null => {
   if (p.linkedTrait) return { id: p.linkedTrait, kind: "subdoc" };
@@ -67,7 +72,7 @@ const inheritedFrom = (model: SchemaModel, td: ITypeDefinition, propName: string
   return undefined;
 };
 
-export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, onEditMetadata, onWarn, readOnly, classes, docPath }: Props) {
+export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, onEditMetadata, onWarn, readOnly, classes, docPath, docCounts }: Props) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const applyMigration = useApplyMigration();
@@ -119,9 +124,11 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   };
   const propNeedsDocReplace = (p: TypePropertyDefinition) => specNeedsDocReplace(specOf(p));
 
+  // Subdoc edits rewrite the parents' documents — fall back to the chain root.
+  const affectedCount = docCounts?.[elementId] ?? docCounts?.[pathIds[0]] ?? 0;
   const commitOps = (ops: MigrationOp[]) => {
     if (ops.length === 0) return;
-    if (ops.some(isStrengthening)) {
+    if (ops.some(isStrengthening) || affectedCount > LARGE_CLASS_THRESHOLD) {
       onWarn(elementId, ops);
     } else {
       void applyMigration({ path: schemaPath, elementId, ops });
@@ -338,6 +345,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
                 readOnly={readOnly || targetTd.type === "taggedunion"}
                 classes={classes}
                 docPath={docPath}
+                docCounts={docCounts}
               />
             )}
           </div>
@@ -347,7 +355,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   };
 
   return (
-    <div className="relative">
+    <div className="relative overflow-x-auto">
       {showSpinner && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-950/50">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" aria-label={t("model.field.applying")} />

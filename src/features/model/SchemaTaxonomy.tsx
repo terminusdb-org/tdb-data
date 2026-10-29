@@ -11,6 +11,8 @@ interface Props {
   onNewElement: (kind: "Class" | "Enum" | "TaggedUnion" | "Foreign") => void;
   expandedPaths: Set<string>;
   onExpand: (id: string, open: boolean) => void;
+  /** Per-class document counts (top-level classes only). */
+  docCounts?: Record<string, number>;
 }
 
 function KindBadges({ model, id }: { model: SchemaModel; id: string }) {
@@ -60,6 +62,7 @@ function TreeNode({
   onExpand,
   onSelect,
   onJump,
+  docCounts,
 }: {
   node: TaxonomyNode;
   model: SchemaModel;
@@ -69,10 +72,13 @@ function TreeNode({
   onExpand: (id: string, open: boolean) => void;
   onSelect: (id: string) => void;
   onJump: (parentId: string) => void;
+  docCounts?: Record<string, number>;
 }) {
+  const { t } = useTranslation();
   const open = expandedPaths.has(node.path);
   const td = model[node.id]?.typeDefinition;
   const selected = node.id === selectedId;
+  const count = docCounts?.[node.id];
   return (
     <li role="treeitem" aria-expanded={node.children.length > 0 ? open : undefined} aria-selected={selected}>
       <div
@@ -92,6 +98,11 @@ function TreeNode({
           <span className="w-3 shrink-0 text-[10px] text-gray-400">{node.children.length > 0 ? (open ? "▾" : "▸") : ""}</span>
           <span className={td?.isAbstract ? "italic" : ""}>{node.id}</span>
           <KindBadges model={model} id={node.id} />
+          {count !== undefined && (
+            <span className="ml-auto rounded bg-gray-100 px-1 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400" title={t("model.taxonomy.documentCount", { count })}>
+              {count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count}
+            </span>
+          )}
         </button>
         <MultiParentChip node={node} onJump={onJump} />
       </div>
@@ -108,6 +119,7 @@ function TreeNode({
               onExpand={onExpand}
               onSelect={onSelect}
               onJump={onJump}
+              docCounts={docCounts}
             />
           ))}
         </ul>
@@ -116,7 +128,7 @@ function TreeNode({
   );
 }
 
-export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, onNewElement, expandedPaths, onExpand }: Props) {
+export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, onNewElement, expandedPaths, onExpand, docCounts }: Props) {
   const { t } = useTranslation();
   const [objectFilter, setObjectFilter] = useState("");
   const { classes, otherIds } = buildTaxonomy(model);
@@ -164,6 +176,7 @@ export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, on
             onExpand={onExpand}
             onSelect={onSelect}
             onJump={jumpToParent}
+            docCounts={docCounts}
           />
         ))}
         {classes.length === 0 && <li className="px-1 py-1 text-xs text-gray-400">{t("model.taxonomy.noClasses")}</li>}

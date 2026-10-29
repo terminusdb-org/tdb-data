@@ -23,12 +23,14 @@ interface Props {
   onNavigate: (id: string) => void;
   onNavigateObject: (id: string) => void;
   onDeleted: () => void;
+  /** Per-class document counts — drives the large-class migration gate. */
+  docCounts?: Record<string, number>;
 }
 
 type Tab = "fields" | "diagram" | "raw";
 const VALID_TABS: readonly Tab[] = ["fields", "diagram", "raw"];
 
-export function ClassDetail({ model, classes, elementId, schemaPath, docPath, tab: routeTab, onTabChange, onNavigate, onNavigateObject, onDeleted }: Props) {
+export function ClassDetail({ model, classes, elementId, schemaPath, docPath, tab: routeTab, onTabChange, onNavigate, onNavigateObject, onDeleted, docCounts }: Props) {
   const { t } = useTranslation();
   const td = model[elementId]?.typeDefinition;
   const tab: Tab = VALID_TABS.includes(routeTab as Tab) ? (routeTab as Tab) : "fields";
@@ -142,6 +144,7 @@ export function ClassDetail({ model, classes, elementId, schemaPath, docPath, ta
           onWarn={(el, ops) => setWarn({ elementId: el, ops })}
           classes={classes}
           docPath={docPath}
+          docCounts={docCounts}
         />
       )}
       {tab === "diagram" && <MermaidPanel model={model} elementId={elementId} onNavigate={handleNavigate} />}
@@ -164,6 +167,7 @@ export function ClassDetail({ model, classes, elementId, schemaPath, docPath, ta
           elementId={warn.elementId}
           ops={warn.ops}
           schemaPath={schemaPath}
+          docCount={docCounts?.[warn.elementId] ?? docCounts?.[elementId]}
           onClose={() => {
             setWarn(null);
             if (warn.ops.some((o) => o["@type"] === "DeleteClass" && o.class === elementId)) onDeleted();

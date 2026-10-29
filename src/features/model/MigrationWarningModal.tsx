@@ -13,10 +13,12 @@ interface Props {
   readonly ops: MigrationOp[];
   readonly schemaPath: string;
   readonly onClose: () => void;
+  /** Document count of the affected class — shown when known. */
+  readonly docCount?: number;
 }
 
 // Strengthening ops: dry-run on open, show affected counts, confirm applies.
-export function MigrationWarningModal({ open, elementId, ops, schemaPath, onClose }: Props) {
+export function MigrationWarningModal({ open, elementId, ops, schemaPath, onClose, docCount }: Props) {
   const { t } = useTranslation();
   const username = useAppSelector((s) => s.auth.username ?? "admin");
   const [runMigration] = useRunMigrationMutation();
@@ -49,6 +51,11 @@ export function MigrationWarningModal({ open, elementId, ops, schemaPath, onClos
         <pre className="mb-2 max-h-40 overflow-auto rounded bg-gray-50 p-2 text-[11px] dark:bg-gray-950">
           {JSON.stringify(ops, null, 2)}
         </pre>
+        {docCount !== undefined && docCount > 0 && (
+          <div className="mb-2 rounded bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            {t("model.migration.documentsAffected", { count: docCount, id: elementId })}
+          </div>
+        )}
         {checking && <div className="text-xs text-gray-500">{t("model.migration.dryRunRunning")}</div>}
         {dryRun && (
           <div className="mb-2 rounded bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">

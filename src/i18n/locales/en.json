@@ -844,11 +844,14 @@
       "otherObjects": "Other objects",
       "filter": "Filter…",
       "multiParent": "Also under: {{parents}}",
+      "documentCount": "{{count}} documents",
       "noClasses": "No classes yet",
       "newClass": "New class",
       "newEnum": "New enum",
       "newTaggedUnion": "New tagged union",
-      "newForeign": "New foreign"
+      "newForeign": "New foreign",
+      "open": "Browse schema",
+      "close": "Close schema browser"
     },
     "overview": {
       "title": "Schema model",
@@ -947,6 +950,7 @@
       "warningTitle": "Review migration — {{id}}",
       "dryRunRunning": "Running dry-run…",
       "dryRunResult": "This will apply {{schemaOps}} schema operations and modify {{instanceOps}} existing documents.",
+      "documentsAffected": "{{id}} has {{count}} documents — this migration may affect all of them.",
       "applyAnyway": "Apply migration"
     },
     "enum": {

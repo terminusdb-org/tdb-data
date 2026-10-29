@@ -35,6 +35,7 @@ export const SchemaPage: React.FC = () => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [newElement, setNewElement] = useState<{ kind: "Class" | "Enum" | "TaggedUnion" | "Foreign"; id: string } | null>(null);
   const [foreignNames, setForeignNames] = useState<string[]>([]);
+  const [navOpen, setNavOpen] = useState(false);
   const [runWoql] = useRunWoqlMutation();
 
   const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
@@ -76,6 +77,52 @@ export const SchemaPage: React.FC = () => {
     }
     return reduceZebraSchemaFromTerminusSchema(docs);
   }, [classes, foreignNames]);
+
+  // Document counts per class — only "type" entries are top-level documents
+  // (subdoc traits/enums/TUs/foreigns produce no standalone instances).
+  // WOQL, not GraphQL _count: class ids like "Mtcard-minmax" aren't legal
+  // GraphQL names and would poison the whole query.
+  const countableIds = useMemo(
+    () => Object.keys(model).filter((id) => model[id].type === "type"),
+    [model]
+  );
+  const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!woqlPath || countableIds.length === 0) {
+      setDocCounts({});
+      return;
+    }
+    let cancelled = false;
+    const query = {
+      "@type": "And",
+      and: countableIds.map((id, i) => ({
+        // TripleCount reads the rdf:type index directly — no materialization.
+        "@type": "TripleCount",
+        subject: { "@type": "NodeValue", variable: `d${i}` },
+        predicate: { "@type": "NodeValue", node: "rdf:type" },
+        object: { "@type": "NodeValue", node: `@schema:${id}` },
+        count: { "@type": "Value", variable: `n${i}` },
+      })),
+    };
+    runWoql({ path: woqlPath, query })
+      .unwrap()
+      .then((res) => {
+        if (cancelled) return;
+        const bindings = (res.bindings?.[0] ?? {}) as Record<string, unknown>;
+        const out: Record<string, number> = {};
+        countableIds.forEach((id, i) => {
+          const raw = bindings[`n${i}`];
+          const n =
+            typeof raw === "object" && raw !== null ? Number((raw as Record<string, unknown>)["@value"]) : Number(raw);
+          if (!Number.isNaN(n)) out[id] = n;
+        });
+        setDocCounts(out);
+      })
+      .catch(() => setDocCounts({}));
+    return () => {
+      cancelled = true;
+    };
+  }, [woqlPath, countableIds, runWoql]);
 
   // ?class=X compat (DocumentEditor "edit schema" link)
   useEffect(() => {
@@ -128,6 +175,14 @@ export const SchemaPage: React.FC = () => {
       header={
         <PageHeader>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 md:hidden dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              onClick={() => setNavOpen(true)}
+              aria-label={t("model.taxonomy.open")}
+            >
+              ☰
+            </button>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t("model.title")}</h2>
             {classId && (
               <Link
@@ -151,15 +206,26 @@ export const SchemaPage: React.FC = () => {
       }
     >
       <div className="flex h-full">
-        <SchemaTaxonomy
-          model={model}
-          selectedId={classId ?? objectId}
-          onSelect={goClass}
-          onSelectObject={goObject}
-          onNewElement={(kind) => setNewElement({ kind, id: "" })}
-          expandedPaths={expandedPaths}
-          onExpand={onExpand}
-        />
+        {navOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/20 md:hidden"
+            aria-label={t("model.taxonomy.close")}
+            onClick={() => setNavOpen(false)}
+          />
+        )}
+        <div className={`${navOpen ? "fixed inset-y-0 left-0 z-50 bg-white shadow-xl dark:bg-gray-950" : "hidden"} md:relative md:block`}>
+          <SchemaTaxonomy
+            model={model}
+            selectedId={classId ?? objectId}
+            onSelect={(id) => { goClass(id); setNavOpen(false); }}
+            onSelectObject={(id) => { goObject(id); setNavOpen(false); }}
+            onNewElement={(kind) => setNewElement({ kind, id: "" })}
+            expandedPaths={expandedPaths}
+            onExpand={onExpand}
+            docCounts={docCounts}
+          />
+        </div>
         {classId && model[classId] && (model[classId].type === "type" || model[classId].type === "trait") ? (
           <ClassDetail
             model={model}
@@ -172,6 +238,7 @@ export const SchemaPage: React.FC = () => {
             onNavigate={goClass}
             onNavigateObject={goObject}
             onDeleted={goHome}
+            docCounts={docCounts}
           />
         ) : objectId === "@context" ? (
           <ContextDetail classes={classes ?? []} schemaPath={schemaPath} tab={tab} onTabChange={(next) => goObjectTab("@context", next)} />

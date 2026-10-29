@@ -17,7 +17,7 @@ export function ModelDialog({ open, onClose, title, children, widthClass = "w-96
     <Dialog open={open} onClose={onClose} className="relative z-40">
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className={`max-h-[85vh] overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-gray-900 ${widthClass}`}>
+        <DialogPanel className={`max-h-[85vh] max-w-full overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-gray-900 ${widthClass}`}>
           <DialogTitle className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</DialogTitle>
           {children}
         </DialogPanel>

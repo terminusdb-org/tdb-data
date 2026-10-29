@@ -162,7 +162,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
   };
 
   const selectCls =
-    "rounded border border-gray-300 px-1.5 py-1 text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
+    "min-h-9 rounded border border-gray-300 px-1.5 py-1 text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
   return (
     <div className="rounded-md border border-sky-300 bg-sky-50/50 p-2 dark:border-sky-800 dark:bg-sky-950/20">
@@ -173,7 +173,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("model.field.namePlaceholder")}
-          className={`${selectCls} w-40`}
+          className={`${selectCls} w-full sm:w-40`}
           aria-label={t("model.field.name")}
         />
         <datalist id={`predicates-${targetId}`}>
@@ -181,7 +181,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             <option key={p} value={p} />
           ))}
         </datalist>
-        <select value={multiplicity} onChange={(e) => setMultiplicity(e.target.value as TerminusMultiplicityDefinitions)} className={selectCls} aria-label={t("model.field.multiplicity")} disabled={targetKind === "linkedForeign"}>
+        <select value={multiplicity} onChange={(e) => setMultiplicity(e.target.value as TerminusMultiplicityDefinitions)} className={`${selectCls} w-full sm:w-auto`} aria-label={t("model.field.multiplicity")} disabled={targetKind === "linkedForeign"}>
           {MULTIPLICITIES.map((m) => (
             <option key={m} value={m}>{MULT_LABEL[m] ?? m}</option>
           ))}
@@ -189,7 +189,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
         <select
           value={targetKind}
           onChange={(e) => { setTargetKind(e.target.value as typeof targetKind); setLinkedTarget(""); }}
-          className={selectCls}
+          className={`${selectCls} w-full sm:w-auto`}
           aria-label={t("model.field.type")}
         >
           <option value="primitive">{t("model.field.primitive")}</option>
@@ -213,7 +213,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             onChange={(v) => setPrimitive(v as SupportedZebraTypes)}
             placeholder={t("model.field.primitiveType")}
             aria-label={t("model.field.primitiveType")}
-            className="w-60 max-w-full"
+            className="w-full max-w-full sm:w-60"
           />
         )}
         {["linkedType", "linkedTrait", "linkedEnum", "linkedForeign", "linkedTaggedUnion"].includes(targetKind) && (
@@ -224,26 +224,26 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             placeholder={t("model.field.chooseTarget")}
             emptyLabel={t("model.field.noTargets")}
             aria-label={t("model.field.target")}
-            className="w-44"
+            className="w-full sm:w-44"
           />
         )}
         {targetKind !== "primitive" && targetKind !== "newClass" && targetKind !== "newSubdoc" && multiplicity !== "Mandatory" && (
           <label className="flex items-center gap-1 text-[11px] text-gray-600 dark:text-gray-300" title={t("model.field.unfoldTitle")}>
-            <input type="checkbox" checked={unfold} onChange={(e) => setUnfold(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4" checked={unfold} onChange={(e) => setUnfold(e.target.checked)} />
             {t("model.field.unfold")}
           </label>
         )}
         {(targetKind === "newClass" || targetKind === "newSubdoc") && (
-          <input type="text" value={newClassId} onChange={(e) => setNewClassId(e.target.value)} placeholder={t("model.field.newClassIdPlaceholder")} className={`${selectCls} w-36`} />
+          <input type="text" value={newClassId} onChange={(e) => setNewClassId(e.target.value)} placeholder={t("model.field.newClassIdPlaceholder")} className={`${selectCls} w-full sm:w-36`} />
         )}
         {multiplicity === "Cardinality" && (
           <>
-            <input type="number" value={minCard} onChange={(e) => setMinCard(e.target.value)} placeholder={t("model.field.min")} className={`${selectCls} w-14`} />
-            <input type="number" value={maxCard} onChange={(e) => setMaxCard(e.target.value)} placeholder={t("model.field.max")} className={`${selectCls} w-14`} />
+            <input type="number" value={minCard} onChange={(e) => setMinCard(e.target.value)} placeholder={t("model.field.min")} className={`${selectCls} w-20`} />
+            <input type="number" value={maxCard} onChange={(e) => setMaxCard(e.target.value)} placeholder={t("model.field.max")} className={`${selectCls} w-20`} />
           </>
         )}
         {multiplicity === "Array" && (
-          <input type="number" value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder={t("model.field.dimensions")} className={`${selectCls} w-16`} />
+          <input type="number" value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder={t("model.field.dimensions")} className={`${selectCls} w-20`} />
         )}
         {targetIsMandatoryNew && (
           <input
@@ -251,14 +251,14 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             value={defaultValue}
             onChange={(e) => setDefaultValue(e.target.value)}
             placeholder={t("model.field.defaultPlaceholder")}
-            className={`${selectCls} w-32`}
+            className={`${selectCls} w-full sm:w-32`}
             aria-label={t("model.field.default")}
           />
         )}
-        <button type="button" onClick={handleSave} className="rounded bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700">
+        <button type="button" onClick={handleSave} className="min-h-9 w-full rounded bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 sm:w-auto">
           {t("common.save")}
         </button>
-        <button type="button" onClick={onCancel} className="rounded px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
+        <button type="button" onClick={onCancel} className="min-h-9 w-full rounded px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 sm:w-auto dark:text-gray-300 dark:hover:bg-gray-800">
           {t("common.cancel")}
         </button>
       </div>

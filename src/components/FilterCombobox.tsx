@@ -15,7 +15,7 @@ interface Props {
 }
 
 const inputCls =
-  "w-full truncate rounded border border-gray-300 px-1.5 py-1 text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
+  "w-full min-h-9 truncate rounded border border-gray-300 px-1.5 py-1 text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
 // Single-select combobox with type-ahead filtering — used for link targets,
 // primitive types and other long option lists.

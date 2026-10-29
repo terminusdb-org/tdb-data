@@ -236,7 +236,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
         <div className={`flex items-center gap-2 px-2 py-1 text-sm ${applying ? "pointer-events-none opacity-60" : ""}`}>
           <button
             type="button"
-            className="w-4 shrink-0 text-[10px] text-gray-400"
+            className="min-h-7 min-w-7 shrink-0 text-[10px] text-gray-400"
             onClick={() => expandable && toggle(p.name)}
             disabled={!expandable}
             aria-label={isExpanded ? t("model.field.collapse") : t("model.field.expand")}
@@ -302,14 +302,14 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
           {!inherited && !readOnly && (
             <span className="ml-auto flex gap-1">
               {docsAvailable && (
-                <button type="button" className="rounded px-1 text-[11px] text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950" title={t("model.docs.editField")} onClick={() => setDocsFor(p.name)}>
+                <button type="button" className="min-h-7 rounded px-1.5 text-[11px] text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950" title={t("model.docs.editField")} onClick={() => setDocsFor(p.name)}>
                   {t("model.docs.button")}
                 </button>
               )}
-              <button type="button" className="rounded px-1 text-[11px] text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950" onClick={() => setEditingName(p.name)}>
+              <button type="button" className="min-h-7 rounded px-1.5 text-[11px] text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950" onClick={() => setEditingName(p.name)}>
                 {t("common.edit")}
               </button>
-              <button type="button" className="rounded px-1 text-[11px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950" onClick={() => deleteField(p)}>
+              <button type="button" className="min-h-7 rounded px-1.5 text-[11px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950" onClick={() => deleteField(p)}>
                 {t("common.delete")}
               </button>
             </span>
@@ -387,10 +387,10 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
           <div key={e.id} className="mx-2 mt-1">
             <ApiErrorBlock error={e.error!} />
             <div className="mt-1 flex gap-2">
-              <button type="button" className="rounded bg-sky-600 px-2 py-0.5 text-[11px] text-white" onClick={() => retryEdit(e.id)}>
+              <button type="button" className="min-h-8 rounded bg-sky-600 px-2 py-0.5 text-[11px] text-white" onClick={() => retryEdit(e.id)}>
                 {t("common.retry")}
               </button>
-              <button type="button" className="rounded px-2 py-0.5 text-[11px] text-gray-500" onClick={() => dispatch(editDismissed({ id: e.id }))}>
+              <button type="button" className="min-h-8 rounded px-2 py-0.5 text-[11px] text-gray-500" onClick={() => dispatch(editDismissed({ id: e.id }))}>
                 {t("common.dismiss")}
               </button>
             </div>
@@ -399,7 +399,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
       {!readOnly && !adding && (
         <button
           type="button"
-          className="mt-1 ml-2 rounded border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500 hover:border-sky-400 hover:text-sky-600 dark:border-gray-600"
+          className="mt-1 ml-2 min-h-9 rounded border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500 hover:border-sky-400 hover:text-sky-600 dark:border-gray-600"
           onClick={() => setAdding(true)}
         >
           {t("model.field.addTo", { id: elementId })}

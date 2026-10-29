@@ -2,6 +2,10 @@
 // surface in the global error banner — each call site renders guidance
 // instead. Anything not listed here stays an error.
 
+// IRIs are compressed engine-side (api_document.pl folds them through the
+// database prefixes); the payload is printed verbatim.
+
+
 // RTK Query puts the payload in error.data; endpoints using a text
 // responseHandler leave it as a JSON string, so parse before inspecting.
 function errorData(error: unknown): Record<string, unknown> | null {
@@ -77,4 +81,28 @@ export function apiErrorMessage(error: { status?: unknown; data?: unknown; messa
     return JSON.stringify(error.status);
   }
   return error.status !== undefined ? String(error.status) : (error.message ?? "An error occurred");
+}
+
+export interface ApiErrorDetail {
+  readonly type: string | null; // api:error.@type — the stable error code
+  readonly message: string;     // verbatim api:message
+  readonly detailsJson: string; // pretty-printed full payload for the Details expander
+}
+
+// Single entry point all modeller error surfaces funnel through.
+export function describeApiError(error: unknown): ApiErrorDetail {
+  const data = errorData(error);
+  let message = "An error occurred";
+  try {
+    message = apiErrorMessage(error as { status?: unknown; data?: unknown; message?: string });
+  } catch {
+    /* fall through to default */
+  }
+  let detailsJson: string;
+  try {
+    detailsJson = data ? JSON.stringify(data, null, 2) : JSON.stringify(error, null, 2);
+  } catch {
+    detailsJson = String(error);
+  }
+  return { type: apiErrorType(error), message, detailsJson };
 }

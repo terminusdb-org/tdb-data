@@ -63,6 +63,7 @@ function TreeNode({
   onSelect,
   onJump,
   docCounts,
+  forceOpen,
 }: {
   node: TaxonomyNode;
   model: SchemaModel;
@@ -73,9 +74,10 @@ function TreeNode({
   onSelect: (id: string) => void;
   onJump: (parentId: string) => void;
   docCounts?: Record<string, number>;
+  forceOpen?: boolean;
 }) {
   const { t } = useTranslation();
-  const open = expandedPaths.has(node.path);
+  const open = forceOpen || expandedPaths.has(node.path);
   const td = model[node.id]?.typeDefinition;
   const selected = node.id === selectedId;
   const count = docCounts?.[node.id];
@@ -120,6 +122,7 @@ function TreeNode({
               onSelect={onSelect}
               onJump={onJump}
               docCounts={docCounts}
+              forceOpen={forceOpen}
             />
           ))}
         </ul>
@@ -131,7 +134,20 @@ function TreeNode({
 export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, onNewElement, expandedPaths, onExpand, docCounts }: Props) {
   const { t } = useTranslation();
   const [objectFilter, setObjectFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
   const { classes, otherIds } = buildTaxonomy(model);
+
+  // Filter keeps matching nodes plus their ancestors so the path stays visible.
+  const filterTree = (nodes: TaxonomyNode[], q: string): TaxonomyNode[] => {
+    if (!q) return nodes;
+    const lq = q.toLowerCase();
+    const walk = (n: TaxonomyNode): TaxonomyNode | null => {
+      const kids = n.children.map(walk).filter((c): c is TaxonomyNode => c !== null);
+      return n.id.toLowerCase().includes(lq) || kids.length > 0 ? { ...n, children: kids } : null;
+    };
+    return nodes.map(walk).filter((n): n is TaxonomyNode => n !== null);
+  };
+  const filteredClasses = filterTree(classes, classFilter);
 
   const jumpToParent = (parentId: string) => {
     // Navigate to the other parent branch — expand it and open its detail.
@@ -164,8 +180,16 @@ export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, on
         ))}
       </div>
       <div className="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">{t("model.taxonomy.classes")}</div>
+      <input
+        type="text"
+        value={classFilter}
+        onChange={(e) => setClassFilter(e.target.value)}
+        placeholder={t("model.taxonomy.filter")}
+        className="mb-1 w-full rounded border border-gray-300 px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-900"
+        aria-label={t("model.taxonomy.filterClasses")}
+      />
       <ul role="tree" className="mb-3">
-        {classes.map((n) => (
+        {filteredClasses.map((n) => (
           <TreeNode
             key={n.id}
             node={n}
@@ -177,6 +201,7 @@ export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, on
             onSelect={onSelect}
             onJump={jumpToParent}
             docCounts={docCounts}
+            forceOpen={classFilter.length > 0}
           />
         ))}
         {classes.length === 0 && <li className="px-1 py-1 text-xs text-gray-400">{t("model.taxonomy.noClasses")}</li>}

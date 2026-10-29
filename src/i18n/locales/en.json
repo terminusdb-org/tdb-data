@@ -845,6 +845,7 @@
       "filter": "Filter…",
       "multiParent": "Also under: {{parents}}",
       "documentCount": "{{count}} documents",
+      "filterClasses": "Filter classes",
       "noClasses": "No classes yet",
       "newClass": "New class",
       "newEnum": "New enum",

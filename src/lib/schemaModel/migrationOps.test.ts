@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { diffClassToOps, isStrengthening, ops, specOf } from "./migrationOps";
+import { diffClassToOps, isStrengthening, newClassDoc, ops, specOf } from "./migrationOps";
 import { ITypeDefinition } from "./types";
 
 describe("ops builders", () => {
@@ -58,6 +58,14 @@ describe("ops builders", () => {
       default: { "@type": "Default", value: 7 },
     });
     expect(ops.expandEnum("E", ["a", "b"])).toEqual({ "@type": "ExpandEnum", enum: "E", values: ["a", "b"] });
+  });
+
+  it("builds minimal class documents for inline-created targets", () => {
+    expect(newClassDoc("C", "class")).toEqual({ "@type": "Class", "@id": "C", "@key": { "@type": "Random" } });
+    expect(newClassDoc("S", "subdoc")).toEqual({ "@type": "Class", "@id": "S", "@key": { "@type": "Random" }, "@subdocument": [] });
+    expect(newClassDoc("E", "enum")).toEqual({ "@type": "Enum", "@id": "E", "@value": [] });
+    expect(newClassDoc("T", "taggedunion")).toEqual({ "@type": "TaggedUnion", "@id": "T" });
+    expect(newClassDoc("F", "foreign")).toEqual({ "@type": "Foreign", "@id": "F" });
   });
 });
 

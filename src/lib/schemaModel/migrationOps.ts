@@ -72,6 +72,28 @@ export const ops = {
 // The schema property spec for a definition, e.g. "xsd:string" or {"@type":"Set","@class":"xsd:string"}.
 export const specOf = (pd: TypePropertyDefinition): unknown => castTerminusValue(pd)[pd.name];
 
+export type NewClassKind = "class" | "subdoc" | "enum" | "taggedunion" | "foreign";
+
+// Minimal legal schema document for an inline-created link target. Enum and
+// TaggedUnion members are added afterwards on the class's own page.
+export const newClassDoc = (id: string, kind: NewClassKind): TerminusSchema => {
+  switch (kind) {
+    case "enum":
+      return { "@type": "Enum", "@id": id, "@value": [] } as TerminusSchema;
+    case "taggedunion":
+      return { "@type": "TaggedUnion", "@id": id } as TerminusSchema;
+    case "foreign":
+      return { "@type": "Foreign", "@id": id } as TerminusSchema;
+    default:
+      return {
+        "@type": "Class",
+        "@id": id,
+        "@key": { "@type": "Random" },
+        ...(kind === "subdoc" && { "@subdocument": [] }),
+      } as TerminusSchema;
+  }
+};
+
 type NormalizedSpec = {
   "@class"?: string;
   "@type": string;

@@ -116,19 +116,19 @@ export type SupportedTerminusTypes =
   | "xsd:NMTOKEN"            //                               --> edit as strings
   | "xsd:Name"               //                               --> edit as strings
   | "xsd:NCName"             //                               --> edit as strings
-  // Miscellaneous XDD types
-  // DEPRECATED | "xdd:url" // corresponds to JSON Schema - string/iri
-  // DEPRECATED | "xdd:email" // corresponds to JSON Schema - string/idn-email
+  // Miscellaneous XDD types (TerminusDB extended datatypes)
+  | "xdd:url" //              --> edit as string (IRI)
+  | "xdd:email" //            --> edit as string
+  | "xdd:html" //             --> edit as string
   | "xdd:json"               //- available in TerminusDB      --> edit as string
-  // DEPRECATED | xdd:html - available in TerminusDB           --> edit as string
-  // Pattern: [58.00882,8.43888] - [~w,~w], see casting rules for WOQL
-  // DEPRECATED | "xdd:coordinate" // [58.00882,8.43888] (see coordinate_polygon in TerminusDB)
-  // DEPRECATED | "xdd:coordinatePolygon" // [[58.00882,8.43888],[58.00882,8.43888]] (see coordinate_polygon in TerminusDB)
-  // DEPRECATED | "xdd:coordinatePolyline" // [[58.00882,8.43888]] (see coordinate_polygon in TerminusDB)
-  // DEPRECATED | xdd:dateRange                                --> edit as set of two dates - format?
-  // DEPRECATED | xdd:gYearRange                               --> edit as set of two gYears - format?
-  // DEPRECATED | xdd:integerRange                             --> edit as as set of to integers - format?
-  // DEPRECATED | xdd:decimalRange                             --> edit as as set of two numbers - format?
+  | "xdd:coordinate" //         [lat,long]
+  | "xdd:coordinatePolygon" //  [[lat,long],...]
+  | "xdd:coordinatePolyline" // [[lat,long],...]
+  | "xdd:dateRange" //          [start,end] dates
+  | "xdd:dateTimeInterval" //   ISO interval string
+  | "xdd:gYearRange" //         [start,end] years
+  | "xdd:integerRange" //       [lo,hi] integers
+  | "xdd:decimalRange" //       [lo,hi] decimals
   | "sys:JSON"          // Internal TerminusDB type allowing for any JSON
   | "xsd:anySimpleType" // Internal TerminusDB type allowing for any simple type
   | "linkedForeign" // For foreign references
@@ -182,13 +182,19 @@ export type SupportedZebraTypes =
   | "Name"            
   | "NCName"          
   | "JSON"
+  // XDD extended datatypes (zebra names mirror the tdb suffix)
+  | "url"
+  | "email"
+  | "html"
+  | "coordinate"
+  | "coordinatePolygon"
+  | "coordinatePolyline"
+  | "dateRange"
+  | "dateTimeInterval"
+  | "gYearRange"
+  | "integerRange"
+  | "decimalRange"
   ;
-  // | "url"
-  // | "email"
-  // DEPRECATED | "decimalrange";
-  // DEPRECATED | "coordinate"
-  // DEPRECATED | "coordinatePolygon"
-  // DEPRECATED | "coordinatePolyline";
 
 export interface TerminusSchemaObject {
   [propName: string]: TerminusSchema;

@@ -287,18 +287,52 @@ export const zebraToOthersMapping: ZebraToOthersMapping = {
     },
     tdb: "linkedForeign",
   },
-  // Miscellaneous XDD types (THESE ARE DEPRECATED IN TERMINUSDB)
-  // tdb: "xdd:url",
-  // tdb: "xdd:email",
-  // xdd:json - available in TerminusDB as sys:JSON --> edit as string
-  // xdd:html - available in TerminusDB           --> edit as string
-  // xdd:dateRange
-  // xdd:gYearRange
-  // xdd:integerRange
-  // xdd:decimalRange
-  // tdb: "xdd:coordinate",
-  // tdb: "xdd:coordinatePolygon",
-  // tdb: "xdd:coordinatePolyline",
+  // XDD extended datatypes — all supported engine base types except
+  // xdd:json (covered by sys:JSON above).
+  url: {
+    jsonSchema: { type: "string", format: "uri" },
+    tdb: "xdd:url",
+  },
+  email: {
+    jsonSchema: { type: "string", format: "email" },
+    tdb: "xdd:email",
+  },
+  html: {
+    jsonSchema: { type: "string" },
+    tdb: "xdd:html",
+  },
+  coordinate: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:coordinate",
+  },
+  coordinatePolygon: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:coordinatePolygon",
+  },
+  coordinatePolyline: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:coordinatePolyline",
+  },
+  dateRange: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:dateRange",
+  },
+  dateTimeInterval: {
+    jsonSchema: { type: "string" },
+    tdb: "xdd:dateTimeInterval",
+  },
+  gYearRange: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:gYearRange",
+  },
+  integerRange: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:integerRange",
+  },
+  decimalRange: {
+    jsonSchema: { type: "array" },
+    tdb: "xdd:decimalRange",
+  },
 };
 
 export const tdbToJOthersMapping: TdbToJOthersMapping = Object.keys(zebraToOthersMapping).reduce((acc, key) => {

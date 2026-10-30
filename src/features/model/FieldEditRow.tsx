@@ -6,12 +6,16 @@ import { buildPredicateIndex, specsEqual } from "@/lib/schemaModel/predicates";
 import { FilterCombobox } from "@/components/FilterCombobox";
 import { zebraToOthersMapping } from "@/lib/schemaModel/mappings";
 
+import type { NewClassKind } from "@/lib/schemaModel/migrationOps";
+
 export interface FieldDraft {
   name: string;
   prop: TypePropertyDefinition;
   default?: { value: string } | "error";
   /** Inline-created link target (decision 12). */
-  newClass?: { id: string; subdocument: boolean };
+  newClass?: { id: string; kind: NewClassKind };
+  /** @oneOf group index — equal to oneOfCount appends a new group; absent = regular field. */
+  oneOfGroup?: number;
 }
 
 // Full TerminusDB datatype palette — every xsd/sys type the engine accepts.
@@ -26,21 +30,56 @@ const PRIMITIVES: SupportedZebraTypes[] = [
   "hexBinary", "base64Binary",
   "anyURI", "language", "normalizedString", "token", "NMTOKEN", "Name", "NCName",
   "JSON",
+  "url", "email", "html",
+  "coordinate", "coordinatePolygon", "coordinatePolyline",
+  "dateRange", "dateTimeInterval", "gYearRange", "integerRange", "decimalRange",
 ];
 const MULTIPLICITIES: TerminusMultiplicityDefinitions[] = ["Mandatory", "Optional", "Set", "List", "Cardinality", "Array"];
 // Cardinality is presented as "Set (Cardinality)": a bounded Set. Bare Set when no bounds are set.
 const MULT_LABEL: Record<string, string> = { Cardinality: "Set (Cardinality)" };
+
+type LinkedKind = "linkedType" | "linkedTrait" | "linkedEnum" | "linkedForeign" | "linkedTaggedUnion";
+// Inline-created targets: targetKind → link slot on the property + doc kind to create.
+const NEW_TARGET = {
+  newClass: { link: "linkedType", kind: "class" },
+  newSubdoc: { link: "linkedTrait", kind: "subdoc" },
+  newEnum: { link: "linkedEnum", kind: "enum" },
+  newTaggedUnion: { link: "linkedTaggedUnion", kind: "taggedunion" },
+  newForeign: { link: "linkedForeign", kind: "foreign" },
+} as const;
+type TargetKind = "primitive" | LinkedKind | keyof typeof NEW_TARGET;
+
+// Model element type → property link slot.
+const LINK_KIND_OF: Record<string, LinkedKind> = {
+  type: "linkedType",
+  trait: "linkedTrait",
+  enumtrait: "linkedEnum",
+  foreign: "linkedForeign",
+  taggedunion: "linkedTaggedUnion",
+};
+const linkKindOf = (modelType: string | undefined): LinkedKind | "primitive" =>
+  (modelType && LINK_KIND_OF[modelType]) || "primitive";
+
+const LINK_KEYS: readonly LinkedKind[] = ["linkedTrait", "linkedType", "linkedEnum", "linkedForeign", "linkedTaggedUnion"];
+const initialTargetKind = (initial?: TypePropertyDefinition): TargetKind => {
+  for (const k of LINK_KEYS) if (initial?.[k]) return k;
+  return "primitive";
+};
 
 interface Props {
   model: SchemaModel;
   targetId: string;
   existingNames: string[];
   initial?: TypePropertyDefinition & { originalName?: string };
+  /** Number of existing @oneOf groups on the class; undefined hides the control. */
+  oneOfCount?: number;
+  /** Group index the edited field currently belongs to (undefined = regular field). */
+  oneOfGroup?: number;
   onSave: (draft: FieldDraft) => void;
   onCancel: () => void;
 }
 
-export function FieldEditRow({ model, targetId, existingNames, initial, onSave, onCancel }: Props) {
+export function FieldEditRow({ model, targetId, existingNames, initial, oneOfCount, oneOfGroup, onSave, onCancel }: Props) {
   const { t } = useTranslation();
   const predicates = useMemo(() => buildPredicateIndex(model), [model]);
   const [name, setName] = useState(initial?.originalName ?? initial?.name ?? "");
@@ -49,36 +88,24 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
     initial?.linkedType ?? initial?.linkedTrait ?? initial?.linkedEnum ?? initial?.linkedForeign ?? initial?.linkedTaggedUnion ?? ""
   );
   const [primitive, setPrimitive] = useState<SupportedZebraTypes>(initial?.type && PRIMITIVES.includes(initial.type) ? initial.type : "string");
-  const [targetKind, setTargetKind] = useState<"primitive" | "linkedType" | "linkedTrait" | "linkedEnum" | "linkedForeign" | "linkedTaggedUnion" | "newClass" | "newSubdoc">(
-    initial?.linkedTrait ? "linkedTrait"
-      : initial?.linkedType ? "linkedType"
-      : initial?.linkedEnum ? "linkedEnum"
-      : initial?.linkedForeign ? "linkedForeign"
-      : initial?.linkedTaggedUnion ? "linkedTaggedUnion"
-      : "primitive"
-  );
+  const [targetKind, setTargetKind] = useState<TargetKind>(initialTargetKind(initial));
   const [newClassId, setNewClassId] = useState("");
   const [unfold, setUnfold] = useState(initial?.unfold ?? false);
   const [minCard, setMinCard] = useState(initial?.minCardinality?.toString() ?? "");
   const [maxCard, setMaxCard] = useState(initial?.maxCardinality?.toString() ?? initial?.cardinality?.toString() ?? "");
   const [dimensions, setDimensions] = useState(initial?.dimensions?.toString() ?? "1");
   const [defaultValue, setDefaultValue] = useState("");
+  const [oneOfSel, setOneOfSel] = useState<string>(oneOfGroup !== undefined ? String(oneOfGroup) : "none");
   const [error, setError] = useState<string | null>(null);
 
-  const targetIsMandatoryNew = !initial && multiplicity === "Mandatory";
+  // Mandatory fields need a default for existing instances; Foreign specs
+  // always need one — the engine rejects a Foreign property created without.
+  const targetNeedsDefault = !initial && (multiplicity === "Mandatory" || targetKind === "linkedForeign" || targetKind === "newForeign");
   const knownPredicate = predicates[name];
   const predicateSpecs = knownPredicate ? [...new Set(knownPredicate.defs.map((d) => JSON.stringify(d.spec)))] : [];
 
   const classOptions = (kind: string) =>
-    Object.keys(model).filter((id) => {
-      const k = model[id].type;
-      if (kind === "linkedType") return k === "type";
-      if (kind === "linkedTrait") return k === "trait";
-      if (kind === "linkedEnum") return k === "enumtrait";
-      if (kind === "linkedForeign") return k === "foreign";
-      if (kind === "linkedTaggedUnion") return k === "taggedunion";
-      return false;
-    });
+    Object.keys(model).filter((id) => linkKindOf(model[id].type) === kind);
 
   // Picking a known predicate name offers its existing definitions for reuse.
   const adoptPredicateDef = (specJson: string) => {
@@ -93,12 +120,8 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
     } else if (spec && typeof spec === "object") {
       const s = spec as Record<string, unknown>;
       setMultiplicity((s["@type"] as TerminusMultiplicityDefinitions) ?? "Optional");
-      const cls = String(s["@class"] ?? "");
-      const targetKindOf = (id: string) => {
-        const k = model[id]?.type;
-        return k === "type" ? "linkedType" : k === "trait" ? "linkedTrait" : k === "enumtrait" ? "linkedEnum" : k === "foreign" ? "linkedForeign" : k === "taggedunion" ? "linkedTaggedUnion" : "primitive";
-      };
-      const kind = targetKindOf(cls);
+      const cls = typeof s["@class"] === "string" ? s["@class"] : "";
+      const kind = linkKindOf(model[cls]?.type);
       if (kind !== "primitive") {
         setTargetKind(kind);
         setLinkedTarget(cls);
@@ -114,10 +137,11 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
     if (name.startsWith("@")) return t("model.field.errorNoAtPrefix");
     const isOwn = existingNames.includes(name);
     if (isOwn && name !== initial?.originalName) return t("model.field.errorCollision");
-    if ((targetKind === "newClass" || targetKind === "newSubdoc") && (!newClassId.trim() || model[newClassId])) {
+    if (targetKind in NEW_TARGET && (!newClassId.trim() || model[newClassId])) {
       return t("model.field.errorNewClassId");
     }
-    if (targetIsMandatoryNew && !defaultValue) return t("model.field.errorDefaultRequired");
+    if (targetNeedsDefault && !defaultValue) return t("model.field.errorDefaultRequired");
+    if (oneOfSel !== "none" && multiplicity === "Optional") return t("model.field.errorOneOfOptional");
     if (["linkedType", "linkedTrait", "linkedEnum", "linkedForeign", "linkedTaggedUnion"].includes(targetKind) && !linkedTarget)
       return t("model.field.errorTargetRequired");
     return null;
@@ -129,20 +153,21 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
       setError(err);
       return;
     }
-    const isForeign = targetKind === "linkedForeign";
+    const isForeign = targetKind === "linkedForeign" || targetKind === "newForeign";
+    const newTarget = targetKind in NEW_TARGET ? NEW_TARGET[targetKind as keyof typeof NEW_TARGET] : undefined;
     // "Set (Cardinality)" with no bounds collapses to a plain Set.
     const effMultiplicity: TerminusMultiplicityDefinitions =
       multiplicity === "Cardinality" && !minCard && !maxCard ? "Set" : multiplicity;
     const prop: TypePropertyDefinition = {
       name,
-      type: targetKind === "primitive" ? primitive : targetKind === "newClass" || targetKind === "newSubdoc" ? "linkedType" : targetKind,
+      type: targetKind === "primitive" ? primitive : newTarget ? newTarget.link : (targetKind as LinkedKind),
       multiplicity: isForeign ? "Foreign" : effMultiplicity,
       ...(targetKind === "linkedType" && { linkedType: linkedTarget }),
       ...(targetKind === "linkedTrait" && { linkedTrait: linkedTarget }),
       ...(targetKind === "linkedEnum" && { linkedEnum: linkedTarget }),
       ...(targetKind === "linkedForeign" && { linkedForeign: linkedTarget }),
       ...(targetKind === "linkedTaggedUnion" && { linkedTaggedUnion: linkedTarget }),
-      ...((targetKind === "newClass" || targetKind === "newSubdoc") && { [targetKind === "newSubdoc" ? "linkedTrait" : "linkedType"]: newClassId }),
+      ...(newTarget && { [newTarget.link]: newClassId }),
       ...(effMultiplicity === "Cardinality" && {
         ...(minCard && { minCardinality: Number(minCard) }),
         ...(maxCard && { maxCardinality: Number(maxCard) }),
@@ -154,9 +179,12 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
     onSave({
       name,
       prop,
-      ...(targetIsMandatoryNew && defaultValue ? { default: { value: defaultValue } } : {}),
-      ...((targetKind === "newClass" || targetKind === "newSubdoc") && {
-        newClass: { id: newClassId, subdocument: targetKind === "newSubdoc" },
+      ...(targetNeedsDefault && defaultValue ? { default: { value: defaultValue } } : {}),
+      ...(newTarget && {
+        newClass: { id: newClassId, kind: newTarget.kind },
+      }),
+      ...(oneOfSel !== "none" && {
+        oneOfGroup: oneOfSel === "new" ? oneOfCount! : Number(oneOfSel),
       }),
     });
   };
@@ -181,7 +209,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             <option key={p} value={p} />
           ))}
         </datalist>
-        <select value={multiplicity} onChange={(e) => setMultiplicity(e.target.value as TerminusMultiplicityDefinitions)} className={`${selectCls} w-full sm:w-auto`} aria-label={t("model.field.multiplicity")} disabled={targetKind === "linkedForeign"}>
+        <select value={multiplicity} onChange={(e) => setMultiplicity(e.target.value as TerminusMultiplicityDefinitions)} className={`${selectCls} w-full sm:w-auto`} aria-label={t("model.field.multiplicity")} disabled={targetKind === "linkedForeign" || targetKind === "newForeign"}>
           {MULTIPLICITIES.map((m) => (
             <option key={m} value={m}>{MULT_LABEL[m] ?? m}</option>
           ))}
@@ -203,8 +231,28 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
           <optgroup label={t("model.field.createNew")}>
             <option value="newClass">{t("model.field.newClassOption")}</option>
             <option value="newSubdoc">{t("model.field.newSubdocOption")}</option>
+            <option value="newEnum">{t("model.field.newEnumOption")}</option>
+            <option value="newTaggedUnion">{t("model.field.newTaggedUnionOption")}</option>
+            <option value="newForeign">{t("model.field.newForeignOption")}</option>
           </optgroup>
         </select>
+        {oneOfCount !== undefined && (
+          <select
+            value={oneOfSel}
+            onChange={(e) => setOneOfSel(e.target.value)}
+            className={`${selectCls} w-full sm:w-auto`}
+            aria-label={t("model.field.oneOf")}
+            title={t("model.field.oneOfTitle")}
+          >
+            <option value="none">{t("model.field.oneOfNone")}</option>
+            {Array.from({ length: oneOfCount }, (_, i) => (
+              <option key={i} value={i}>
+                {t("model.field.oneOfGroup", { index: i + 1 })}
+              </option>
+            ))}
+            <option value="new">{t("model.field.oneOfNew")}</option>
+          </select>
+        )}
         {targetKind === "primitive" && (
           <FilterCombobox
             options={PRIMITIVES}
@@ -227,13 +275,13 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
             className="w-full sm:w-44"
           />
         )}
-        {targetKind !== "primitive" && targetKind !== "newClass" && targetKind !== "newSubdoc" && multiplicity !== "Mandatory" && (
+        {targetKind !== "primitive" && !(targetKind in NEW_TARGET) && multiplicity !== "Mandatory" && (
           <label className="flex items-center gap-1 text-[11px] text-gray-600 dark:text-gray-300" title={t("model.field.unfoldTitle")}>
             <input type="checkbox" className="h-4 w-4" checked={unfold} onChange={(e) => setUnfold(e.target.checked)} />
             {t("model.field.unfold")}
           </label>
         )}
-        {(targetKind === "newClass" || targetKind === "newSubdoc") && (
+        {targetKind in NEW_TARGET && (
           <input type="text" value={newClassId} onChange={(e) => setNewClassId(e.target.value)} placeholder={t("model.field.newClassIdPlaceholder")} className={`${selectCls} w-full sm:w-36`} />
         )}
         {multiplicity === "Cardinality" && (
@@ -245,7 +293,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, onSave, 
         {multiplicity === "Array" && (
           <input type="number" value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder={t("model.field.dimensions")} className={`${selectCls} w-20`} />
         )}
-        {targetIsMandatoryNew && (
+        {targetNeedsDefault && (
           <input
             type="text"
             value={defaultValue}

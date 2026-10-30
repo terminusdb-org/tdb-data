@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ITypeDefinition, SchemaModel, TypePropertyDefinition } from "@/lib/schemaModel/types";
 import { buildPredicateIndex, specsEqual } from "@/lib/schemaModel/predicates";
-import { diffClassToOps, isStrengthening, ops as migOps, type MigrationOp } from "@/lib/schemaModel/migrationOps";
-import { useAppSelector, useAppDispatch } from "@/store";
+import { diffClassToOps, isStrengthening, newClassDoc, ops as migOps, specOf, type MigrationOp } from "@/lib/schemaModel/migrationOps";
+import { useAppSelector, useAppDispatch, useReplaceSchemaDocumentMutation } from "@/store";
 import { selectPendingForElement, editDismissed } from "@/store/modelSlice";
+import { notify } from "@/store/notificationSlice";
+import { describeApiError } from "@/utils/apiErrors";
 import { useApplyMigration } from "./applyEdit";
 import { FieldEditRow, type FieldDraft } from "./FieldEditRow";
 import { ApiErrorBlock } from "@/components/ApiErrorBlock";
@@ -75,6 +77,8 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const applyMigration = useApplyMigration();
+  const username = useAppSelector((s) => s.auth.username ?? "admin");
+  const [replaceSchemaDocument] = useReplaceSchemaDocumentMutation();
   const td = model[elementId]?.typeDefinition;
   const pending = useAppSelector((s) => selectPendingForElement(s, elementId));
   const predicates = useMemo(() => buildPredicateIndex(model), [model]);
@@ -100,7 +104,9 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   const docsAvailable = !!docsCls && !!docPath;
   const inheritedProps = Object.values(td.inheritedPropertyDefinitions ?? {});
   const oneOfSets = td.propertyDefinitionsOneOf ?? [];
-  const existingNames = [...ownProps, ...inheritedProps].map((p) => p.name);
+  const oneOfGroupOf: Record<string, number> = {};
+  oneOfSets.forEach((set, i) => Object.keys(set).forEach((n) => (oneOfGroupOf[n] = i)));
+  const existingNames = [...ownProps, ...inheritedProps, ...oneOfSets.flatMap((s) => Object.values(s))].map((p) => p.name);
 
   const toggle = (name: string) =>
     setExpanded((prev) => {
@@ -121,19 +127,67 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     }
   };
 
+  // @oneOf membership isn't expressible through the migration op vocabulary —
+  // rewrite the class document directly (same path as the raw/docs editors).
+  const applyFieldDoc = async (mutate: (doc: Record<string, unknown>, segs: Record<string, unknown>[]) => void, message: string) => {
+    if (!docsCls || !docPath) {
+      dispatch(notify({ severity: "error", title: t("model.field.oneOfFailed"), message: t("model.field.oneOfNoDoc") }));
+      return;
+    }
+    const doc = JSON.parse(JSON.stringify(docsCls)) as Record<string, unknown>;
+    const rawOneOf = doc["@oneOf"];
+    const segs = (Array.isArray(rawOneOf) ? rawOneOf : rawOneOf && typeof rawOneOf === "object" ? [rawOneOf] : []) as Record<string, unknown>[];
+    mutate(doc, segs);
+    const nonempty = segs.filter((s) => Object.keys(s).length > 0);
+    if (nonempty.length) doc["@oneOf"] = nonempty;
+    else delete doc["@oneOf"];
+    try {
+      await replaceSchemaDocument({
+        path: docPath,
+        id: elementId,
+        document: doc as SchemaClass,
+        author: username,
+        message,
+      }).unwrap();
+    } catch (err) {
+      const detail = describeApiError(err);
+      dispatch(notify({ severity: "error", title: detail.type ?? t("model.field.oneOfFailed"), message: detail.message, detailsJson: detail.detailsJson }));
+    }
+  };
+
   const saveField = (draft: FieldDraft, originalName?: string) => {
     setAdding(false);
     setEditingName(null);
+    const origGroup = originalName !== undefined ? oneOfGroupOf[originalName] : undefined;
+    if (origGroup !== undefined || draft.oneOfGroup !== undefined) {
+      const spec = specOf(draft.prop);
+      const origProp = origGroup !== undefined ? oneOfSets[origGroup]?.[originalName!] : undefined;
+      if (origProp && originalName === draft.name && origGroup === draft.oneOfGroup && specsEqual(specOf(origProp), spec)) return;
+      void (async () => {
+        if (draft.newClass) {
+          await applyMigration({
+            path: schemaPath,
+            elementId,
+            ops: [migOps.createClass(newClassDoc(draft.newClass.id, draft.newClass.kind))],
+          });
+        }
+        await applyFieldDoc((doc, segs) => {
+          const removeName = originalName ?? draft.name;
+          delete doc[removeName];
+          for (const seg of segs) delete seg[removeName];
+          if (draft.oneOfGroup !== undefined) {
+            while (segs.length <= draft.oneOfGroup) segs.push({});
+            segs[draft.oneOfGroup][draft.name] = spec;
+          } else {
+            doc[draft.name] = spec;
+          }
+        }, `model: field ${elementId}.${draft.name}`);
+      })();
+      return;
+    }
     const operations: MigrationOp[] = [];
     if (draft.newClass) {
-      operations.push(
-        migOps.createClass({
-          "@type": "Class",
-          "@id": draft.newClass.id,
-          "@key": { "@type": "Random" },
-          ...(draft.newClass.subdocument && { "@subdocument": [] }),
-        })
-      );
+      operations.push(migOps.createClass(newClassDoc(draft.newClass.id, draft.newClass.kind)));
     }
     const after = {
       ...(originalName && originalName !== draft.name ? { renames: [{ from: originalName, to: draft.name }] } : {}),
@@ -145,6 +199,13 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   };
 
   const deleteField = (prop: TypePropertyDefinition) => {
+    if (oneOfGroupOf[prop.name] !== undefined) {
+      void applyFieldDoc((doc, segs) => {
+        delete doc[prop.name];
+        for (const seg of segs) delete seg[prop.name];
+      }, `model: delete ${elementId}.${prop.name}`);
+      return;
+    }
     commitOps(diffClassToOps(elementId, td, {
       propertyDefinitions: Object.fromEntries(
         Object.entries(td.propertyDefinitions ?? {}).filter(([k]) => k !== prop.name)
@@ -174,7 +235,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     return distinct.length > 1 ? distinct.length : 0;
   };
 
-  const renderRow = (p: TypePropertyDefinition, inherited: boolean) => {
+  const renderRow = (p: TypePropertyDefinition, inherited: boolean, oneOfGroup?: number) => {
     const target = linkedTargetOf(p, model);
     const targetTd = target ? model[target.id]?.typeDefinition : undefined;
     const expandable = !!target && !!targetTd && !pathIds.includes(target.id);
@@ -275,6 +336,8 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
               targetId={elementId}
               existingNames={existingNames}
               initial={{ ...p, originalName: p.name }}
+              oneOfCount={oneOfSets.length}
+              oneOfGroup={oneOfGroup}
               onSave={(d) => saveField(d, p.name)}
               onCancel={() => setEditingName(null)}
             />
@@ -319,7 +382,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
         {oneOfSets.map((fieldSet, i) => (
           <li key={`oneof-${i}`} className="border-b border-gray-100 px-2 py-1 dark:border-gray-800">
             <div className="text-[10px] font-semibold tracking-wide text-gray-400 uppercase">⨁ {t("model.field.oneOfSet", { index: i + 1 })}</div>
-            <ul>{Object.values(fieldSet).map((p) => renderRow(p, false))}</ul>
+            <ul>{Object.values(fieldSet).map((p) => renderRow(p, false, i))}</ul>
           </li>
         ))}
         {inheritedProps.length > 0 && (
@@ -355,7 +418,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
       )}
       {adding && (
         <div className="mt-1 px-2 pb-2">
-          <FieldEditRow model={model} targetId={elementId} existingNames={existingNames} onSave={(d) => saveField(d)} onCancel={() => setAdding(false)} />
+          <FieldEditRow model={model} targetId={elementId} existingNames={existingNames} oneOfCount={oneOfSets.length} onSave={(d) => saveField(d)} onCancel={() => setAdding(false)} />
         </div>
       )}
       {docsFor && docsCls && docPath && (

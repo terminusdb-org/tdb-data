@@ -17,7 +17,7 @@ export const zebraToOthersMapping: ZebraToOthersMapping = {
   decimal: {
     jsonSchema: {
       type: "string",
-      pattern: "^-?[0-9]+(\\.[0-9]+)?$",
+      pattern: String.raw`^-?[0-9]+(\.[0-9]+)?$`,
     },
     tdb: "xsd:decimal",
   },

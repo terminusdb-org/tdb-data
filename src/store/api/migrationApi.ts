@@ -61,7 +61,8 @@ export const migrationApi = baseApi.injectEndpoints({
               for (const op of params.operations) {
                 if (op["@type"] === "CreateClass") {
                   const doc = op.class_document as Record<string, unknown>;
-                  const id = String(doc["@id"] ?? "");
+                  const rawId = doc["@id"];
+                  const id = typeof rawId === "string" ? rawId : "";
                   if (id && !draft.some((c) => c["@id"] === id)) {
                     draft.push({ "@id": id, "@type": doc["@type"] ?? "Class", ...doc } as (typeof draft)[number]);
                   }

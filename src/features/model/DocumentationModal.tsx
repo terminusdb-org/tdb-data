@@ -8,20 +8,26 @@ import { asArray, readPropDocs, readTypeDocs, withDocumentation, type Documentat
 import type { SchemaClass } from "@/types/terminusdb";
 
 interface Props {
-  open: boolean;
+  readonly open: boolean;
   /** Raw class document whose @documentation is edited. */
-  cls: SchemaClass;
+  readonly cls: SchemaClass;
   /** Field name — when set, edits that field's docs instead of type docs. */
-  propName?: string;
-  docPath: string;
-  onClose: () => void;
+  readonly propName?: string;
+  readonly docPath: string;
+  readonly onClose: () => void;
 }
 
-interface Row {
+interface DocFields {
   lang: string;
   label: string;
   comment: string;
 }
+
+interface Row extends DocFields {
+  id: number;
+}
+
+let nextRowId = 0;
 
 const inputCls =
   "w-full rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100";
@@ -37,7 +43,7 @@ export function DocumentationModal({ open, cls, propName, docPath, onClose }: Pr
   const username = useAppSelector((s) => s.auth.username ?? "admin");
   const [replaceSchemaDocument] = useReplaceSchemaDocumentMutation();
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
-  const [defaultDoc, setDefaultDoc] = useState<Row>({ lang: "", label: "", comment: "" });
+  const [defaultDoc, setDefaultDoc] = useState<DocFields>({ lang: "", label: "", comment: "" });
   // Engine rule (api:NoLanguageTagForMultilingual): once any entry carries
   // @language, every entry must have one — the default entry then needs an
   // explicit tag. Left empty so the user picks rather than silently becoming "en".
@@ -52,7 +58,7 @@ export function DocumentationModal({ open, cls, propName, docPath, onClose }: Pr
     const docs: DocumentationSet = propName ? readPropDocs(cls, propName) : readTypeDocs(cls);
     setDefaultDoc({ lang: "", label: docs.default.label ?? "", comment: docs.default.comment ?? "" });
     setRows(
-      Object.entries(docs.translations).map(([lang, d]) => ({ lang, label: d.label ?? "", comment: d.comment ?? "" }))
+      Object.entries(docs.translations).map(([lang, d]) => ({ id: nextRowId++, lang, label: d.label ?? "", comment: d.comment ?? "" }))
     );
     setDefaultLang("");
     setError(null);
@@ -166,7 +172,7 @@ export function DocumentationModal({ open, cls, propName, docPath, onClose }: Pr
           <p className="text-xs text-gray-500 italic">{t("model.docs.multilingualHint")}</p>
         )}
         {rows.map((row, i) => (
-          <div key={i}>
+          <div key={row.id}>
             <div className="flex items-center gap-2">
               <input className={langCls} value={row.lang} placeholder="en" aria-label={t("model.docs.lang")} onChange={(e) => updateRow(i, { lang: e.target.value })} />
               <input className={labelCls} value={row.label} placeholder={t("model.docs.label")} aria-label={`${t("model.docs.label")} ${row.lang}`} onChange={(e) => updateRow(i, { label: e.target.value })} />
@@ -178,7 +184,7 @@ export function DocumentationModal({ open, cls, propName, docPath, onClose }: Pr
           </div>
         ))}
       </div>
-      <button type="button" className="rounded border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500 hover:border-sky-400 dark:border-gray-600" onClick={() => setRows((r) => [...r, { lang: "", label: "", comment: "" }])}>
+      <button type="button" className="rounded border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500 hover:border-sky-400 dark:border-gray-600" onClick={() => setRows((r) => [...r, { id: nextRowId++, lang: "", label: "", comment: "" }])}>
         {t("model.docs.addLang")}
       </button>
       {error && (

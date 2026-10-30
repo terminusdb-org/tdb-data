@@ -90,6 +90,25 @@ const langDocToTerminus = (d: LangDoc): Record<string, string> | undefined => {
  * the doc still has an untagged entry, the untagged entry is retagged to
  * `defaultLang` so its remaining content survives under that language.
  */
+// Retag the single untagged entry to `defaultLang` — required by the engine's
+// no-mixing rule when an update goes multilingual — and verify no language
+// ends up with duplicate entries.
+const retagUntagged = (entries: DocEntry[], defaultLang: string | undefined): DocEntry[] => {
+  const untagged = entries.filter((e) => e["@language"] === undefined);
+  if (untagged.length > 1) throw new Error("Internal error: multiple untagged @documentation entries");
+  if (!defaultLang) throw new Error("Internal error: multilingual @documentation update requires defaultLang to retag the untagged entry");
+  const retagged = entries.map((e) => (e["@language"] === undefined ? { ...e, "@language": defaultLang } : e));
+  const langs = new Set<string>();
+  for (const e of retagged) {
+    const l = e["@language"];
+    if (typeof l === "string") {
+      if (langs.has(l)) throw new Error(`Internal error: duplicate @documentation language "${l}"`);
+      langs.add(l);
+    }
+  }
+  return retagged;
+};
+
 export const withDocumentation = (
   cls: SchemaClass,
   update: { typeDocs?: DocumentationSet; propName?: string; propDocs?: DocumentationSet; defaultLang?: string }
@@ -100,33 +119,22 @@ export const withDocumentation = (
   const multilingual = wantedLangs.size > 0;
 
   const rawEntries = asArray(cls["@documentation"]);
-  const untagged = rawEntries.filter((e) => e["@language"] === undefined);
-  let entries = rawEntries;
-  if (multilingual && untagged.length > 0) {
-    if (untagged.length > 1) throw new Error("Internal error: multiple untagged @documentation entries");
-    if (!update.defaultLang) throw new Error("Internal error: multilingual @documentation update requires defaultLang to retag the untagged entry");
-    entries = rawEntries.map((e) => (e["@language"] === undefined ? { ...e, "@language": update.defaultLang } : e));
-    const langs = new Set<string>();
-    for (const e of entries) {
-      const l = e["@language"];
-      if (typeof l === "string") {
-        if (langs.has(l)) throw new Error(`Internal error: duplicate @documentation language "${l}"`);
-        langs.add(l);
-      }
-    }
-  }
+  const entries =
+    multilingual && rawEntries.some((e) => e["@language"] === undefined)
+      ? retagUntagged(rawEntries, update.defaultLang)
+      : rawEntries;
+
+  // A retagged (former default) entry takes docs.default unless it is blank,
+  // in which case the caller-provided translations[defaultLang] applies.
+  const docFor = (lang: string | undefined): LangDoc | undefined => {
+    if (!docs) return undefined;
+    if (lang === update.defaultLang && !isBlank(docs.default)) return docs.default;
+    return lang ? docs.translations[lang] : docs.default;
+  };
 
   const applyTo = (e: DocEntry, lang: string | undefined): DocEntry => {
     const next = { ...e };
-    // A retagged (former default) entry takes docs.default unless it is blank,
-    // in which case the caller-provided translations[defaultLang] applies.
-    const d = docs
-      ? lang === update.defaultLang && !isBlank(docs.default)
-        ? docs.default
-        : lang
-          ? docs.translations[lang]
-          : docs.default
-      : undefined;
+    const d = docFor(lang);
     if (update.typeDocs) {
       const td = langDocToTerminus(d ?? {});
       delete next["@label"];

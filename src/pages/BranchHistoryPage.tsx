@@ -22,6 +22,15 @@ const iconBtn =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:border-dfrntBlue-300 hover:bg-dfrntBlue-50 hover:text-dfrntBlue-700 focus:outline-none focus:ring-2 focus:ring-dfrntBlue-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-400";
 
 const svgIcon = "h-3.5 w-3.5";
+
+// Popup nudge in % of its own width: left-aligned at the bar's left edge,
+// right-aligned at the right edge, centred anywhere else.
+const popupShift = (pos: number): number => {
+  if (pos < 0.15) return 0;
+  if (pos > 0.85) return -100;
+  return -50;
+};
+
 const svgProps = {
   "aria-hidden": true,
   viewBox: "0 0 16 16",
@@ -586,24 +595,25 @@ export const BranchHistoryPage: React.FC = () => {
     setRangeError(null);
     const ts = ms / 1000;
     const iso = new Date(ms).toISOString();
-    if (edge === "axisLo" || edge === "axisHi") {
-      // Endpoint edits always retarget the corresponding fetch bound.
-      if (edge === "axisHi") {
-        if (endIso && endIso > iso) {
-          setRangeError(t("branchHistory.rangeOrderError"));
-          return;
-        }
-        writeBounds(endIso, iso);
-      } else {
-        if (anchorIso && iso > anchorIso) {
-          setRangeError(t("branchHistory.rangeOrderError"));
-          return;
-        }
-        writeBounds(iso, anchorIso);
+
+    // A bound edit that violates the ordering constraint surfaces, never
+    // applies. Upper bounds (axisHi, newest) compare against endIso, lower
+    // bounds (axisLo, oldest) against anchorIso.
+    const retargetBound = (upper: boolean) => {
+      const bound = upper ? endIso : anchorIso;
+      if (bound && (upper ? bound > iso : bound < iso)) {
+        setRangeError(t("branchHistory.rangeOrderError"));
+        return;
       }
-      return;
-    }
+      if (upper) writeBounds(endIso, iso);
+      else writeBounds(iso, anchorIso);
+    };
+
+    // Endpoint edits always retarget the corresponding fetch bound.
+    if (edge === "axisLo" || edge === "axisHi") return retargetBound(edge === "axisHi");
+
     if (timeAxis && ts >= axisLo && ts <= axisHi) {
+      // Inside the loaded range the edge moves to that exact time (wl/wr).
       if (edge === "newest") {
         if (ts <= effWl) {
           setRangeError(t("branchHistory.rangeOrderError"));
@@ -619,19 +629,9 @@ export const BranchHistoryPage: React.FC = () => {
       }
       return;
     }
-    if (edge === "newest") {
-      if (endIso && endIso > iso) {
-        setRangeError(t("branchHistory.rangeOrderError"));
-        return;
-      }
-      writeBounds(endIso, iso);
-    } else {
-      if (anchorIso && iso > anchorIso) {
-        setRangeError(t("branchHistory.rangeOrderError"));
-        return;
-      }
-      writeBounds(iso, anchorIso);
-    }
+    // Outside the loaded range the edit becomes a fetch bound so the server
+    // loads that edge.
+    retargetBound(edge === "newest");
   };
 
   const initialHasMore = (initialData?.commits.length ?? 0) > INITIAL_COUNT;
@@ -885,7 +885,7 @@ export const BranchHistoryPage: React.FC = () => {
                         <div
                           className="whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] leading-snug shadow-md"
                           style={{
-                            transform: `translateX(${timeAxis.bands[hoverBand].pos < 0.15 ? 0 : timeAxis.bands[hoverBand].pos > 0.85 ? -100 : -50}%)`,
+                            transform: `translateX(${popupShift(timeAxis.bands[hoverBand].pos)}%)`,
                           }}
                         >
                           <div className="font-medium text-gray-800">
@@ -1039,15 +1039,14 @@ export const BranchHistoryPage: React.FC = () => {
               {visibleCommits.map((entry, idx) => {
                 const isLatest = entry.identifier === mergedCommits[0]?.identifier;
                 const isCurrent = currentCommitId === entry.identifier;
+                let dotCls = "border-gray-300 bg-white";
+                if (isCurrent) dotCls = "border-amber-500 bg-amber-100";
+                else if (isLatest) dotCls = "border-dfrntBlue-500 bg-dfrntBlue-100";
                 return (
                   <div key={entry.identifier} className="relative flex gap-4 pb-6">
                     {/* Timeline line and dot */}
                     <div className="flex flex-col items-center">
-                      <div
-                        className={`mt-1 h-3 w-3 rounded-full border-2 ${
-                          isCurrent ? "border-amber-500 bg-amber-100" : isLatest ? "border-dfrntBlue-500 bg-dfrntBlue-100" : "border-gray-300 bg-white"
-                        }`}
-                      />
+                      <div className={`mt-1 h-3 w-3 rounded-full border-2 ${dotCls}`} />
                       {idx < visibleCommits.length - 1 && (
                         <div className="mt-1 w-0.5 flex-1 bg-gray-200" />
                       )}

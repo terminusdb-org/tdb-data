@@ -1,4 +1,5 @@
 import { baseApi } from "../baseApi";
+import { schemaApi } from "./schemaApi";
 import type { MigrationOp } from "@/lib/schemaModel/migrationOps";
 
 export interface MigrationResponse {
@@ -42,6 +43,40 @@ export const migrationApi = baseApi.injectEndpoints({
         };
       },
       invalidatesTags: (_result, _error, params) => (params.dryRun ? [] : ["Schema", "Frame", "Prefixes"]),
+      // The invalidation refetch is async — patch the schema cache on success so
+      // the taxonomy shows class create/delete/rename instantly.
+      onQueryStarted: async (params, { dispatch, getState, queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch {
+          return;
+        }
+        if (params.dryRun) return;
+        const schemaPath = params.path.replace("/api/migration/", "/api/schema/");
+        const cached = schemaApi.util.selectCachedArgsForQuery(getState(), "getSchema");
+        for (const args of cached) {
+          if (args.path !== schemaPath) continue;
+          dispatch(
+            schemaApi.util.updateQueryData("getSchema", args, (draft) => {
+              for (const op of params.operations) {
+                if (op["@type"] === "CreateClass") {
+                  const doc = op.class_document as Record<string, unknown>;
+                  const id = String(doc["@id"] ?? "");
+                  if (id && !draft.some((c) => c["@id"] === id)) {
+                    draft.push({ "@id": id, "@type": doc["@type"] ?? "Class", ...doc } as (typeof draft)[number]);
+                  }
+                } else if (op["@type"] === "DeleteClass") {
+                  const i = draft.findIndex((c) => c["@id"] === op.class);
+                  if (i >= 0) draft.splice(i, 1);
+                } else if (op["@type"] === "MoveClass") {
+                  const c = draft.find((c) => c["@id"] === op.from);
+                  if (c) (c as Record<string, unknown>)["@id"] = String(op.to);
+                }
+              }
+            })
+          );
+        }
+      },
     }),
 
     // Pre-flight: runs the document write in a discarded transaction (check=true).

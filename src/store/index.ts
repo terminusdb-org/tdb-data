@@ -57,7 +57,7 @@ export {
   useCandidatesMutation,
 } from "./api/searchApi";
 
-export { useRunWoqlMutation } from "./api/woqlApi";
+export { useRunWoqlMutation, useGetDocumentIdsByPrefixQuery } from "./api/woqlApi";
 export { useRunGraphqlMutation, useGraphqlDocumentCountQuery } from "./api/graphqlApi";
 export { useGetDatabasesQuery } from "./api/dbApi";
 export type { DatabaseEntry } from "./api/dbApi";

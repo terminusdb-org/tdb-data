@@ -10,6 +10,7 @@ export interface GetDocumentsParams {
   readonly graphType?: "instance" | "schema";
   readonly type?: string;
   readonly id?: string;
+  readonly ids?: readonly string[];
   readonly skip?: number;
   readonly count?: number;
   readonly asList?: boolean;
@@ -31,6 +32,8 @@ export const documentApi = baseApi.injectEndpoints({
         if (params.minimized !== undefined) searchParams.set("minimized", String(params.minimized));
         if (params.unfold !== undefined) searchParams.set("unfold", String(params.unfold));
         if (params.rawJson) searchParams.set("raw_json", "true");
+        // ids is a JSON-encoded list on the wire — the engine parses it.
+        if (params.ids && params.ids.length > 0) searchParams.set("ids", JSON.stringify(params.ids));
         searchParams.set("compress_ids", "true");
         const qs = [searchParams.toString(), params.id ? `id=${normalizeDocId(params.id)}` : ""]
           .filter(Boolean)

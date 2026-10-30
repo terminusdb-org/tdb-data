@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly } from "@/store";
+import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly, useGetDocumentIdsByPrefixQuery, useGetSchemaQuery } from "@/store";
 import { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, ConfirmDialog } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { TerminusDBDocument, PageSizes } from "@/types/terminusdb";
@@ -44,6 +44,35 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   const [deleteDoc] = useDeleteDocumentMutation();
 
   const docPath = buildApiPath(routeParams, "document");
+  const schemaPath = buildApiPath(routeParams, "schema");
+  const woqlPath = buildApiPath(routeParams, "woql");
+
+  // Debounce the prefix filter so typing doesn't fire a WOQL per keystroke.
+  const [activeFilter, setActiveFilter] = useState("");
+  useEffect(() => {
+    const handle = setTimeout(() => setActiveFilter(idFilter.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [idFilter]);
+
+  // Relative prefixes expand under the context @base; a full IRI goes through
+  // as-is (handled inside getDocumentIdsByPrefix).
+  const { data: schemaDocs } = useGetSchemaQuery({ path: schemaPath, asList: true }, { skip: !schemaPath });
+  const docBase = useMemo(() => {
+    const ctx = schemaDocs?.find((d) => d["@id"] === "@context") as Record<string, unknown> | undefined;
+    return typeof ctx?.["@base"] === "string" ? ctx["@base"] : "terminusdb:///data/";
+  }, [schemaDocs]);
+
+  const { data: matchingIds, refetch: refetchIds } = useGetDocumentIdsByPrefixQuery(
+    { path: woqlPath, base: docBase, prefix: activeFilter, type: "sys:JSONDocument" },
+    { skip: !activeFilter }
+  );
+
+  // Filtered mode: page over the matching ids, then fetch just that slice of
+  // documents by id. Unfiltered mode: the paged listing as before.
+  const pageIds = useMemo(
+    () => (activeFilter ? (matchingIds ?? []).slice(page * pageSize, (page + 1) * pageSize) : []),
+    [activeFilter, matchingIds, page, pageSize]
+  );
 
   const { data: documentsData, isLoading: loading, refetch } = useGetDocumentsQuery(
     {
@@ -54,16 +83,35 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
       skip: page * pageSize,
       count: pageSize,
     },
-    { skip: !docPath }
+    { skip: !docPath || !!activeFilter }
   );
 
-  const allDocs: TerminusDBDocument[] = useMemo(() =>
-    Array.isArray(documentsData) ? documentsData : documentsData ? [documentsData] : [],
-    [documentsData]
+  const { data: filteredData, isLoading: loadingFiltered, refetch: refetchFiltered } = useGetDocumentsQuery(
+    {
+      path: docPath,
+      rawJson: true,
+      asList: true,
+      type: "sys:JSONDocument",
+      ids: pageIds,
+    },
+    { skip: !activeFilter || pageIds.length === 0 }
   );
-  const documents = idFilter.trim()
-    ? allDocs.filter((d) => (d["@id"] ?? "").startsWith(idFilter.trim()))
-    : allDocs;
+
+  const docsSource = activeFilter ? filteredData : documentsData;
+  const isLoadingDocs = activeFilter ? loadingFiltered : loading;
+  const refetchAll = () => {
+    refetch();
+    if (activeFilter) {
+      refetchIds();
+      refetchFiltered();
+    }
+  };
+
+  const allDocs: TerminusDBDocument[] = useMemo(() =>
+    Array.isArray(docsSource) ? docsSource : docsSource ? [docsSource] : [],
+    [docsSource]
+  );
+  const documents = allDocs;
 
   const handleNewDocSave = async () => {
     if (!newDocValid) return;
@@ -83,7 +131,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
       setNewDocText("{}");
       setUseCustomId(false);
       setCustomId("");
-      refetch();
+      refetchAll();
     } catch (err) {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
@@ -123,7 +171,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
         author: username,
         message: t("rawJson.updatedViaRawJson"),
       }).unwrap();
-      refetch();
+      refetchAll();
     } catch (err) {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
@@ -157,7 +205,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
     try {
       await deleteDoc({ path: docPath, id, author: username, message: t("rawJson.deletedViaRawJson") }).unwrap();
       if (expandedId === id) setExpandedId(null);
-      refetch();
+      refetchAll();
     } catch (err) {
       if (err && typeof err === "object" && "data" in err) {
         const data = (err as { data: unknown }).data;
@@ -309,7 +357,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
             <button
               type="button"
               onClick={() => setPage(page + 1)}
-              disabled={documents.length < pageSize}
+              disabled={activeFilter ? (page + 1) * pageSize >= (matchingIds?.length ?? 0) : documents.length < pageSize}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
               {t("common.next")}
@@ -330,7 +378,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
         {deleteError && (
           <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-600">{deleteError}</div>
         )}
-        {loading ? (
+        {isLoadingDocs ? (
           <PagePlaceholder>{t("common.loading")}</PagePlaceholder>
         ) : documents.length === 0 ? (
           <PagePlaceholder>{t("rawJson.noDocuments")}</PagePlaceholder>

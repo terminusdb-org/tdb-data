@@ -236,4 +236,84 @@ describe("exampleFromJsonSchema", () => {
       expect(out.e).toEqual({ "@type": "Empty", "@id": "Empty/Example" });
     });
   });
+
+  describe("class links", () => {
+    // A typed ref under upsert creates the implied document — it must be a
+    // complete, valid document. Links therefore expand to a full example doc
+    // with every schema field; a link to a class already emitted in the write
+    // (self-links, repeats, cycles) becomes a ref to that doc's id.
+    const mtxModel: SchemaModel = {
+      Mtx: {
+        id: "Mtx",
+        label: "Mtx",
+        description: "",
+        type: "type",
+        typeDefinition: {
+          id: "Mtx",
+          type: "type",
+          propertyDefinitions: {
+            t1: { name: "t1", type: "string", multiplicity: "Mandatory" },
+            f37: { name: "f37", type: "linkedType", multiplicity: "Optional", linkedType: "Mtx" },
+            f11: { name: "f11", type: "linkedTrait", multiplicity: "List", linkedTrait: "MtxSub" },
+          },
+        },
+      },
+      MtxSub: {
+        id: "MtxSub",
+        label: "MtxSub",
+        description: "",
+        type: "trait",
+        typeDefinition: {
+          id: "MtxSub",
+          type: "trait",
+          propertyDefinitions: { city: { name: "city", type: "string", multiplicity: "Mandatory" } },
+        },
+      },
+    };
+    const linkNode = (classId: string) => ({ type: "string", "x-terminusdb": { link: classId } });
+
+    it("expands a linked class into a complete document with its fields", () => {
+      const out = exampleFromJsonSchema(
+        {
+          type: "object",
+          "x-terminusdb": { type_choices: ["Holder"] },
+          properties: { "@id": { type: "string" }, "@type": { type: "string" }, link: linkNode("Mtx") },
+        },
+        mtxModel
+      ) as Record<string, Record<string, unknown>>;
+      expect(out.link["@type"]).toBe("Mtx");
+      expect(out.link.t1).toBe("example t1");
+      // linkedTrait is a subdocument — embedded inline, no fabricated @id.
+      expect(out.link.f11).toEqual([{ "@type": "MtxSub", city: "example city" }]);
+      // The expanded doc's self-link points back at itself as a bare id
+      // string — a typed {@type,@id} object would upsert an empty document.
+      expect(out.link.f37).toBe("Mtx/Example");
+    });
+
+    it("points a self-link at the root document's id", () => {
+      const out = exampleFromJsonSchema(
+        {
+          type: "object",
+          "x-terminusdb": { type_choices: ["Mtx"] },
+          properties: { "@id": { type: "string" }, "@type": { type: "string" }, f37: linkNode("Mtx") },
+        },
+        mtxModel
+      ) as Record<string, Record<string, unknown>>;
+      expect(out["@id"]).toBe("Mtx/Example");
+      expect(out.f37).toBe("Mtx/Example");
+    });
+
+    it("points a repeated link at the emitted doc as a bare id string", () => {
+      const out = exampleFromJsonSchema(
+        {
+          type: "object",
+          "x-terminusdb": { type_choices: ["Holder"] },
+          properties: { "@id": { type: "string" }, "@type": { type: "string" }, a: linkNode("Mtx"), b: linkNode("Mtx") },
+        },
+        mtxModel
+      ) as Record<string, Record<string, unknown>>;
+      expect(out.b).toBe("Mtx/Example");
+      expect(out.a["@id"]).toBe("Mtx/Example");
+    });
+  });
 });

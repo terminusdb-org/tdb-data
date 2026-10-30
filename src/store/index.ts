@@ -19,6 +19,8 @@ export { baseApi } from "./baseApi";
 
 export {
   useGetDocumentsQuery,
+  useGetDocumentIdsQuery,
+  useGetDocumentCountQuery,
   useGetDocumentQuery,
   useGetEmbeddingTextQuery,
   useGetMarkdownTextQuery,
@@ -57,7 +59,7 @@ export {
   useCandidatesMutation,
 } from "./api/searchApi";
 
-export { useRunWoqlMutation, useGetDocumentIdsByPrefixQuery } from "./api/woqlApi";
+export { useRunWoqlMutation } from "./api/woqlApi";
 export { useRunGraphqlMutation, useGraphqlDocumentCountQuery } from "./api/graphqlApi";
 export { useGetDatabasesQuery } from "./api/dbApi";
 export type { DatabaseEntry } from "./api/dbApi";

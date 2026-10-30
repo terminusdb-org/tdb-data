@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useGetDocumentsQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly, useGetDocumentIdsByPrefixQuery, useGetSchemaQuery } from "@/store";
+import { useGetDocumentsQuery, useGetDocumentIdsQuery, useGetDocumentCountQuery, useInsertRawJsonDocumentMutation, useReplaceRawJsonDocumentMutation, useDeleteDocumentMutation, useAppSelector, useAppDispatch, addToWorkingSet, setProjectionSelectionIds, setProjectSelectionOnly } from "@/store";
 import { PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, ConfirmDialog } from "@/components";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import type { TerminusDBDocument, PageSizes } from "@/types/terminusdb";
@@ -44,34 +44,33 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   const [deleteDoc] = useDeleteDocumentMutation();
 
   const docPath = buildApiPath(routeParams, "document");
-  const schemaPath = buildApiPath(routeParams, "schema");
-  const woqlPath = buildApiPath(routeParams, "woql");
 
-  // Debounce the prefix filter so typing doesn't fire a WOQL per keystroke.
+  // Debounce the prefix filter so typing doesn't refetch per keystroke.
   const [activeFilter, setActiveFilter] = useState("");
   useEffect(() => {
     const handle = setTimeout(() => setActiveFilter(idFilter.trim()), 300);
     return () => clearTimeout(handle);
   }, [idFilter]);
 
-  // Relative prefixes expand under the context @base; a full IRI goes through
-  // as-is (handled inside getDocumentIdsByPrefix).
-  const { data: schemaDocs } = useGetSchemaQuery({ path: schemaPath, asList: true }, { skip: !schemaPath });
-  const docBase = useMemo(() => {
-    const ctx = schemaDocs?.find((d) => d["@id"] === "@context") as Record<string, unknown> | undefined;
-    return typeof ctx?.["@base"] === "string" ? ctx["@base"] : "terminusdb:///data/";
-  }, [schemaDocs]);
-
-  const { data: matchingIds, refetch: refetchIds } = useGetDocumentIdsByPrefixQuery(
-    { path: woqlPath, base: docBase, prefix: activeFilter, type: "sys:JSONDocument" },
-    { skip: !activeFilter }
+  // Filtered mode: the document API's format=ids streams the succinct-
+  // dictionary range for the IRI prefix (relative prefixes expand under the
+  // database's own @context; full IRIs pass through). skip/count page the id
+  // stream server-side; the same selector with counted gives the total.
+  const { data: pageIds, refetch: refetchIds } = useGetDocumentIdsQuery(
+    {
+      path: docPath,
+      idPrefix: activeFilter,
+      type: "sys:JSONDocument",
+      skip: page * pageSize,
+      count: pageSize,
+      asList: true,
+    },
+    { skip: !docPath || !activeFilter }
   );
 
-  // Filtered mode: page over the matching ids, then fetch just that slice of
-  // documents by id. Unfiltered mode: the paged listing as before.
-  const pageIds = useMemo(
-    () => (activeFilter ? (matchingIds ?? []).slice(page * pageSize, (page + 1) * pageSize) : []),
-    [activeFilter, matchingIds, page, pageSize]
+  const { data: filteredTotal } = useGetDocumentCountQuery(
+    { path: docPath, idPrefix: activeFilter, type: "sys:JSONDocument" },
+    { skip: !docPath || !activeFilter }
   );
 
   const { data: documentsData, isLoading: loading, refetch } = useGetDocumentsQuery(
@@ -92,9 +91,9 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
       rawJson: true,
       asList: true,
       type: "sys:JSONDocument",
-      ids: pageIds,
+      ids: pageIds ?? [],
     },
-    { skip: !activeFilter || pageIds.length === 0 }
+    { skip: !activeFilter || !pageIds || pageIds.length === 0 }
   );
 
   const docsSource = activeFilter ? filteredData : documentsData;
@@ -357,7 +356,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
             <button
               type="button"
               onClick={() => setPage(page + 1)}
-              disabled={activeFilter ? (page + 1) * pageSize >= (matchingIds?.length ?? 0) : documents.length < pageSize}
+              disabled={activeFilter ? (page + 1) * pageSize >= (filteredTotal ?? 0) : documents.length < pageSize}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
               {t("common.next")}

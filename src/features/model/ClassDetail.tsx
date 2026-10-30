@@ -22,6 +22,8 @@ interface Props {
   onTabChange: (tab: string) => void;
   onNavigate: (id: string) => void;
   onNavigateObject: (id: string) => void;
+  /** Navigate to a class on a specific tab — diagram clicks stay in diagram view. */
+  onNavigateTab?: (id: string, tab: string) => void;
   onDeleted: () => void;
   /** Per-class document counts — drives the large-class migration gate. */
   docCounts?: Record<string, number>;
@@ -30,7 +32,7 @@ interface Props {
 type Tab = "fields" | "diagram" | "raw";
 const VALID_TABS: readonly Tab[] = ["fields", "diagram", "raw"];
 
-export function ClassDetail({ model, classes, elementId, schemaPath, docPath, tab: routeTab, onTabChange, onNavigate, onNavigateObject, onDeleted, docCounts }: Props) {
+export function ClassDetail({ model, classes, elementId, schemaPath, docPath, tab: routeTab, onTabChange, onNavigate, onNavigateObject, onNavigateTab, onDeleted, docCounts }: Props) {
   const { t } = useTranslation();
   const td = model[elementId]?.typeDefinition;
   const tab: Tab = VALID_TABS.includes(routeTab as Tab) ? (routeTab as Tab) : "fields";
@@ -61,6 +63,13 @@ export function ClassDetail({ model, classes, elementId, schemaPath, docPath, ta
     const kind = model[id]?.type;
     if (kind === "type" || kind === "trait") onNavigate(id);
     else onNavigateObject(id);
+  };
+
+  // Diagram clicks open the target's diagram (objects have no diagram tab).
+  const handleDiagramNavigate = (id: string) => {
+    const kind = model[id]?.type;
+    if ((kind === "type" || kind === "trait") && onNavigateTab) onNavigateTab(id, "diagram");
+    else handleNavigate(id);
   };
 
   const tabs: { id: Tab; label: string }[] = [
@@ -147,7 +156,7 @@ export function ClassDetail({ model, classes, elementId, schemaPath, docPath, ta
           docCounts={docCounts}
         />
       )}
-      {tab === "diagram" && <MermaidPanel model={model} elementId={elementId} onNavigate={handleNavigate} />}
+      {tab === "diagram" && <MermaidPanel model={model} elementId={elementId} onNavigate={handleDiagramNavigate} />}
       {tab === "raw" && <SchemaRawEditor classes={classes} schemaPath={schemaPath} docPath={docPath} elementId={elementId} />}
       {metaTarget && (
         <MetadataModal

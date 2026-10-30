@@ -237,6 +237,7 @@ export const SchemaPage: React.FC = () => {
             onTabChange={(next) => goClassTab(classId, next)}
             onNavigate={goClass}
             onNavigateObject={goObject}
+            onNavigateTab={goClassTab}
             onDeleted={goHome}
             docCounts={docCounts}
           />

@@ -136,7 +136,10 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     }
     const doc = JSON.parse(JSON.stringify(docsCls)) as Record<string, unknown>;
     const rawOneOf = doc["@oneOf"];
-    const segs = (Array.isArray(rawOneOf) ? rawOneOf : rawOneOf && typeof rawOneOf === "object" ? [rawOneOf] : []) as Record<string, unknown>[];
+    let segs: Record<string, unknown>[];
+    if (Array.isArray(rawOneOf)) segs = rawOneOf;
+    else if (rawOneOf && typeof rawOneOf === "object") segs = [rawOneOf as Record<string, unknown>];
+    else segs = [];
     mutate(doc, segs);
     const nonempty = segs.filter((s) => Object.keys(s).length > 0);
     if (nonempty.length) doc["@oneOf"] = nonempty;
@@ -161,7 +164,8 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     const origGroup = originalName !== undefined ? oneOfGroupOf[originalName] : undefined;
     if (origGroup !== undefined || draft.oneOfGroup !== undefined) {
       const spec = specOf(draft.prop);
-      const origProp = origGroup !== undefined ? oneOfSets[origGroup]?.[originalName!] : undefined;
+      let origProp;
+      if (origGroup !== undefined) origProp = oneOfSets[origGroup]?.[originalName!];
       if (origProp && originalName === draft.name && origGroup === draft.oneOfGroup && specsEqual(specOf(origProp), spec)) return;
       void (async () => {
         if (draft.newClass) {
@@ -189,9 +193,10 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     if (draft.newClass) {
       operations.push(migOps.createClass(newClassDoc(draft.newClass.id, draft.newClass.kind)));
     }
+    const renames = originalName && originalName !== draft.name ? [{ from: originalName, to: draft.name }] : [];
     const after = {
-      ...(originalName && originalName !== draft.name ? { renames: [{ from: originalName, to: draft.name }] } : {}),
       propertyDefinitions: { ...(td.propertyDefinitions ?? {}), [draft.name]: draft.prop },
+      ...(renames.length ? { renames } : {}),
       ...(draft.default && { defaults: { [draft.name]: draft.default } }),
     };
     operations.push(...diffClassToOps(elementId, td, after));
@@ -380,7 +385,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
       <ul>
         {ownProps.map((p) => renderRow(p, false))}
         {oneOfSets.map((fieldSet, i) => (
-          <li key={`oneof-${i}`} className="border-b border-gray-100 px-2 py-1 dark:border-gray-800">
+          <li key={`oneof-${Object.keys(fieldSet).join(",")}`} className="border-b border-gray-100 px-2 py-1 dark:border-gray-800">
             <div className="text-[10px] font-semibold tracking-wide text-gray-400 uppercase">⨁ {t("model.field.oneOfSet", { index: i + 1 })}</div>
             <ul>{Object.values(fieldSet).map((p) => renderRow(p, false, i))}</ul>
           </li>

@@ -66,6 +66,45 @@ const initialTargetKind = (initial?: TypePropertyDefinition): TargetKind => {
   return "primitive";
 };
 
+type PropArgs = {
+  name: string;
+  targetKind: TargetKind;
+  primitive: SupportedZebraTypes;
+  linkedTarget: string;
+  newClassId: string;
+  newTarget?: (typeof NEW_TARGET)[keyof typeof NEW_TARGET];
+  multiplicity: TerminusMultiplicityDefinitions;
+  minCard: string;
+  maxCard: string;
+  dimensions: string;
+  unfold: boolean;
+};
+
+const buildProp = (a: PropArgs): TypePropertyDefinition => {
+  // "Set (Cardinality)" with no bounds collapses to a plain Set.
+  const effMultiplicity: TerminusMultiplicityDefinitions =
+    a.multiplicity === "Cardinality" && !a.minCard && !a.maxCard ? "Set" : a.multiplicity;
+  const linkKind: LinkedKind = a.newTarget ? a.newTarget.link : (a.targetKind as LinkedKind);
+  return {
+    name: a.name,
+    type: a.targetKind === "primitive" ? a.primitive : linkKind,
+    multiplicity: effMultiplicity,
+    ...(a.targetKind === "linkedType" && { linkedType: a.linkedTarget }),
+    ...(a.targetKind === "linkedTrait" && { linkedTrait: a.linkedTarget }),
+    ...(a.targetKind === "linkedEnum" && { linkedEnum: a.linkedTarget }),
+    ...(a.targetKind === "linkedForeign" && { linkedForeign: a.linkedTarget }),
+    ...(a.targetKind === "linkedTaggedUnion" && { linkedTaggedUnion: a.linkedTarget }),
+    ...(a.newTarget && { [a.newTarget.link]: a.newClassId }),
+    ...(effMultiplicity === "Cardinality" && {
+      ...(a.minCard && { minCardinality: Number(a.minCard) }),
+      ...(a.maxCard && { maxCardinality: Number(a.maxCard) }),
+      ...(a.minCard && a.minCard === a.maxCard ? { cardinality: Number(a.minCard) } : {}),
+    }),
+    ...(a.multiplicity === "Array" && { dimensions: Number(a.dimensions) || 1 }),
+    ...(a.unfold && a.targetKind !== "primitive" && { unfold: true }),
+  };
+};
+
 interface Props {
   model: SchemaModel;
   targetId: string;
@@ -98,9 +137,11 @@ export function FieldEditRow({ model, targetId, existingNames, initial, oneOfCou
   const [oneOfSel, setOneOfSel] = useState<string>(oneOfGroup !== undefined ? String(oneOfGroup) : "none");
   const [error, setError] = useState<string | null>(null);
 
-  // Mandatory fields need a default for existing instances; Foreign specs
-  // always need one — the engine rejects a Foreign property created without.
-  const targetNeedsDefault = !initial && (multiplicity === "Mandatory" || targetKind === "linkedForeign" || targetKind === "newForeign");
+  // Mandatory fields need a default for existing instances; a bare Foreign spec
+  // always needs one — the engine rejects a Foreign property created without.
+  // Defaults are migration-time fill values; @oneOf edits go through document
+  // replace, which has no instance migration — no default to collect.
+  const targetNeedsDefault = !initial && oneOfSel === "none" && (multiplicity === "Mandatory" || multiplicity === "Foreign");
   const knownPredicate = predicates[name];
   const predicateSpecs = knownPredicate ? [...new Set(knownPredicate.defs.map((d) => JSON.stringify(d.spec)))] : [];
 
@@ -153,29 +194,9 @@ export function FieldEditRow({ model, targetId, existingNames, initial, oneOfCou
       setError(err);
       return;
     }
-    const isForeign = targetKind === "linkedForeign" || targetKind === "newForeign";
     const newTarget = targetKind in NEW_TARGET ? NEW_TARGET[targetKind as keyof typeof NEW_TARGET] : undefined;
-    // "Set (Cardinality)" with no bounds collapses to a plain Set.
-    const effMultiplicity: TerminusMultiplicityDefinitions =
-      multiplicity === "Cardinality" && !minCard && !maxCard ? "Set" : multiplicity;
-    const prop: TypePropertyDefinition = {
-      name,
-      type: targetKind === "primitive" ? primitive : newTarget ? newTarget.link : (targetKind as LinkedKind),
-      multiplicity: isForeign ? "Foreign" : effMultiplicity,
-      ...(targetKind === "linkedType" && { linkedType: linkedTarget }),
-      ...(targetKind === "linkedTrait" && { linkedTrait: linkedTarget }),
-      ...(targetKind === "linkedEnum" && { linkedEnum: linkedTarget }),
-      ...(targetKind === "linkedForeign" && { linkedForeign: linkedTarget }),
-      ...(targetKind === "linkedTaggedUnion" && { linkedTaggedUnion: linkedTarget }),
-      ...(newTarget && { [newTarget.link]: newClassId }),
-      ...(effMultiplicity === "Cardinality" && {
-        ...(minCard && { minCardinality: Number(minCard) }),
-        ...(maxCard && { maxCardinality: Number(maxCard) }),
-        ...(minCard && minCard === maxCard ? { cardinality: Number(minCard) } : {}),
-      }),
-      ...(multiplicity === "Array" && { dimensions: Number(dimensions) || 1 }),
-      ...(unfold && targetKind !== "primitive" && { unfold: true }),
-    };
+    const prop = buildProp({ name, targetKind, primitive, linkedTarget, newClassId, newTarget, multiplicity, minCard, maxCard, dimensions, unfold });
+    const oneOfGroup = oneOfSel === "new" ? oneOfCount! : Number(oneOfSel);
     onSave({
       name,
       prop,
@@ -183,9 +204,7 @@ export function FieldEditRow({ model, targetId, existingNames, initial, oneOfCou
       ...(newTarget && {
         newClass: { id: newClassId, kind: newTarget.kind },
       }),
-      ...(oneOfSel !== "none" && {
-        oneOfGroup: oneOfSel === "new" ? oneOfCount! : Number(oneOfSel),
-      }),
+      ...(oneOfSel !== "none" && { oneOfGroup }),
     });
   };
 
@@ -205,14 +224,15 @@ export function FieldEditRow({ model, targetId, existingNames, initial, oneOfCou
           aria-label={t("model.field.name")}
         />
         <datalist id={`predicates-${targetId}`}>
-          {Object.keys(predicates).sort().map((p) => (
+          {Object.keys(predicates).sort((a, b) => a.localeCompare(b)).map((p) => (
             <option key={p} value={p} />
           ))}
         </datalist>
-        <select value={multiplicity} onChange={(e) => setMultiplicity(e.target.value as TerminusMultiplicityDefinitions)} className={`${selectCls} w-full sm:w-auto`} aria-label={t("model.field.multiplicity")} disabled={targetKind === "linkedForeign" || targetKind === "newForeign"}>
+        <select value={multiplicity} onChange={(e) => setMultiplicity(e.target.value as TerminusMultiplicityDefinitions)} className={`${selectCls} w-full sm:w-auto`} aria-label={t("model.field.multiplicity")}>
           {MULTIPLICITIES.map((m) => (
             <option key={m} value={m}>{MULT_LABEL[m] ?? m}</option>
           ))}
+          {multiplicity === "Foreign" && <option value="Foreign">Foreign</option>}
         </select>
         <select
           value={targetKind}

@@ -229,7 +229,7 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
           <button
             type="button"
             className="mr-auto rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
-            onClick={() => setText(JSON.stringify(exampleFromJsonSchema(strict), null, 2))}
+            onClick={() => setText(JSON.stringify(exampleFromJsonSchema(strict, model), null, 2))}
           >
             {t("model.preflight.generateExample")}
           </button>

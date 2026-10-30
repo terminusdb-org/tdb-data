@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { exampleFromJsonSchema } from "./exampleDocument";
+import type { SchemaModel } from "./types";
 
 describe("exampleFromJsonSchema", () => {
   it("emits an example for every property of an object", () => {
@@ -19,6 +20,16 @@ describe("exampleFromJsonSchema", () => {
     }) as Record<string, unknown>;
     expect(out["@id"]).toBe("Person/Example");
     expect(out["@type"]).toBe("Person");
+  });
+
+  it("uses the first of several type_choices for @type and @id", () => {
+    const out = exampleFromJsonSchema({
+      type: "object",
+      "x-terminusdb": { type_choices: ["MemberA", "MemberB"] },
+      properties: { "@id": { type: "string" }, "@type": { type: "string" } },
+    }) as Record<string, unknown>;
+    expect(out["@type"]).toBe("MemberA");
+    expect(out["@id"]).toBe("MemberA/Example");
   });
 
   it("renders a link-typed string as a typed reference", () => {
@@ -141,5 +152,88 @@ describe("exampleFromJsonSchema", () => {
 
   it("honours numeric minimum when it exceeds the default", () => {
     expect(exampleFromJsonSchema({ type: "integer", minimum: 100 })).toBe(100);
+  });
+
+  describe("taggedunion links", () => {
+    const model: SchemaModel = {
+      Test: {
+        id: "Test",
+        label: "Test",
+        description: "",
+        type: "taggedunion" as const,
+        typeDefinition: {
+          id: "Test",
+          type: "taggedunion" as const,
+          propertyDefinitionsOneOf: [
+            {
+              city: { name: "city", type: "string", multiplicity: "Optional" },
+              tags: { name: "tags", type: "string", multiplicity: "Set" },
+            },
+          ],
+        },
+      },
+      Colour: {
+        id: "Colour",
+        label: "Colour",
+        description: "",
+        type: "enumtrait" as const,
+        typeDefinition: { id: "Colour", type: "enumtrait" as const, enumValues: ["red", "blue"] },
+      },
+      Empty: {
+        id: "Empty",
+        label: "Empty",
+        description: "",
+        type: "taggedunion" as const,
+        typeDefinition: { id: "Empty", type: "taggedunion" as const, propertyDefinitionsOneOf: [{}] },
+      },
+    };
+
+    it("fills member fields so the implied document satisfies a member", () => {
+      const out = exampleFromJsonSchema(
+        { type: "object", properties: { f30: { type: "string", "x-terminusdb": { link: "Test" } } } },
+        model
+      ) as Record<string, Record<string, unknown>>;
+      // Engine rule: a taggedunion document must store at least one member
+      // field — Optional means "at most one value when present", not
+      // "absence satisfies the choice".
+      expect(out.f30).toEqual({
+        "@type": "Test",
+        "@id": "Test/Example",
+        city: "example city",
+        tags: ["example tags"],
+      });
+    });
+
+    it("emits the first enum value for an enum member field", () => {
+      const m: SchemaModel = {
+        U: {
+          id: "U",
+          label: "U",
+          description: "",
+          type: "taggedunion" as const,
+          typeDefinition: {
+            id: "U",
+            type: "taggedunion" as const,
+            propertyDefinitionsOneOf: [
+              { colour: { name: "colour", type: "string", multiplicity: "Mandatory", linkedEnum: "Colour" } },
+            ],
+          },
+        },
+        Colour: model.Colour,
+      };
+      const out = exampleFromJsonSchema(
+        { type: "object", properties: { u: { type: "string", "x-terminusdb": { link: "U" } } } },
+        m
+      ) as Record<string, Record<string, unknown>>;
+      expect(out.u).toEqual({ "@type": "U", "@id": "U/Example", colour: "red" });
+    });
+
+    it("leaves a vacuous member (empty oneOf branch) as a bare ref", () => {
+      const out = exampleFromJsonSchema(
+        { type: "object", properties: { e: { type: "string", "x-terminusdb": { link: "Empty" } } } },
+        model
+      ) as Record<string, Record<string, unknown>>;
+      expect(out.e).toEqual({ "@type": "Empty", "@id": "Empty/Example" });
+    });
   });
 });

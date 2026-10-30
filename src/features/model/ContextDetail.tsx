@@ -22,10 +22,10 @@ import {
 } from "@/lib/schemaModel/contextEdit";
 
 interface Props {
-  classes: SchemaClass[];
-  schemaPath: string;
-  tab?: string;
-  onTabChange: (tab: string) => void;
+  readonly classes: SchemaClass[];
+  readonly schemaPath: string;
+  readonly tab?: string;
+  readonly onTabChange: (tab: string) => void;
 }
 
 interface FormState {
@@ -50,21 +50,23 @@ const normalizeDocs = (ctx: Record<string, unknown>): Record<string, unknown>[] 
   return [];
 };
 
+const str = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : fallback);
+
 const formFromDoc = (ctx: Record<string, unknown>): FormState => {
   const metadata = (ctx["@metadata"] ?? {}) as Record<string, unknown>;
   const opts = (metadata?.["terminusdb"] as Record<string, unknown> | undefined)?.["options"];
   const options = Array.isArray(opts) ? (opts as string[]) : [];
   const doc0 = normalizeDocs(ctx)[0] ?? {};
   return {
-    base: String(ctx["@base"] ?? ""),
-    schema: String(ctx["@schema"] ?? ""),
+    base: str(ctx["@base"]),
+    schema: str(ctx["@schema"]),
     rows: Object.entries(prefixMapOf(ctx)).map(([prefix, uri]) => ({ prefix, uri })),
     metadataJson: JSON.stringify(metadata, null, 2),
     storeIndices: options.includes("store_indices"),
     storeClustering: options.includes("store_clustering"),
-    docLang: String(doc0["@language"] ?? "en"),
-    docTitle: String(doc0["@title"] ?? ""),
-    docDesc: String(doc0["@description"] ?? ""),
+    docLang: str(doc0["@language"], "en"),
+    docTitle: str(doc0["@title"]),
+    docDesc: str(doc0["@description"]),
   };
 };
 
@@ -84,7 +86,7 @@ const docFromForm = (f: FormState): Record<string, unknown> | null => {
   ) as string[];
   const nextMetadata = { ...parsedMetadata };
   if (options.length > 0) {
-    nextMetadata["terminusdb"] = { ...((nextMetadata["terminusdb"] as Record<string, unknown>) ?? {}), options };
+    nextMetadata["terminusdb"] = { ...(nextMetadata["terminusdb"] as Record<string, unknown> | undefined), options };
   } else if (nextMetadata["terminusdb"] && typeof nextMetadata["terminusdb"] === "object") {
     const { options: _drop, ...restTdb } = nextMetadata["terminusdb"] as Record<string, unknown>;
     if (Object.keys(restTdb).length > 0) nextMetadata["terminusdb"] = restTdb;
@@ -248,9 +250,9 @@ export function ContextDetail({ classes, schemaPath, tab: routeTab, onTabChange 
 
   return (
     <div className="min-w-0 flex-1 p-3">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="text-base font-semibold">@context</h2>
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex flex-wrap justify-end gap-1">
           <button
             type="button"
             className="rounded bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"

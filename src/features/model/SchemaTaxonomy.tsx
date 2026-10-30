@@ -5,20 +5,20 @@ import type { SchemaModel } from "@/lib/schemaModel/types";
 import { buildTaxonomy, type TaxonomyNode } from "@/lib/schemaModel/taxonomy";
 
 interface Props {
-  model: SchemaModel;
-  selectedId?: string;
-  onSelect: (id: string) => void;
-  onSelectObject: (id: string) => void;
-  onNewElement: (kind: "Class" | "Enum" | "TaggedUnion" | "Foreign") => void;
-  expandedPaths: Set<string>;
-  onExpand: (id: string, open: boolean) => void;
+  readonly model: SchemaModel;
+  readonly selectedId?: string;
+  readonly onSelect: (id: string) => void;
+  readonly onSelectObject: (id: string) => void;
+  readonly onNewElement: (kind: "Class" | "Enum" | "TaggedUnion" | "Foreign") => void;
+  readonly expandedPaths: Set<string>;
+  readonly onExpand: (id: string, open: boolean) => void;
   /** Per-class document counts (top-level classes only). */
-  docCounts?: Record<string, number>;
+  readonly docCounts?: Record<string, number>;
   /** Builds the filtered-documents URL a count badge links to. */
-  docHref?: (classId: string) => string;
+  readonly docHref?: (classId: string) => string;
 }
 
-function KindBadges({ model, id }: { model: SchemaModel; id: string }) {
+function KindBadges({ model, id }: Readonly<{ model: SchemaModel; id: string }>) {
   const td = model[id]?.typeDefinition;
   if (!td) return null;
   return (
@@ -37,7 +37,7 @@ function KindBadges({ model, id }: { model: SchemaModel; id: string }) {
   );
 }
 
-function MultiParentChip({ node, onJump }: { node: TaxonomyNode; onJump: (parentId: string) => void }) {
+function MultiParentChip({ node, onJump }: Readonly<{ node: TaxonomyNode; onJump: (parentId: string) => void }>) {
   const { t } = useTranslation();
   if (node.siblingParentIds.length === 0) return null;
   return (
@@ -181,7 +181,7 @@ export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, on
   );
 
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col overflow-y-auto border-r border-gray-200 p-2 dark:border-gray-700">
+    <div className="flex h-full w-72 max-w-[85vw] shrink-0 flex-col overflow-y-auto border-r border-gray-200 p-2 dark:border-gray-700">
       <div className="mb-2 flex gap-1">
         {(["Class", "Enum", "TaggedUnion", "Foreign"] as const).map((k) => (
           <button

@@ -252,7 +252,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     const isEditing = editingName === p.name;
     return (
       <li key={`${inherited ? "inh" : "own"}-${p.name}`} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
-        <div className={`flex items-center gap-2 px-2 py-1 text-sm ${applying ? "pointer-events-none opacity-60" : ""}`}>
+        <div className={`flex flex-wrap items-center gap-2 px-2 py-1 text-sm ${applying ? "pointer-events-none opacity-60" : ""}`}>
           <button
             type="button"
             className="min-h-7 min-w-7 shrink-0 text-[10px] text-gray-400"
@@ -319,7 +319,7 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
             </button>
           )}
           {!inherited && !readOnly && (
-            <span className="ml-auto flex gap-1">
+            <span className="ml-auto flex flex-wrap justify-end gap-1">
               {docsAvailable && (
                 <button type="button" className="min-h-7 rounded px-1.5 text-[11px] text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950" title={t("model.docs.editField")} onClick={() => setDocsFor(p.name)}>
                   {t("model.docs.button")}

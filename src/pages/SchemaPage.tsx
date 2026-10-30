@@ -99,6 +99,16 @@ export const SchemaPage: React.FC = () => {
     }
   }, [searchParams, routeBase, navigate]);
 
+  // Escape closes the mobile taxonomy drawer.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
+
   if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
   if (isLoading) return <PagePlaceholder>{t("schema.loadingSchema")}</PagePlaceholder>;
 
@@ -141,33 +151,37 @@ export const SchemaPage: React.FC = () => {
     <PageShell
       header={
         <PageHeader>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 md:hidden dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-              onClick={() => setNavOpen(true)}
-              aria-label={t("model.taxonomy.open")}
-            >
-              ☰
-            </button>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t("model.title")}</h2>
-            {classId && (
-              <Link
-                to={`${routeBase}/documents?type=${encodeURIComponent(classId)}`}
-                className="ml-auto rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          <div className="flex items-center gap-2">
+            <h2 className="min-w-0 truncate text-lg font-semibold text-gray-900 dark:text-gray-100">{t("model.title")}</h2>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {classId && (
+                <Link
+                  to={`${routeBase}/documents?type=${encodeURIComponent(classId)}`}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {t("model.documentsLink")}
+                </Link>
+              )}
+              {/* Embeddings only make sense for classes that produce instances. */}
+              {(!classId || (model[classId]?.type === "type" && !model[classId]?.typeDefinition.isAbstract)) && (
+                <Link
+                  to={`${routeBase}/embeddings${classId ? `?type=${encodeURIComponent(classId)}` : ""}`}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {t("model.embeddingsLink")}
+                </Link>
+              )}
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-100 md:hidden dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => setNavOpen(true)}
+                aria-label={t("model.taxonomy.open")}
               >
-                {t("model.documentsLink")}
-              </Link>
-            )}
-            {/* Embeddings only make sense for classes that produce instances. */}
-            {(!classId || (model[classId]?.type === "type" && !model[classId]?.typeDefinition.isAbstract)) && (
-              <Link
-                to={`${routeBase}/embeddings${classId ? `?type=${encodeURIComponent(classId)}` : ""}`}
-                className={`rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 ${classId ? "" : "ml-auto"}`}
-              >
-                {t("model.embeddingsLink")}
-              </Link>
-            )}
+                <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </PageHeader>
       }
@@ -181,13 +195,13 @@ export const SchemaPage: React.FC = () => {
             onClick={() => setNavOpen(false)}
           />
         )}
-        <div className={`${navOpen ? "fixed inset-y-0 left-0 z-50 bg-white shadow-xl dark:bg-gray-950" : "hidden"} md:relative md:block`}>
+        <div className={`${navOpen ? "fixed inset-y-0 right-0 z-50 max-w-full bg-white shadow-xl dark:bg-gray-950" : "hidden"} md:relative md:block`}>
           <SchemaTaxonomy
             model={model}
             selectedId={classId ?? objectId}
             onSelect={(id) => { goClass(id); setNavOpen(false); }}
             onSelectObject={(id) => { goObject(id); setNavOpen(false); }}
-            onNewElement={(kind) => setNewElement({ kind, id: "" })}
+            onNewElement={(kind) => { setNewElement({ kind, id: "" }); setNavOpen(false); }}
             expandedPaths={expandedPaths}
             onExpand={onExpand}
             docCounts={docCounts}

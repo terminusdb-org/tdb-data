@@ -99,8 +99,8 @@ export const DataLayout: React.FC = () => {
             onKeyDown={(e) => { if (e.key === "Escape") setMobileNavOpen(false); }}
             aria-label={t("nav.closeNavigation")}
           />
-          <div className="fixed left-0 top-0 z-50 h-full md:hidden">
-            <IconRail onNavigate={() => setMobileNavOpen(false)} />
+          <div className="fixed left-0 top-0 z-50 h-full shadow-xl md:hidden">
+            <IconRail variant="drawer" onNavigate={() => setMobileNavOpen(false)} />
           </div>
         </>
       )}

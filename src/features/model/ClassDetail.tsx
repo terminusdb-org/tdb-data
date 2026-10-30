@@ -112,7 +112,7 @@ export function ClassDetail({ model, classes, elementId, schemaPath, docPath, ta
             </button>
           ))}
         </span>
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex flex-wrap justify-end gap-1">
           <button type="button" className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800" onClick={() => { setRenameValue(elementId); setRenaming(true); }}>
             {t("model.class.rename")}
           </button>

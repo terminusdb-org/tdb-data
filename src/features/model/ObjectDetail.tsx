@@ -62,7 +62,7 @@ export function ObjectDetail({ model, classes, elementId, schemaPath, docPath, r
             <span className="ml-2 rounded bg-amber-100 px-1 text-[10px] text-amber-800 dark:bg-amber-900 dark:text-amber-200">{kindLabel}</span>
           </h2>
         )}
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex flex-wrap justify-end gap-1">
           {td.type === "enumtrait" && (
             <button type="button" className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800" onClick={() => setEnumModal(true)}>
               {t("model.object.editValues")}

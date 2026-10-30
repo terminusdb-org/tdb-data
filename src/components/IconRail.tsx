@@ -97,9 +97,11 @@ const allItems: ReadonlyArray<RailItem> = [
 
 export interface IconRailProps {
   readonly onNavigate?: () => void;
+  /** "rail" is the desktop icon strip; "drawer" shows icon + label rows. */
+  readonly variant?: "rail" | "drawer";
 }
 
-export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
+export const IconRail: React.FC<IconRailProps> = ({ onNavigate, variant = "rail" }) => {
   const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
@@ -144,9 +146,11 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
     statusDotClass = "bg-red-500";
   }
 
+  const drawer = variant === "drawer";
+
   return (
-    <aside className="flex w-14 flex-col items-center border-r border-gray-200 bg-white">
-      <div className="flex h-14 w-full items-center justify-center border-b border-gray-200">
+    <aside className={`flex h-full flex-col border-r border-gray-200 bg-white ${drawer ? "w-64 items-stretch" : "w-14 items-center"}`}>
+      <div className={`flex h-14 w-full items-center border-b border-gray-200 ${drawer ? "px-3" : "justify-center"}`}>
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-dfrntBlue-600">
           <svg aria-hidden="true" className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
@@ -154,7 +158,7 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col items-center overflow-y-auto py-2" aria-label={t("nav.mainNavigation")}>
+      <nav className={`flex flex-1 flex-col overflow-y-auto py-2 ${drawer ? "items-stretch px-2" : "items-center"}`} aria-label={t("nav.mainNavigation")}>
         {allItems.map((item) => {
           const isActive = currentSegment === item.segment;
           const path = buildPath(item.segment);
@@ -178,12 +182,18 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
                 navigate(path);
                 onNavigate?.();
               }}
-              className={`group relative mb-1 flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${toneClass}`}
+              className={`group relative mb-1 flex items-center rounded-lg transition-colors ${toneClass} ${
+                drawer ? "h-9 gap-3 px-3" : "h-10 w-10 justify-center"
+              }`}
             >
               {item.icon}
-              <span className="pointer-events-none absolute left-12 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                {label}
-              </span>
+              {drawer ? (
+                <span className="truncate text-sm">{label}</span>
+              ) : (
+                <span className="pointer-events-none absolute left-12 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  {label}
+                </span>
+              )}
               {isActive && (
                 <span className="absolute -left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-full bg-dfrntBlue-600" />
               )}
@@ -192,10 +202,10 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
         })}
       </nav>
 
-      <div className="flex flex-col items-center border-t border-gray-200 py-2">
+      <div className={`flex border-t border-gray-200 py-2 ${drawer ? "flex-col items-stretch px-2" : "flex-col items-center"}`}>
         {latestCommitId && (
           <span
-            className={`mb-2 h-1.5 w-1.5 rounded-full ${statusDotClass}`}
+            className={`h-1.5 w-1.5 rounded-full ${statusDotClass} ${drawer ? "mx-3 mb-1" : "mb-2"}`}
             title={latestCommitId.slice(0, 7)}
           />
         )}
@@ -207,11 +217,14 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
             navigate("/");
             onNavigate?.();
           }}
-          className="mb-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className={`mb-1 flex items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 ${
+            drawer ? "h-9 gap-3 px-3" : "h-8 w-8 justify-center"
+          }`}
         >
           <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
           </svg>
+          {drawer && <span className="text-sm">{t("nav.allDataProducts")}</span>}
         </button>
         <button
           type="button"
@@ -221,11 +234,14 @@ export const IconRail: React.FC<IconRailProps> = ({ onNavigate }) => {
             dispatch(logout());
             navigate("/login", { replace: true });
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className={`flex items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 ${
+            drawer ? "h-9 gap-3 px-3" : "h-8 w-8 justify-center"
+          }`}
         >
           <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
           </svg>
+          {drawer && <span className="truncate text-sm">{t("nav.signOut")}</span>}
         </button>
       </div>
     </aside>

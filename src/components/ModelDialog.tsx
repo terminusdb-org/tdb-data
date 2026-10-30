@@ -1,4 +1,5 @@
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -10,9 +11,26 @@ interface Props {
   widthClass?: string;
 }
 
+// Only one model dialog stays open at a time: mounting a new open dialog
+// closes whichever was open before.
+let openDialogCloser: (() => void) | null = null;
+
 // Shared modal shell — Headless UI supplies the dialog role, aria-modal,
 // focus trap, initial focus and Escape handling.
 export function ModelDialog({ open, onClose, title, children, widthClass = "w-96" }: Props) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!open) return;
+    const closeSelf = () => onCloseRef.current();
+    if (openDialogCloser && openDialogCloser !== closeSelf) openDialogCloser();
+    openDialogCloser = closeSelf;
+    return () => {
+      if (openDialogCloser === closeSelf) openDialogCloser = null;
+    };
+  }, [open]);
+
   return (
     <Dialog open={open} onClose={onClose} className="relative z-40">
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />

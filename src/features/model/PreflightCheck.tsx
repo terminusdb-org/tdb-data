@@ -49,6 +49,7 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
   const [tdbError, setTdbError] = useState<ApiErrorDetail | null>(null);
   const [checking, setChecking] = useState(false);
   const [copiedTechnical, setCopiedTechnical] = useState(false);
+  const [copiedDoc, setCopiedDoc] = useState(false);
 
   // Subdocuments only exist embedded in a parent — the engine's insert-check
   // can only ever answer inserted_subdocument_as_document for them.
@@ -234,6 +235,17 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
             {t("model.preflight.generateExample")}
           </button>
         )}
+        <button
+          type="button"
+          className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          onClick={() => {
+            void navigator.clipboard.writeText(text);
+            setCopiedDoc(true);
+            setTimeout(() => setCopiedDoc(false), 1500);
+          }}
+        >
+          {copiedDoc ? t("common.copied") : t("common.copy")}
+        </button>
         <button type="button" className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800" onClick={onClose}>
           {t("common.close")}
         </button>

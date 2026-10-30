@@ -118,7 +118,8 @@ const linkRef = (classId: string, ancestors: ReadonlySet<string>, ctx: EmitCtx):
     const member = td.propertyDefinitionsOneOf?.[0];
     if (member) {
       for (const [name, pd] of Object.entries(member)) {
-        ref[name] = propertyExample(name, pd, ctx, ancestors);
+        const v = propertyExample(name, pd, ctx, ancestors);
+        if (v !== SKIP) ref[name] = v;
       }
     }
   } else {
@@ -129,19 +130,25 @@ const linkRef = (classId: string, ancestors: ReadonlySet<string>, ctx: EmitCtx):
 
 const emitPropertyFields = (out: JsonObject, td: ITypeDefinition, ctx: EmitCtx, ancestors: ReadonlySet<string>): void => {
   for (const [name, pd] of Object.entries({ ...td.inheritedPropertyDefinitions, ...td.propertyDefinitions })) {
-    out[name] = propertyExample(name, pd, ctx, ancestors);
+    const v = propertyExample(name, pd, ctx, ancestors);
+    if (v !== SKIP) out[name] = v;
   }
 };
 
 const propertyExample = (name: string, pd: TypePropertyDefinition, ctx: EmitCtx, ancestors: ReadonlySet<string>): unknown => {
   const docLink = pd.linkedType ?? pd.linkedTaggedUnion;
+  // An enum with no declared values admits no value — the engine rejects any
+  // string, so the field is left out rather than filled with a
+  // guaranteed-invalid example.
+  const enumValue =
+    pd.linkedEnum !== undefined ? ctx.model?.[pd.linkedEnum]?.typeDefinition.enumValues?.[0] : undefined;
   const scalar =
     pd.linkedTrait !== undefined
       ? subdocExample(pd.linkedTrait, ancestors, ctx)
       : docLink !== undefined
         ? linkRef(docLink, ancestors, ctx)
         : pd.linkedEnum !== undefined
-          ? (ctx.model?.[pd.linkedEnum]?.typeDefinition.enumValues?.[0] ?? `example ${name}`)
+          ? enumValue
           : INTEGER_TYPES.has(pd.type)
             ? 42
             : pd.type === "boolean"
@@ -153,6 +160,7 @@ const propertyExample = (name: string, pd: TypePropertyDefinition, ctx: EmitCtx,
                   : pd.type === "time"
                     ? FORMAT_EXAMPLES["time"]
                     : `example ${name}`;
+  if (scalar === undefined) return SKIP;
   return pd.multiplicity === "Set" || pd.multiplicity === "List" || pd.multiplicity === "Array" || pd.multiplicity === "Cardinality"
     ? [scalar]
     : scalar;

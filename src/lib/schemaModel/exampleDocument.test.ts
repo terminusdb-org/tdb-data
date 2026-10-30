@@ -237,6 +237,72 @@ describe("exampleFromJsonSchema", () => {
     });
   });
 
+  describe("enum fields", () => {
+    // Enum values only resolve through the model — a plain {type:"string"}
+    // schema node can't know the legal values.
+    const enumLinkModel: SchemaModel = {
+      Linked: {
+        id: "Linked",
+        label: "Linked",
+        description: "",
+        type: "type" as const,
+        typeDefinition: {
+          id: "Linked",
+          type: "type" as const,
+          propertyDefinitions: {
+            sub: { name: "sub", type: "linkedTrait", multiplicity: "Optional", linkedTrait: "Sub" },
+          },
+        },
+      },
+      Sub: {
+        id: "Sub",
+        label: "Sub",
+        description: "",
+        type: "trait" as const,
+        typeDefinition: {
+          id: "Sub",
+          type: "trait" as const,
+          propertyDefinitions: {
+            good: { name: "good", type: "string", multiplicity: "Optional", linkedEnum: "Colour" },
+            bad: { name: "bad", type: "string", multiplicity: "Optional", linkedEnum: "EmptyEnum" },
+          },
+        },
+      },
+      Colour: {
+        id: "Colour",
+        label: "Colour",
+        description: "",
+        type: "enumtrait" as const,
+        typeDefinition: { id: "Colour", type: "enumtrait" as const, enumValues: ["red", "blue"] },
+      },
+      EmptyEnum: {
+        id: "EmptyEnum",
+        label: "EmptyEnum",
+        description: "",
+        type: "enumtrait" as const,
+        typeDefinition: { id: "EmptyEnum", type: "enumtrait" as const, enumValues: [] },
+      },
+    };
+
+    it("emits the first declared value for a linked enum inside an expanded doc", () => {
+      const out = exampleFromJsonSchema(
+        { type: "object", properties: { l: { type: "string", "x-terminusdb": { link: "Linked" } } } },
+        enumLinkModel
+      ) as Record<string, Record<string, Record<string, unknown>>>;
+      expect(out.l.sub.good).toBe("red");
+    });
+
+    // An enum with no @values admits no value — an Optional field typed by
+    // it must be omitted, not filled with a guaranteed-invalid string.
+    it("omits a field typed by an enum with no values", () => {
+      const out = exampleFromJsonSchema(
+        { type: "object", properties: { l: { type: "string", "x-terminusdb": { link: "Linked" } } } },
+        enumLinkModel
+      ) as Record<string, Record<string, Record<string, unknown>>>;
+      expect("bad" in out.l.sub).toBe(false);
+    });
+  });
+
   describe("class links", () => {
     // A typed ref under upsert creates the implied document — it must be a
     // complete, valid document. Links therefore expand to a full example doc

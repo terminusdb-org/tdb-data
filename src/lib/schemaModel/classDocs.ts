@@ -18,7 +18,7 @@ export interface DocumentationSet {
 
 type DocEntry = Record<string, unknown>;
 
-const asArray = (v: unknown): DocEntry[] => {
+export const asArray = (v: unknown): DocEntry[] => {
   if (!v) return [];
   const arr = Array.isArray(v) ? v : [v];
   return arr.filter((e): e is DocEntry => !!e && typeof e === "object" && !Array.isArray(e));
@@ -48,6 +48,9 @@ export const readTypeDocs = (cls: SchemaClass): DocumentationSet => {
       ...(typeof e["@label"] === "string" && { label: e["@label"] }),
       ...(typeof e["@comment"] === "string" && { comment: e["@comment"] }),
     };
+    // Skip entries whose type-level doc is empty (e.g. only @properties) —
+    // they carry no row for the type editor.
+    if (isBlank(doc)) continue;
     if (lang) out.translations[lang] = doc;
     else out.default = doc;
   }
@@ -61,6 +64,7 @@ export const readPropDocs = (cls: SchemaClass, propName: string): DocumentationS
     const props = e["@properties"];
     if (!props || typeof props !== "object" || Array.isArray(props)) continue;
     const doc = readLangDoc((props as Record<string, unknown>)[propName]);
+    if (isBlank(doc)) continue;
     const lang = typeof e["@language"] === "string" ? e["@language"] : undefined;
     if (lang) out.translations[lang] = doc;
     else out.default = doc;
@@ -80,19 +84,49 @@ const langDocToTerminus = (d: LangDoc): Record<string, string> | undefined => {
 /**
  * Rebuild a class doc's @documentation with updated type- or field-level
  * docs. All other entry content (@values, type metadata keys) is preserved.
+ *
+ * Engine rule (api:NoLanguageTagForMultilingual): untagged and @language-
+ * tagged entries cannot mix. When the update introduces tagged entries and
+ * the doc still has an untagged entry, the untagged entry is retagged to
+ * `defaultLang` so its remaining content survives under that language.
  */
 export const withDocumentation = (
   cls: SchemaClass,
-  update: { typeDocs?: DocumentationSet; propName?: string; propDocs?: DocumentationSet }
+  update: { typeDocs?: DocumentationSet; propName?: string; propDocs?: DocumentationSet; defaultLang?: string }
 ): SchemaClass => {
-  const entries = asArray(cls["@documentation"]);
   const wantedLangs = new Set<string>();
   const docs = update.propDocs ?? update.typeDocs;
   if (docs) Object.keys(docs.translations).forEach((l) => wantedLangs.add(l));
+  const multilingual = wantedLangs.size > 0;
+
+  const rawEntries = asArray(cls["@documentation"]);
+  const untagged = rawEntries.filter((e) => e["@language"] === undefined);
+  let entries = rawEntries;
+  if (multilingual && untagged.length > 0) {
+    if (untagged.length > 1) throw new Error("Internal error: multiple untagged @documentation entries");
+    if (!update.defaultLang) throw new Error("Internal error: multilingual @documentation update requires defaultLang to retag the untagged entry");
+    entries = rawEntries.map((e) => (e["@language"] === undefined ? { ...e, "@language": update.defaultLang } : e));
+    const langs = new Set<string>();
+    for (const e of entries) {
+      const l = e["@language"];
+      if (typeof l === "string") {
+        if (langs.has(l)) throw new Error(`Internal error: duplicate @documentation language "${l}"`);
+        langs.add(l);
+      }
+    }
+  }
 
   const applyTo = (e: DocEntry, lang: string | undefined): DocEntry => {
     const next = { ...e };
-    const d = docs ? (lang ? docs.translations[lang] : docs.default) : undefined;
+    // A retagged (former default) entry takes docs.default unless it is blank,
+    // in which case the caller-provided translations[defaultLang] applies.
+    const d = docs
+      ? lang === update.defaultLang && !isBlank(docs.default)
+        ? docs.default
+        : lang
+          ? docs.translations[lang]
+          : docs.default
+      : undefined;
     if (update.typeDocs) {
       const td = langDocToTerminus(d ?? {});
       delete next["@label"];
@@ -114,8 +148,9 @@ export const withDocumentation = (
     applyTo(e, typeof e["@language"] === "string" ? e["@language"] : undefined)
   );
   const hasDefault = entries.some((e) => e["@language"] === undefined);
-  // Create a default entry when needed.
-  if (!hasDefault && docs && (!isBlank(docs.default) || update.propName)) {
+  // Create an untagged default entry when needed — only for monolingual
+  // output; a multilingual doc must not gain an untagged entry.
+  if (!hasDefault && !multilingual && docs && (!isBlank(docs.default) || update.propName)) {
     result.unshift(applyTo({}, undefined));
   }
   // Create entries for languages that had none.

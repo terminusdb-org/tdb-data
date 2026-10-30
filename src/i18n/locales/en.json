@@ -1047,7 +1047,11 @@
       "button": "docs",
       "editField": "Edit field documentation",
       "defaultLangTag": "Language for the default row",
-      "defaultLangTitle": "With multiple languages, the default row also needs a language tag"
+      "defaultLangTitle": "With multiple languages, the default row also needs a language tag",
+      "defaultNeedsLang": "The default entry needs a language tag — the schema requires all entries tagged once any entry has one",
+      "defaultLangDuplicate": "Language \"{{lang}}\" is already used by another row",
+      "langRequired": "Every row needs a language tag — fill it in or delete the row",
+      "multilingualHint": "This class uses multilingual documentation — every entry needs a language"
     }
   },
   "schema-element-browser": {

@@ -31,15 +31,18 @@ describe("readPropDocs", () => {
 
 describe("withDocumentation", () => {
   it("updates field docs per language, preserving other entries", () => {
+    // cls's doc mixes untagged + sv — engine-invalid but exercising retag:
+    // the untagged entry is retagged to defaultLang and keeps its content.
     const next = withDocumentation(cls, {
       propName: "city",
       propDocs: { default: { label: "Town" }, translations: { fr: { label: "Ville" }, sv: {} } },
+      defaultLang: "en",
     }) as unknown as Record<string, unknown>;
     const docs = next["@documentation"] as Array<Record<string, unknown>>;
-    const def = docs.find((e) => e["@language"] === undefined)!;
-    expect((def["@properties"] as Record<string, unknown>).city).toEqual({ "@label": "Town" });
-    // type-level docs preserved on the same entry
-    expect(def["@label"]).toBe("Animal");
+    const en = docs.find((e) => e["@language"] === "en")!;
+    expect((en["@properties"] as Record<string, unknown>).city).toEqual({ "@label": "Town" });
+    // type-level docs preserved on the retagged entry
+    expect(en["@label"]).toBe("Animal");
     const sv = docs.find((e) => e["@language"] === "sv")!;
     // sv's city docs were cleared → its @properties is dropped entirely
     expect(sv["@properties"]).toBeUndefined();
@@ -65,5 +68,49 @@ describe("withDocumentation", () => {
     const bare = { "@type": "Class", "@id": "X", "@documentation": [{ "@label": "x" }] } as unknown as SchemaClass;
     const next = withDocumentation(bare, { typeDocs: { default: {}, translations: {} } }) as unknown as Record<string, unknown>;
     expect("@documentation" in next).toBe(false);
+  });
+
+  it("retags the untagged entry when the update goes multilingual", () => {
+    // untagged entry carries another field's docs — retagging must preserve them
+    const mono = {
+      "@type": "Class", "@id": "Y",
+      "@documentation": [{ "@properties": { other: { "@label": "Other" }, p: { "@label": "Old" } } }],
+    } as unknown as SchemaClass;
+    const next = withDocumentation(mono, {
+      propName: "p",
+      propDocs: { default: {}, translations: { en: { label: "New" }, sv: { label: "Ny" } } },
+      defaultLang: "en",
+    }) as unknown as Record<string, unknown>;
+    const docs = next["@documentation"] as Array<Record<string, unknown>>;
+    expect(docs.every((e) => e["@language"] !== undefined)).toBe(true);
+    const en = docs.find((e) => e["@language"] === "en")!;
+    const props = en["@properties"] as Record<string, unknown>;
+    expect(props.other).toEqual({ "@label": "Other" });
+    expect(props.p).toEqual({ "@label": "New" });
+    const sv = docs.find((e) => e["@language"] === "sv")!;
+    expect((sv["@properties"] as Record<string, unknown>).p).toEqual({ "@label": "Ny" });
+  });
+
+  it("throws when a multilingual update lacks defaultLang for the untagged entry", () => {
+    const mono = {
+      "@type": "Class", "@id": "Z",
+      "@documentation": [{ "@properties": { other: { "@label": "Other" } } }],
+    } as unknown as SchemaClass;
+    expect(() =>
+      withDocumentation(mono, {
+        propName: "p",
+        propDocs: { default: {}, translations: { en: { label: "x" } } },
+      })
+    ).toThrow(/defaultLang/);
+  });
+
+  it("does not create an untagged entry in a multilingual update", () => {
+    const bare = { "@type": "Class", "@id": "W" } as unknown as SchemaClass;
+    const next = withDocumentation(bare, {
+      propName: "p",
+      propDocs: { default: { label: "ignored" }, translations: { en: { label: "x" } } },
+    }) as unknown as Record<string, unknown>;
+    const docs = next["@documentation"] as Array<Record<string, unknown>>;
+    expect(docs.every((e) => e["@language"] !== undefined)).toBe(true);
   });
 });

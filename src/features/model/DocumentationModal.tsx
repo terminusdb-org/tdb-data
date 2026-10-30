@@ -68,7 +68,10 @@ export function DocumentationModal({ open, cls, propName, docPath, onClose }: Pr
   const docEntries = asArray(cls["@documentation"]);
   const classHasUntagged = docEntries.some((e) => e["@language"] === undefined);
   const classHasTagged = docEntries.some((e) => typeof e["@language"] === "string");
-  const showDefaultRow = !classHasTagged || !!(defaultDoc.label.trim() || defaultDoc.comment.trim());
+  // Show the default row for monolingual docs, for existing untagged content,
+  // and for corrupt docs carrying an untagged entry (its tag input is needed
+  // to retag it on a multilingual save).
+  const showDefaultRow = !classHasTagged || classHasUntagged || !!(defaultDoc.label.trim() || defaultDoc.comment.trim());
 
   const save = async () => {
     setSaving(true);
@@ -130,11 +133,17 @@ export function DocumentationModal({ open, cls, propName, docPath, onClose }: Pr
   return (
     <ModelDialog open={open} onClose={onClose} widthClass="w-[36rem]"
       title={propName ? t("model.docs.titleField", { id: cls["@id"], prop: propName }) : t("model.docs.titleClass", { id: cls["@id"] })}>
+      {rows.length > 0 && !classHasTagged && (
+        <div role="alert" className="mb-3 flex items-start gap-2 rounded bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <span aria-hidden="true">⚠</span>
+          <span>{t("model.docs.firstLangWarning")}</span>
+        </div>
+      )}
       <div className="mb-3 flex flex-col gap-3">
         {showDefaultRow && (
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex w-24 shrink-0 items-center gap-1 text-xs text-gray-500 italic">
+            <span className="flex w-24 shrink-0 items-center gap-1 text-xs text-gray-500 italic" title={t("model.docs.defaultTitle")}>
               {t("model.docs.defaultLang")}
               {rows.length > 0 && (
                 <input

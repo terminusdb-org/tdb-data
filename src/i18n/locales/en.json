@@ -1040,18 +1040,20 @@
       "comment": "Description",
       "defaultLang": "default",
       "addLang": "+ Add language",
-      "duplicateLang": "Duplicate language tag",
+      "duplicateLang": "Two rows have the same language",
       "titleField": "Documentation — {{id}}.{{prop}}",
       "titleClass": "Documentation — {{id}}",
-      "translations": "Translations & multilingual documentation…",
+      "translations": "Languages and documentation…",
       "button": "docs",
       "editField": "Edit field documentation",
-      "defaultLangTag": "Language for the default row",
-      "defaultLangTitle": "With multiple languages, the default row also needs a language tag",
-      "defaultNeedsLang": "The default entry needs a language tag — the schema requires all entries tagged once any entry has one",
-      "defaultLangDuplicate": "Language \"{{lang}}\" is already used by another row",
-      "langRequired": "Every row needs a language tag — fill it in or delete the row",
-      "multilingualHint": "This class uses multilingual documentation — every entry needs a language"
+      "defaultLangTag": "Language of the default entry",
+      "defaultLangTitle": "If one entry has a language, all entries must have one. The language set here applies to every field’s untagged documentation.",
+      "defaultNeedsLang": "Set a language for the default entry. It applies to every field’s untagged documentation.",
+      "defaultLangDuplicate": "Another row already uses \"{{lang}}\"",
+      "langRequired": "Each row must have a language. Add one, or remove the row.",
+      "multilingualHint": "The documentation of this class uses languages. Add a language to write the label and the description for this field.",
+      "defaultTitle": "Entry without a language — shared by all fields until languages are added",
+      "firstLangWarning": "Adding a language makes the documentation of this class multilingual — you cannot go back to a single default entry. The language of the default entry applies to all untagged documentation."
     }
   },
   "schema-element-browser": {

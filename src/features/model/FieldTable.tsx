@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ITypeDefinition, SchemaModel, TypePropertyDefinition, TypePropertyDefinitions } from "@/lib/schemaModel/types";
-import { describeApiError, type ApiErrorDetail } from "@/utils/apiErrors";
+import type { ITypeDefinition, SchemaModel, TypePropertyDefinition } from "@/lib/schemaModel/types";
 import { buildPredicateIndex, specsEqual } from "@/lib/schemaModel/predicates";
-import { diffClassToOps, isStrengthening, ops as migOps, specOf, type MigrationOp } from "@/lib/schemaModel/migrationOps";
-import { useAppSelector, useAppDispatch, useReplaceSchemaDocumentMutation } from "@/store";
+import { diffClassToOps, isStrengthening, ops as migOps, type MigrationOp } from "@/lib/schemaModel/migrationOps";
+import { useAppSelector, useAppDispatch } from "@/store";
 import { selectPendingForElement, editDismissed } from "@/store/modelSlice";
 import { useApplyMigration } from "./applyEdit";
 import { FieldEditRow, type FieldDraft } from "./FieldEditRow";
@@ -76,8 +75,6 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const applyMigration = useApplyMigration();
-  const [replaceSchemaDocument] = useReplaceSchemaDocumentMutation();
-  const username = useAppSelector((s) => s.auth.username ?? "admin");
   const td = model[elementId]?.typeDefinition;
   const pending = useAppSelector((s) => selectPendingForElement(s, elementId));
   const predicates = useMemo(() => buildPredicateIndex(model), [model]);
@@ -85,7 +82,6 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   const [adding, setAdding] = useState(false);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [docsFor, setDocsFor] = useState<string | null>(null);
-  const [error, setError] = useState<ApiErrorDetail | null>(null);
   const [showSpinner, setShowSpinner] = useState(false);
 
   const applying = pending.some((p) => p.status === "applying");
@@ -114,16 +110,6 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
       return next;
     });
 
-  // Engine bug: CreateClassProperty/CastClassProperty 500 (api:TypeError) for
-  // Cardinality, Array, Foreign and @unfold specs — those edits go through a
-  // class-document replace instead of the migration API.
-  const specNeedsDocReplace = (spec: unknown): boolean => {
-    if (!spec || typeof spec !== "object") return false;
-    const t = (spec as Record<string, unknown>)["@type"];
-    return t === "Cardinality" || t === "Array" || t === "Foreign" || "@unfold" in (spec as object);
-  };
-  const propNeedsDocReplace = (p: TypePropertyDefinition) => specNeedsDocReplace(specOf(p));
-
   // Subdoc edits rewrite the parents' documents — fall back to the chain root.
   const affectedCount = docCounts?.[elementId] ?? docCounts?.[pathIds[0]] ?? 0;
   const commitOps = (ops: MigrationOp[]) => {
@@ -135,35 +121,9 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
     }
   };
 
-  // Rewrite the class document with a new property set (doc-replace path).
-  const applyPropertyDocReplace = async (nextProps: TypePropertyDefinitions, message: string) => {
-    if (!docsCls) {
-      setError({ type: null, message: t("model.metadata.classDocMissing"), detailsJson: "" });
-      return;
-    }
-    const rest = Object.fromEntries(
-      Object.entries(docsCls as Record<string, unknown>).filter(([k]) => k.startsWith("@"))
-    );
-    const next = { ...rest };
-    for (const p of Object.values(nextProps)) next[p.name] = specOf(p);
-    try {
-      await replaceSchemaDocument({ path: docPath!, id: elementId, document: next as SchemaClass, author: username, message }).unwrap();
-    } catch (err) {
-      setError(describeApiError(err));
-    }
-  };
-
   const saveField = (draft: FieldDraft, originalName?: string) => {
     setAdding(false);
     setEditingName(null);
-    const prevProp = originalName ? td.propertyDefinitions?.[originalName] : undefined;
-    if (propNeedsDocReplace(draft.prop) || (prevProp && propNeedsDocReplace(prevProp)) || (draft.prop.unfold)) {
-      const next = { ...(td.propertyDefinitions ?? {}) };
-      if (originalName && originalName !== draft.name) delete next[originalName];
-      next[draft.name] = draft.prop;
-      void applyPropertyDocReplace(next, `model: field ${draft.name} on ${elementId}`);
-      return;
-    }
     const operations: MigrationOp[] = [];
     if (draft.newClass) {
       operations.push(
@@ -185,13 +145,6 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
   };
 
   const deleteField = (prop: TypePropertyDefinition) => {
-    if (propNeedsDocReplace(prop)) {
-      const next = Object.fromEntries(
-        Object.entries(td.propertyDefinitions ?? {}).filter(([k]) => k !== prop.name)
-      );
-      void applyPropertyDocReplace(next as TypePropertyDefinitions, `model: delete ${prop.name} on ${elementId}`);
-      return;
-    }
     commitOps(diffClassToOps(elementId, td, {
       propertyDefinitions: Object.fromEntries(
         Object.entries(td.propertyDefinitions ?? {}).filter(([k]) => k !== prop.name)
@@ -376,11 +329,6 @@ export function FieldTable({ model, elementId, pathIds, schemaPath, onNavigate, 
           </li>
         )}
       </ul>
-      {error && (
-        <div className="mx-2 mt-1">
-          <ApiErrorBlock error={error} />
-        </div>
-      )}
       {pending
         .filter((e) => e.status === "error")
         .map((e) => (

@@ -57,4 +57,26 @@ describe("strictJsonSchema", () => {
     expect(out.required).toBeUndefined();
     expect(out.additionalProperties).toBe(false);
   });
+
+  it("widens document links to accept a string id or a typed reference", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        friend: { type: "string", "x-terminusdb": { link: "Person" } },
+        friends: {
+          type: "array",
+          items: { type: "string", "x-terminusdb": { link: "Person" } },
+        },
+      },
+    };
+    const out = strictJsonSchema(schema, model) as {
+      properties: { friend: { oneOf: unknown[] }; friends: { items: { oneOf: unknown[] } } };
+    };
+    const linkOneOf = [
+      { type: "string" },
+      { type: "object", required: ["@type", "@id"], properties: { "@type": { type: "string" }, "@id": { type: "string" } } },
+    ];
+    expect(out.properties.friend.oneOf).toEqual(linkOneOf);
+    expect(out.properties.friends.items.oneOf).toEqual(linkOneOf);
+  });
 });

@@ -191,6 +191,7 @@ export const SchemaPage: React.FC = () => {
             expandedPaths={expandedPaths}
             onExpand={onExpand}
             docCounts={docCounts}
+            docHref={(id) => `${routeBase}/documents?type=${encodeURIComponent(id)}`}
           />
         </div>
         {classId && model[classId] && (model[classId].type === "type" || model[classId].type === "trait") ? (

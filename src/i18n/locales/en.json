@@ -980,7 +980,9 @@
       "openContext": "Open context editor"
     },
     "export": {
-      "title": "JSON Schema — {{id}}"
+      "title": "JSON Schema — {{id}}",
+      "tabSchema": "Schema",
+      "tabExample": "Example document"
     },
     "preflight": {
       "title": "Test document — {{type}}",
@@ -994,7 +996,9 @@
       },
       "schemaLoading": "Loading JSON Schema…",
       "failed": "Document fails the schema check",
-      "technical": "Technical feedback"
+      "technical": "Technical feedback",
+      "subdocumentNote": "Subdocuments only exist inside a parent document — there is no standalone document to check. The JSON Schema check validates the fields.",
+      "generateExample": "Generate example"
     },
     "new": {
       "title": "New {{kind}}",

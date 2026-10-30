@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { SchemaModel } from "@/lib/schemaModel/types";
 import { buildTaxonomy, type TaxonomyNode } from "@/lib/schemaModel/taxonomy";
@@ -13,6 +14,8 @@ interface Props {
   onExpand: (id: string, open: boolean) => void;
   /** Per-class document counts (top-level classes only). */
   docCounts?: Record<string, number>;
+  /** Builds the filtered-documents URL a count badge links to. */
+  docHref?: (classId: string) => string;
 }
 
 function KindBadges({ model, id }: { model: SchemaModel; id: string }) {
@@ -63,6 +66,7 @@ function TreeNode({
   onSelect,
   onJump,
   docCounts,
+  docHref,
   forceOpen,
 }: {
   node: TaxonomyNode;
@@ -74,6 +78,7 @@ function TreeNode({
   onSelect: (id: string) => void;
   onJump: (parentId: string) => void;
   docCounts?: Record<string, number>;
+  docHref?: (classId: string) => string;
   forceOpen?: boolean;
 }) {
   const { t } = useTranslation();
@@ -100,12 +105,22 @@ function TreeNode({
           <span className="w-3 shrink-0 text-[10px] text-gray-400">{node.children.length > 0 ? (open ? "▾" : "▸") : ""}</span>
           <span className={td?.isAbstract ? "italic" : ""}>{node.id}</span>
           <KindBadges model={model} id={node.id} />
-          {count !== undefined && (
+        </button>
+        {count !== undefined &&
+          (docHref ? (
+            <Link
+              to={docHref(node.id)}
+              className="ml-auto rounded bg-gray-100 px-1 text-[10px] text-gray-500 underline-offset-2 hover:bg-gray-200 hover:underline dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              title={t("model.taxonomy.documentCount", { count })}
+              aria-label={t("model.taxonomy.documentCount", { count })}
+            >
+              {count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count}
+            </Link>
+          ) : (
             <span className="ml-auto rounded bg-gray-100 px-1 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400" title={t("model.taxonomy.documentCount", { count })}>
               {count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count}
             </span>
-          )}
-        </button>
+          ))}
         <MultiParentChip node={node} onJump={onJump} />
       </div>
       {open && node.children.length > 0 && (
@@ -122,6 +137,7 @@ function TreeNode({
               onSelect={onSelect}
               onJump={onJump}
               docCounts={docCounts}
+              docHref={docHref}
               forceOpen={forceOpen}
             />
           ))}
@@ -131,7 +147,7 @@ function TreeNode({
   );
 }
 
-export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, onNewElement, expandedPaths, onExpand, docCounts }: Props) {
+export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, onNewElement, expandedPaths, onExpand, docCounts, docHref }: Props) {
   const { t } = useTranslation();
   const [objectFilter, setObjectFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -201,6 +217,7 @@ export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, on
             onSelect={onSelect}
             onJump={jumpToParent}
             docCounts={docCounts}
+            docHref={docHref}
             forceOpen={classFilter.length > 0}
           />
         ))}

@@ -29,6 +29,23 @@ export const strictJsonSchema = (schema: unknown, model: SchemaModel): unknown =
   const out: JsonObject = {};
   for (const [k, v] of Object.entries(obj)) out[k] = strictJsonSchema(v, model);
 
+  // A document link is exported as a plain string, but the engine also
+  // accepts the typed reference form {"@type","@id"} — required for List/Set
+  // members and for references to documents that don't exist yet.
+  const link = (out["x-terminusdb"] as JsonObject | undefined)?.["link"];
+  if (out["type"] === "string" && typeof link === "string") {
+    delete out["type"];
+    out["oneOf"] = [
+      { type: "string" },
+      // Not @type: {const: link} — a reference may point at a subclass.
+      {
+        type: "object",
+        required: ["@type", "@id"],
+        properties: { "@type": { type: "string" }, "@id": { type: "string" } },
+      },
+    ];
+  }
+
   if (out["properties"] && typeof out["properties"] === "object") {
     out["additionalProperties"] = false;
     const typeChoices = (out["x-terminusdb"] as JsonObject | undefined)?.["type_choices"];

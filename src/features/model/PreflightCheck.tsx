@@ -7,6 +7,7 @@ import { describeApiError, type ApiErrorDetail } from "@/utils/apiErrors";
 import { ApiErrorBlock } from "@/components/ApiErrorBlock";
 import { ModelDialog } from "@/components/ModelDialog";
 import { strictJsonSchema } from "@/lib/schemaModel/jsonSchema";
+import { exampleFromJsonSchema } from "@/lib/schemaModel/exampleDocument";
 import { witnessSummary } from "@/lib/schemaModel/iri";
 import type { SchemaModel } from "@/lib/schemaModel/types";
 
@@ -47,6 +48,11 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
   const [tdbResult, setTdbResult] = useState<TdbCheckResult | null>(null);
   const [tdbError, setTdbError] = useState<ApiErrorDetail | null>(null);
   const [checking, setChecking] = useState(false);
+  const [copiedTechnical, setCopiedTechnical] = useState(false);
+
+  // Subdocuments only exist embedded in a parent — the engine's insert-check
+  // can only ever answer inserted_subdocument_as_document for them.
+  const isSubdocument = model?.[type]?.type === "trait";
 
   const { data: jsonSchema } = useGetJsonSchemaQuery(
     { path: schemaPath ?? "", type },
@@ -83,7 +89,7 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
     }
 
     // 2) TerminusDB engine check under upsert — technical feedback.
-    try {
+    if (!isSubdocument) try {
       const res = await checkDocument({
         path: docPath,
         document: doc,
@@ -100,7 +106,18 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
       if (apiError !== undefined) technical["api:error"] = apiError;
       if (rec["api:message"] !== undefined) technical["api:message"] = rec["api:message"];
       if (witnesses !== undefined) technical["api:witnesses"] = witnesses;
-      if (rec["api:embedding"] !== undefined) technical["api:embedding"] = rec["api:embedding"];
+      const embedding = rec["api:embedding"];
+      // Embedding speaks only when a touched class carries embedding
+      // metadata — api:relevant marks that; api:will_embed covers older
+      // servers without the flag.
+      if (
+        embedding !== null &&
+        typeof embedding === "object" &&
+        ((embedding as Record<string, unknown>)["api:relevant"] === true ||
+          (embedding as Record<string, unknown>)["api:will_embed"] === true)
+      ) {
+        technical["api:embedding"] = embedding;
+      }
       setTdbResult({
         ok: rec["api:valid"] !== false,
         apiError:
@@ -148,7 +165,8 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
             <ul className="mt-1 max-h-32 overflow-y-auto rounded bg-red-50 p-2 text-xs text-red-800 dark:bg-red-950/40 dark:text-red-300">
               {ajvErrors.map((e, i) => (
                 <li key={i} className="font-mono">
-                  {("instancePath" in e ? String(e.instancePath) : "") || "/"} {e.message}
+                  {/* ajv6 uses dataPath (".field"), newer versions use instancePath ("/field") */}
+                  {("instancePath" in e ? String(e.instancePath) : "dataPath" in e ? String(e.dataPath).replace(".", "/") : "") || "/"} {e.message}
                 </li>
               ))}
             </ul>
@@ -160,6 +178,11 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
         <div className="text-[10px] font-semibold tracking-wide text-gray-400 uppercase">
           {t("model.preflight.mode.terminusdb")}
         </div>
+        {isSubdocument && (
+          <div className="mt-1 rounded bg-sky-50 p-2 text-xs text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+            {t("model.preflight.subdocumentNote")}
+          </div>
+        )}
         {tdbResult?.ok && (
           <div className="mt-1 rounded bg-emerald-50 p-2 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {t("model.preflight.ok")}
@@ -176,9 +199,22 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
         {tdbResult?.detailsJson && (
           <details className="mt-1 text-xs">
             <summary className="cursor-pointer text-gray-500">{t("model.preflight.technical")}</summary>
-            <pre className="mt-1 max-h-40 overflow-auto rounded bg-gray-50 p-2 font-mono text-[10px] text-gray-600 dark:bg-gray-900 dark:text-gray-400">
-              {tdbResult.detailsJson}
-            </pre>
+            <div className="relative">
+              <pre className="mt-1 max-h-40 overflow-auto rounded bg-gray-50 p-2 font-mono text-[10px] text-gray-600 dark:bg-gray-900 dark:text-gray-400">
+                {tdbResult.detailsJson}
+              </pre>
+              <button
+                type="button"
+                className="absolute right-1 top-1 rounded border border-gray-300 bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/90 dark:text-gray-300 dark:hover:bg-gray-700"
+                onClick={() => {
+                  void navigator.clipboard.writeText(tdbResult.detailsJson);
+                  setCopiedTechnical(true);
+                  setTimeout(() => setCopiedTechnical(false), 1500);
+                }}
+              >
+                {copiedTechnical ? t("common.copied") : t("common.copy")}
+              </button>
+            </div>
           </details>
         )}
         {tdbError && (
@@ -189,6 +225,15 @@ export function PreflightCheck({ open, type, docPath, schemaPath, model, initial
       </div>
 
       <div className="mt-3 flex justify-end gap-2">
+        {strict !== undefined && (
+          <button
+            type="button"
+            className="mr-auto rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            onClick={() => setText(JSON.stringify(exampleFromJsonSchema(strict), null, 2))}
+          >
+            {t("model.preflight.generateExample")}
+          </button>
+        )}
         <button type="button" className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800" onClick={onClose}>
           {t("common.close")}
         </button>

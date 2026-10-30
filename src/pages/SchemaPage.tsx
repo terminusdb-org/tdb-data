@@ -15,16 +15,6 @@ import { ObjectDetail } from "@/features/model/ObjectDetail";
 import { ContextDetail } from "@/features/model/ContextDetail";
 import { useApplyMigration } from "@/features/model/applyEdit";
 
-// Foreign schema docs are missing from GET /api/schema (TerminusDB #1832) —
-// fetch them via WOQL on the schema graph, same workaround as Zebra.
-const FOREIGN_TYPES_WOQL = {
-  "@type": "Triple",
-  subject: { "@type": "NodeValue", variable: "type_id" },
-  predicate: { "@type": "NodeValue", node: "rdf:type" },
-  object: { "@type": "NodeValue", node: "sys:Foreign" },
-  graph: "schema",
-} as const;
-
 export const SchemaPage: React.FC = () => {
   const { t } = useTranslation();
   const routeParams = useRouteParams();
@@ -34,7 +24,6 @@ export const SchemaPage: React.FC = () => {
   const applyMigration = useApplyMigration();
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [newElement, setNewElement] = useState<{ kind: "Class" | "Enum" | "TaggedUnion" | "Foreign"; id: string } | null>(null);
-  const [foreignNames, setForeignNames] = useState<string[]>([]);
   const [navOpen, setNavOpen] = useState(false);
   const [runWoql] = useRunWoqlMutation();
 
@@ -45,25 +34,6 @@ export const SchemaPage: React.FC = () => {
 
   const { data: classes, isLoading } = useGetSchemaQuery({ path: schemaPath, asList: true }, { skip: !routeParams });
 
-  useEffect(() => {
-    if (!woqlPath) return;
-    let cancelled = false;
-    runWoql({ path: woqlPath, query: FOREIGN_TYPES_WOQL })
-      .unwrap()
-      .then((res) => {
-        if (cancelled) return;
-        const names = (res.bindings ?? [])
-          .map((b) => String((b as Record<string, unknown>)["type_id"] ?? ""))
-          .filter(Boolean)
-          .map((n) => (n.startsWith("@schema:") ? n.slice("@schema:".length) : n));
-        setForeignNames(names);
-      })
-      .catch(() => setForeignNames([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [woqlPath, classes, runWoql]);
-
   const model = useMemo(() => {
     if (!classes) return {};
     const docs: TerminusSchemaObject = {};
@@ -72,11 +42,8 @@ export const SchemaPage: React.FC = () => {
       const { "@id": id, ...rest } = cls;
       docs[id] = { "@id": id, ...rest } as TerminusSchemaObject[string];
     }
-    for (const name of foreignNames) {
-      if (!docs[name]) docs[name] = { "@type": "Foreign", "@id": name } as TerminusSchemaObject[string];
-    }
     return reduceZebraSchemaFromTerminusSchema(docs);
-  }, [classes, foreignNames]);
+  }, [classes]);
 
   // Document counts per class — only "type" entries are top-level documents
   // (subdoc traits/enums/TUs/foreigns produce no standalone instances).

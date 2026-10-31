@@ -54,13 +54,14 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
 
   // Filtered mode: the document API's format=ids streams the succinct-
   // dictionary range for the IRI prefix (relative prefixes expand under the
-  // database's own @context; full IRIs pass through). skip/count page the id
-  // stream server-side; the same selector with counted gives the total.
+  // database's own @context; full IRIs pass through). No type filter — the
+  // prefix selects the namespace directly, so the range is served straight
+  // from the dictionary. skip/count page the id stream server-side; the
+  // same selector with counted gives the total as a range-length sum.
   const { data: pageIds, refetch: refetchIds } = useGetDocumentIdsQuery(
     {
       path: docPath,
       idPrefix: activeFilter,
-      type: "sys:JSONDocument",
       skip: page * pageSize,
       count: pageSize,
       asList: true,
@@ -69,7 +70,7 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
   );
 
   const { data: filteredTotal } = useGetDocumentCountQuery(
-    { path: docPath, idPrefix: activeFilter, type: "sys:JSONDocument" },
+    { path: docPath, idPrefix: activeFilter },
     { skip: !docPath || !activeFilter }
   );
 
@@ -84,6 +85,15 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
     },
     { skip: !docPath || !!activeFilter }
   );
+
+  // Unfiltered total — fired in parallel with the page fetch (counted=true
+  // streams the range length; cheap at any corpus size).
+  const { data: unfilteredTotal } = useGetDocumentCountQuery(
+    { path: docPath, type: "sys:JSONDocument" },
+    { skip: !docPath || !!activeFilter }
+  );
+
+  const total = activeFilter ? filteredTotal : unfilteredTotal;
 
   const { data: filteredData, isLoading: loadingFiltered, refetch: refetchFiltered } = useGetDocumentsQuery(
     {
@@ -352,11 +362,14 @@ export const RawJsonList: React.FC<RawJsonListProps> = ({ routeParams }) => {
             >
               {t("common.previous")}
             </button>
-            <span className="text-sm text-gray-500">{t("common.page")} {page + 1}</span>
+            <span className="text-sm text-gray-500">
+              {t("common.page")} {page + 1}
+              {total !== undefined && ` — ${total.toLocaleString()} ${t("common.docs")}`}
+            </span>
             <button
               type="button"
               onClick={() => setPage(page + 1)}
-              disabled={activeFilter ? (page + 1) * pageSize >= (filteredTotal ?? 0) : documents.length < pageSize}
+              disabled={total !== undefined ? (page + 1) * pageSize >= total : documents.length < pageSize}
               className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
             >
               {t("common.next")}

@@ -82,12 +82,20 @@
     "no": "No",
     "format": "Format",
     "formatting": "Formatting…",
-    "loadingSchema": "Loading schema…"
+    "loadingSchema": "Loading schema…",
+    "retry": "Retry",
+    "dismiss": "Dismiss",
+    "copy": "Copy",
+    "copied": "Copied",
+    "create": "Create",
+    "rename": "Rename",
+    "add": "Add",
+    "edit": "Edit"
   },
   "nav": {
     "search": "Search",
     "explore": "Explore",
-    "schema": "Schema",
+    "schema": "Model",
     "embeddings": "Embeddings",
     "documents": "Documents",
     "rawJson": "Raw JSON",
@@ -211,7 +219,8 @@
     "noDocuments": "No documents found.",
     "loadingDocument": "Loading document…",
     "documentNotFound": "Document not found.",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "schemaLink": "Schema →"
   },
   "documentEditor": {
     "form": "Form",
@@ -237,7 +246,8 @@
     "noEmbeddingQueriesDefined": "No embedding queries are defined for this type.",
     "configureEmbeddings": "Set up embeddings for {{type}}",
     "failedToLoadEmbedding": "Failed to load embedding: ",
-    "loadingMarkdown": "Loading markdown…"
+    "loadingMarkdown": "Loading markdown…",
+    "preflight": "Check"
   },
   "documentPicker": {
     "placeholder": "Search for a document…"
@@ -381,7 +391,8 @@
     "selectDocumentToPreview": "Select a document to preview embedding text.",
     "selected": "Selected",
     "selectTypeToBegin": "Select a document type to begin editing embedding configuration.",
-    "updatedEmbedding": "Updated embedding {{field}} for {{type}}"
+    "updatedEmbedding": "Updated embedding {{field}} for {{type}}",
+    "schemaLink": "← Schema"
   },
   "graphql": {
     "title": "GraphQL",
@@ -812,9 +823,9 @@
     "invalidDate": "Enter a valid date and time.",
     "zoomIn": "Zoom the loaded range into the selected span",
     "zoomOutOlder": "Load 50% more history on the older side",
-"zoomOutNewer": "Load 50% more history on the newer side",
-"atLogStart": "At the first commit — zooming out only expands empty time before it",
-"atLogEnd": "At the newest commit — zooming out only expands empty time after it",
+    "zoomOutNewer": "Load 50% more history on the newer side",
+    "atLogStart": "At the first commit — zooming out only expands empty time before it",
+    "atLogEnd": "At the newest commit — zooming out only expands empty time after it",
     "belowWindow": "{{count}} more loaded below — pan down or load more"
   },
   "statusBar": {
@@ -825,5 +836,235 @@
     "documentsLabel": "Documents:",
     "indexedLabel": "Indexed:",
     "typesLabel": "Types:"
+  },
+  "model": {
+    "title": "Model",
+    "taxonomy": {
+      "classes": "Classes",
+      "otherObjects": "Other objects",
+      "filter": "Filter…",
+      "multiParent": "Also under: {{parents}}",
+      "documentCount": "{{count}} documents",
+      "filterClasses": "Filter classes",
+      "noClasses": "No classes yet",
+      "newClass": "New class",
+      "newEnum": "New enum",
+      "newTaggedUnion": "New tagged union",
+      "newForeign": "New foreign",
+      "open": "Browse schema",
+      "close": "Close schema browser"
+    },
+    "overview": {
+      "title": "Schema model",
+      "blurb": "Pick a class on the left to browse fields, inheritance and links — every edit applies through the migration API.",
+      "classes": "Classes",
+      "otherObjects": "Other objects"
+    },
+    "class": {
+      "notFound": "Class {{id}} not found",
+      "fieldsTab": "Fields",
+      "diagramTab": "Diagram",
+      "rawTab": "Raw",
+      "rename": "Rename",
+      "editMetadata": "Edit metadata",
+      "exportSchema": "JSON Schema",
+      "testDocument": "Test document"
+    },
+    "field": {
+      "name": "Field name",
+      "namePlaceholder": "field name",
+      "multiplicity": "Multiplicity",
+      "type": "Type",
+      "primitive": "Primitive",
+      "primitiveType": "Primitive type",
+      "linkTargets": "Link target",
+      "classes": "Class",
+      "subdocuments": "Subdocument",
+      "enums": "Enum",
+      "foreigns": "Foreign",
+      "taggedUnions": "Tagged union",
+      "createNew": "Create new",
+      "newClassOption": "+ New class…",
+      "newSubdocOption": "+ New subdocument…",
+      "newEnumOption": "+ New enum…",
+      "newTaggedUnionOption": "+ New tagged union…",
+      "newForeignOption": "+ New foreign…",
+      "newClassIdPlaceholder": "NewClassId",
+      "chooseTarget": "Choose…",
+      "target": "Target",
+      "min": "min",
+      "max": "max",
+      "dimensions": "dims",
+      "default": "Default",
+      "defaultPlaceholder": "default value",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "inherited": "inherited",
+      "inheritedFields": "Inherited",
+      "openDetail": "↗ open",
+      "oneOfSet": "Field set {{index}}",
+      "oneOf": "@oneOf group",
+      "oneOfTitle": "Place this field in a @oneOf choice group (exactly one group must be satisfied)",
+      "oneOfNone": "regular field",
+      "oneOfGroup": "@oneOf group {{index}}",
+      "oneOfNew": "+ new @oneOf group",
+      "oneOfFailed": "@oneOf edit failed",
+      "oneOfNoDoc": "Class document unavailable — cannot edit @oneOf membership",
+      "addTo": "+ Add field to {{id}}",
+      "applying": "Applying…",
+      "editTargetMetadata": "Edit this class's metadata",
+      "enumValues": "Values: {{values}}",
+      "predicateUsedBy": "predicate defined in {{count}} class(es)",
+      "overloadCount": "{{count}} distinct definitions",
+      "overloadTitle": "This predicate has {{count}} different definitions in the schema",
+      "adoptSpec": "Use existing definition…",
+      "usedBy": "used by {{ids}}",
+      "errorNameRequired": "Field name is required",
+      "errorNoAtPrefix": "Field names cannot start with @",
+      "errorCollision": "A field with this name already exists on this class",
+      "errorNewClassId": "New class id is required and must not already exist",
+      "errorDefaultRequired": "A new mandatory field needs a default value",
+      "errorTargetRequired": "Choose a link target",
+      "errorOneOfOptional": "@oneOf members cannot be Optional",
+      "unfold": "unfold",
+      "unfoldTitle": "Unfold linked documents inline on retrieval (@unfold)",
+      "noTargets": "No matching classes",
+      "inheritedFrom": "Defined on {{id}} — open that class"
+    },
+    "metadata": {
+      "title": "Metadata — {{id}}",
+      "label": "Label",
+      "comment": "Comment",
+      "authors": "Authors (comma-separated)",
+      "metadataJson": "@metadata (JSON)",
+      "keyType": "Key type",
+      "keyFields": "Key fields",
+      "parents": "Parents (multi-select)",
+      "propDefaults": "Defaults for new inherited properties (JSON array)",
+      "base": "@base",
+      "abstract": "Abstract",
+      "unfoldable": "Unfoldable",
+      "subdocNote": "Subdocument flag can only be set when the class is created.",
+      "invalidJson": "@metadata is not valid JSON",
+      "invalidDefaultsJson": "Defaults must be a JSON array",
+      "parentsPlaceholder": "Type to filter parents…",
+      "mandatoryDefaults": "Defaults required for inherited mandatory fields",
+      "defaultFor": "default for {{prop}}",
+      "missingDefaults": "A default is required for: {{props}}",
+      "subdocument": "Subdocument",
+      "shared": "Shared",
+      "subdocTitle": "Embedded document owned by its parent (@subdocument)",
+      "sharedTitle": "Reference-counted document deleted when unreferenced (@shared)",
+      "flagsNote": "@subdocument and @shared are mutually exclusive and apply via a schema document replace.",
+      "classDocMissing": "Class document not found for flag update"
+    },
+    "migration": {
+      "warningTitle": "Review migration — {{id}}",
+      "dryRunRunning": "Running dry-run…",
+      "dryRunResult": "This will apply {{schemaOps}} schema operations and modify {{instanceOps}} existing documents.",
+      "documentsAffected": "{{id}} has {{count}} documents — this migration may affect all of them.",
+      "applyAnyway": "Apply migration"
+    },
+    "enum": {
+      "title": "Enum values — {{id}}",
+      "filter": "Filter…",
+      "newValue": "New value"
+    },
+    "object": {
+      "notFound": "Object {{id}} not found",
+      "definitionTab": "Definition",
+      "values": "Values",
+      "editValues": "Edit values",
+      "foreignBlurb": "Foreign types link to external identifiers and carry no fields.",
+      "contextBlurb": "Prefixes and base URIs for this data product.",
+      "openContext": "Open context editor"
+    },
+    "export": {
+      "title": "JSON Schema — {{id}}",
+      "tabSchema": "Schema",
+      "tabExample": "Example document"
+    },
+    "preflight": {
+      "title": "Test document — {{type}}",
+      "ok": "Document passes the schema check.",
+      "checking": "Checking…",
+      "run": "Check document",
+      "invalidJson": "The document is not valid JSON",
+      "mode": {
+        "terminusdb": "TerminusDB engine check (upsert)",
+        "jsonschema": "JSON Schema"
+      },
+      "schemaLoading": "Loading JSON Schema…",
+      "failed": "Document fails the schema check",
+      "technical": "Technical feedback",
+      "subdocumentNote": "Subdocuments only exist inside a parent document — there is no standalone document to check. The JSON Schema check validates the fields.",
+      "generateExample": "Generate example"
+    },
+    "new": {
+      "title": "New {{kind}}",
+      "idPlaceholder": "Element id",
+      "idTaken": "An element with this id already exists"
+    },
+    "diagram": {
+      "renderFailed": "Diagram render failed",
+      "ariaLabel": "Class relationship diagram",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit",
+      "actual": "Actual size"
+    },
+    "errors": {
+      "api:WeakeningFailure": "Schema change would invalidate existing data",
+      "api:UnknownSchemaMigrationOperation": "Unknown migration operation",
+      "api:SchemaCheckFailure": "Schema check failed",
+      "api:UnresolvableAbsoluteDescriptor": "Unresolvable reference",
+      "api:MissingTargets": "Missing migration target"
+    },
+    "embeddingsLink": "Embeddings →",
+    "context": {
+      "structuredTab": "Structured",
+      "prefixes": "Prefixes",
+      "addPrefix": "+ Prefix",
+      "options": "Indexing options",
+      "storeIndicesTitle": "Trigger indexing on every commit",
+      "storeClusteringTitle": "Also store clustering embeddings (requires store_indices)",
+      "documentation": "Documentation",
+      "docTitle": "Schema title",
+      "docDescription": "Schema description",
+      "invalidJson": "Invalid JSON",
+      "applyPrefixes": "Apply prefixes",
+      "invalidPrefixes": "Invalid prefix entries: {{list}}",
+      "prefixFailed": "Prefix update failed",
+      "saveFailed": "Failed to save @context"
+    },
+    "documentsLink": "Documents →",
+    "docs": {
+      "lang": "Language",
+      "label": "Label",
+      "comment": "Description",
+      "defaultLang": "default",
+      "addLang": "+ Add language",
+      "duplicateLang": "Two rows have the same language",
+      "titleField": "Documentation — {{id}}.{{prop}}",
+      "titleClass": "Documentation — {{id}}",
+      "translations": "Languages and documentation…",
+      "button": "docs",
+      "editField": "Edit field documentation",
+      "defaultLangTag": "Language of the default entry",
+      "defaultLangTitle": "If one entry has a language, all entries must have one. The language set here applies to every field’s untagged documentation.",
+      "defaultNeedsLang": "Set a language for the default entry. It applies to every field’s untagged documentation.",
+      "defaultLangDuplicate": "Another row already uses \"{{lang}}\"",
+      "langRequired": "Each row must have a language. Add one, or remove the row.",
+      "multilingualHint": "The documentation of this class uses languages. Add a language to write the label and the description for this field.",
+      "defaultTitle": "Entry without a language — shared by all fields until languages are added",
+      "firstLangWarning": "Adding a language makes the documentation of this class multilingual — you cannot go back to a single default entry. The language of the default entry applies to all untagged documentation."
+    }
+  },
+  "schema-element-browser": {
+    "composes": "{{fieldId}} (C)",
+    "inherits": "is_a",
+    "links-to": "{{fieldId}} (L)",
+    "nondecorated-link-to": "{{fieldId}}",
+    "first-ten-shown": "{{count}} of many"
   }
 }

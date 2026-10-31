@@ -1,287 +1,267 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useMemo, useState, useEffect } from "react";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Editor from "@monaco-editor/react";
-import { useGetSchemaQuery, useReplaceSchemaMutation, useReplaceSchemaDocumentMutation, useInsertSchemaDocumentMutation, useDeleteSchemaDocumentMutation, useAppSelector } from "@/store";
-import { PageShell, PageHeader, PagePlaceholder, btnPrimary, btnSecondary, selectClass, useRouteParams, ConfirmDialog } from "@/components";
+import { useGetSchemaQuery, useRunWoqlMutation } from "@/store";
+import { PageShell, PageHeader, PagePlaceholder, useRouteParams } from "@/components";
 import { buildApiPath, buildRoutePath } from "@/utils/routes";
-import { isValidJson } from "@/utils/validation";
-import type { SchemaClass } from "@/types/terminusdb";
-
-const MONACO_OPTIONS = {
-  minimap: { enabled: false },
-  fontSize: 13,
-  wordWrap: "on" as const,
-  scrollBeyondLastLine: false,
-  automaticLayout: true,
-  tabSize: 2,
-  scrollbar: { alwaysConsumeMouseWheel: false },
-};
+import { reduceZebraSchemaFromTerminusSchema } from "@/lib/schemaModel/schemaReducer";
+import type { TerminusSchemaObject } from "@/lib/schemaModel/terminusReducers";
+import { ops as migOps } from "@/lib/schemaModel/migrationOps";
+import { ModelDialog } from "@/components/ModelDialog";
+import { SchemaTaxonomy } from "@/features/model/SchemaTaxonomy";
+import { ModelOverview } from "@/features/model/ModelOverview";
+import { ClassDetail } from "@/features/model/ClassDetail";
+import { ObjectDetail } from "@/features/model/ObjectDetail";
+import { ContextDetail } from "@/features/model/ContextDetail";
+import { useApplyMigration } from "@/features/model/applyEdit";
 
 export const SchemaPage: React.FC = () => {
   const { t } = useTranslation();
   const routeParams = useRouteParams();
-  const { classId } = useParams<{ classId?: string }>();
+  const { classId, objectId, tab } = useParams<{ classId?: string; objectId?: string; tab?: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [text, setText] = useState("");
-  const [valid, setValid] = useState(true);
-  const [saveStatus, setSaveStatus] = useState<"" | "saving" | "saved" | "error">("");
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [confirmState, setConfirmState] = useState<{
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  } | null>(null);
-  const [replaceSchema] = useReplaceSchemaMutation();
-  const [replaceSchemaDocument] = useReplaceSchemaDocumentMutation();
-  const [insertSchemaDocument] = useInsertSchemaDocumentMutation();
-  const [deleteSchemaDocument] = useDeleteSchemaDocumentMutation();
-  const username = useAppSelector((state) => state.auth.username ?? "admin");
+  const applyMigration = useApplyMigration();
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [newElement, setNewElement] = useState<{ kind: "Class" | "Enum" | "TaggedUnion" | "Foreign"; id: string } | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const [runWoql] = useRunWoqlMutation();
 
   const schemaPath = routeParams ? buildApiPath(routeParams, "schema") : "";
   const docPath = routeParams ? buildApiPath(routeParams, "document") : "";
-  const { data: classes, isLoading } = useGetSchemaQuery(
-    { path: schemaPath, asList: true },
-    { skip: !routeParams }
-  );
-
-  const isNewClass = classId === "new";
-  const selectedClassId = classId && classId !== "new" ? classId : "";
-
+  const woqlPath = routeParams ? buildApiPath(routeParams, "woql") : "";
   const routeBase = routeParams ? buildRoutePath(routeParams) : "";
 
-  useEffect(() => {
-    if (classes && !isNewClass) {
-      if (selectedClassId) {
-        const cls = classes.find((c) => c["@id"] === selectedClassId);
-        if (cls) {
-          const { "@id": _id, ...rest } = cls;
-          setText(JSON.stringify(rest, null, 2));
-        } else {
-          setText("{}");
-        }
-      } else {
-        setText(JSON.stringify(classes, null, 2));
-      }
-      setValid(true);
-    }
-  }, [classes, selectedClassId, isNewClass]);
+  const { data: classes, isLoading } = useGetSchemaQuery({ path: schemaPath, asList: true }, { skip: !routeParams });
 
-  useEffect(() => {
-    if (isNewClass) {
-      const newId = `NewClass_${Date.now()}`;
-      setText(JSON.stringify({
-        "@type": "Class",
-        "@id": newId,
-        "@key": { "@type": "Random" }
-      }, null, 2));
-      setValid(true);
+  const model = useMemo(() => {
+    if (!classes) return {};
+    const docs: TerminusSchemaObject = {};
+    for (const cls of classes) {
+      if (cls["@id"] === "@context") continue;
+      const { "@id": id, ...rest } = cls;
+      docs[id] = { "@id": id, ...rest } as TerminusSchemaObject[string];
     }
-  }, [isNewClass]);
+    return reduceZebraSchemaFromTerminusSchema(docs);
+  }, [classes]);
+
+  // Document counts per class — only "type" entries are top-level documents
+  // (subdoc traits/enums/TUs/foreigns produce no standalone instances).
+  // WOQL, not GraphQL _count: class ids like "Mtcard-minmax" aren't legal
+  // GraphQL names and would poison the whole query.
+  const countableIds = useMemo(
+    () => Object.keys(model).filter((id) => model[id].type === "type"),
+    [model]
+  );
+  const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!woqlPath || countableIds.length === 0) {
+      setDocCounts({});
+      return;
+    }
+    let cancelled = false;
+    const query = {
+      "@type": "And",
+      and: countableIds.map((id, i) => ({
+        // TripleCount reads the rdf:type index directly — no materialization.
+        "@type": "TripleCount",
+        subject: { "@type": "NodeValue", variable: `d${i}` },
+        predicate: { "@type": "NodeValue", node: "rdf:type" },
+        object: { "@type": "NodeValue", node: `@schema:${id}` },
+        count: { "@type": "Value", variable: `n${i}` },
+      })),
+    };
+    runWoql({ path: woqlPath, query })
+      .unwrap()
+      .then((res) => {
+        if (cancelled) return;
+        const bindings = (res.bindings?.[0] ?? {}) as Record<string, unknown>;
+        const out: Record<string, number> = {};
+        countableIds.forEach((id, i) => {
+          const raw = bindings[`n${i}`];
+          const n =
+            typeof raw === "object" && raw !== null ? Number((raw as Record<string, unknown>)["@value"]) : Number(raw);
+          if (!Number.isNaN(n)) out[id] = n;
+        });
+        setDocCounts(out);
+      })
+      .catch(() => setDocCounts({}));
+    return () => {
+      cancelled = true;
+    };
+  }, [woqlPath, countableIds, runWoql]);
+
+  // ?class=X compat (DocumentEditor "edit schema" link)
+  useEffect(() => {
+    const cls = searchParams.get("class");
+    if (cls && routeBase) {
+      navigate(`${routeBase}/schema/class/${encodeURIComponent(cls)}`, { replace: true });
+    }
+  }, [searchParams, routeBase, navigate]);
+
+  // Escape closes the mobile taxonomy drawer.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   if (!routeParams) return <PagePlaceholder>{t("common.selectDataProduct")}</PagePlaceholder>;
   if (isLoading) return <PagePlaceholder>{t("schema.loadingSchema")}</PagePlaceholder>;
 
-  const handleChange = (value: string | undefined) => {
-    const newText = value ?? "";
-    setText(newText);
-    setValid(isValidJson(newText));
-    setSaveError(null);
-  };
+  const goClass = (id: string) => navigate(`${routeBase}/schema/class/${encodeURIComponent(id)}`);
+  const goObject = (id: string) => navigate(`${routeBase}/schema/object/${encodeURIComponent(id)}`);
+  const goHome = () => navigate(`${routeBase}/schema`);
+  const goClassTab = (id: string, nextTab: string) => navigate(`${routeBase}/schema/class/${encodeURIComponent(id)}/${nextTab}`);
+  const goObjectTab = (id: string, nextTab: string) => navigate(`${routeBase}/schema/object/${encodeURIComponent(id)}/${nextTab}`);
 
-  const handleSave = async () => {
-    if (!valid) return;
-    setSaveStatus("saving");
-    setSaveError(null);
-    try {
-      const parsed = JSON.parse(text);
-      if (selectedClassId || isNewClass) {
-        const docId = parsed["@id"] ?? selectedClassId;
-        const isContext = docId === "@context";
-        const doc: SchemaClass = isContext
-          ? (() => { const { "@id": _stripId, ...rest } = parsed; return { ...rest, "@type": "@context" }; })()
-          : { "@id": docId, ...parsed };
-        const isNew = !classes?.some((c) => c["@id"] === docId);
-        if (isNew) {
-          await insertSchemaDocument({
-            path: docPath,
-            document: doc,
-            author: username,
-            message: t("common.createdVia", { id: docId }),
-          }).unwrap();
-          navigate(`${routeBase}/schema/class/${encodeURIComponent(docId)}`);
-        } else {
-          await replaceSchemaDocument({
-            path: docPath,
-            id: docId,
-            document: doc,
-            author: username,
-            message: t("common.updatedVia", { id: docId }),
-          }).unwrap();
-        }
-      } else {
-        const schemaArray = parsed as SchemaClass[];
-        await replaceSchema({
-          path: schemaPath,
-          schema: schemaArray,
-          author: username,
-          message: t("common.updatedSchemaVia"),
-        }).unwrap();
-      }
-      setSaveStatus("saved");
-      setTimeout(() => setSaveStatus(""), 3000);
-    } catch (err) {
-      setSaveStatus("error");
-      if (err && typeof err === "object" && "data" in err) {
-        const data = (err as { data: unknown }).data;
-        if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("schema.saveFailed");
-          setSaveError(String(msg));
-        } else {
-          setSaveError(t("schema.saveFailed"));
-        }
-      } else {
-        setSaveError(t("schema.saveFailed"));
-      }
-    }
-  };
-
-  const handleNewClass = () => {
-    navigate(`${routeBase}/schema/class/new`);
-  };
-
-  const handleDeleteClass = () => {
-    if (!selectedClassId) return;
-    setConfirmState({
-      title: t("common.deleteClass"),
-      message: t("common.deleteClassConfirm", { id: selectedClassId }),
-      onConfirm: () => {
-        setConfirmState(null);
-        void doDeleteClass();
-      },
+  const onExpand = (id: string, open: boolean) =>
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
     });
-  };
 
-  const doDeleteClass = async () => {
-    if (!selectedClassId) return;
-    setSaveStatus("saving");
-    setSaveError(null);
-    try {
-      await deleteSchemaDocument({
-        path: docPath,
-        id: selectedClassId,
-        author: username,
-        message: t("common.deletedVia", { id: selectedClassId }),
-      }).unwrap();
-      navigate(`${routeBase}/schema`);
-    } catch (err) {
-      setSaveStatus("error");
-      if (err && typeof err === "object" && "data" in err) {
-        const data = (err as { data: unknown }).data;
-        if (typeof data === "object" && data !== null) {
-          const msg = (data as Record<string, unknown>)["api:message"] ?? (data as Record<string, unknown>).message ?? t("schema.deleteFailed");
-          setSaveError(String(msg));
-        } else {
-          setSaveError(t("schema.deleteFailed"));
-        }
-      } else {
-        setSaveError(t("schema.deleteFailed"));
-      }
-    }
+  const createElement = async () => {
+    if (!newElement || !newElement.id.trim() || model[newElement.id]) return;
+    const id = newElement.id.trim();
+    const ops = [
+      migOps.createClass(
+        newElement.kind === "Enum"
+          ? { "@type": "Enum", "@id": id, "@value": [] }
+          : newElement.kind === "Foreign"
+            ? { "@type": "Foreign", "@id": id }
+            : newElement.kind === "TaggedUnion"
+              ? { "@type": "TaggedUnion", "@id": id }
+              : { "@type": "Class", "@id": id, "@key": { "@type": "Random" } }
+      ),
+    ];
+    await applyMigration({ path: schemaPath, elementId: id, ops });
+    const isClassKind = newElement.kind === "Class";
+    setNewElement(null);
+    if (isClassKind) goClass(id);
+    else goObject(id);
   };
-
-  const handleClassSelect = (id: string) => {
-    if (id) {
-      navigate(`${routeBase}/schema/class/${encodeURIComponent(id)}`);
-    } else {
-      navigate(`${routeBase}/schema`);
-    }
-  };
-
-  const saveLabel = saveStatus === "saving" ? t("common.saving") : saveStatus === "saved" ? t("common.saved") : saveStatus === "error" ? t("common.error") : t("common.save");
-  const saveClass = saveStatus === "saved"
-    ? "bg-green-500 text-white"
-    : saveStatus === "error"
-    ? "bg-red-500 text-white"
-    : btnPrimary;
 
   return (
-    <>
     <PageShell
       header={
         <PageHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">{t("schema.editor")}</h2>
-              <select
-                value={selectedClassId}
-                onChange={(e) => handleClassSelect(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">{t("schema.allClasses")}</option>
-                {classes?.map((cls) => (
-                  <option key={cls["@id"]} value={cls["@id"]}>{cls["@id"]}</option>
-                ))}
-              </select>
+          <div className="flex items-center gap-2">
+            <h2 className="min-w-0 truncate text-lg font-semibold text-gray-900 dark:text-gray-100">{t("model.title")}</h2>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {classId && (
+                <Link
+                  to={`${routeBase}/documents?type=${encodeURIComponent(classId)}`}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {t("model.documentsLink")}
+                </Link>
+              )}
+              {/* Embeddings only make sense for classes that produce instances. */}
+              {(!classId || (model[classId]?.type === "type" && !model[classId]?.typeDefinition.isAbstract)) && (
+                <Link
+                  to={`${routeBase}/embeddings${classId ? `?type=${encodeURIComponent(classId)}` : ""}`}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {t("model.embeddingsLink")}
+                </Link>
+              )}
               <button
                 type="button"
-                onClick={handleNewClass}
-                className={btnSecondary}
+                className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-100 md:hidden dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => setNavOpen(true)}
+                aria-label={t("model.taxonomy.open")}
               >
-                {t("schema.newClass")}
+                <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0z" />
+                </svg>
               </button>
-              {selectedClassId && (
-                <button
-                  type="button"
-                  onClick={handleDeleteClass}
-                  disabled={saveStatus === "saving"}
-                  className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  {t("common.delete")}
-                </button>
-              )}
             </div>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!valid || saveStatus === "saving"}
-              className={saveClass}
-            >
-              {saveLabel}
-            </button>
           </div>
         </PageHeader>
       }
     >
-      <div className="relative" style={{ height: "600px" }}>
-        <Editor
-          height="100%"
-          defaultLanguage="json"
-          value={text}
-          onChange={handleChange}
-          options={MONACO_OPTIONS}
-        />
-        {!valid && (
-          <div className="absolute bottom-4 left-4 rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700">
-            {t("schema.invalidJson")}
-          </div>
+      <div className="flex h-full">
+        {navOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/20 md:hidden"
+            aria-label={t("model.taxonomy.close")}
+            onClick={() => setNavOpen(false)}
+          />
         )}
-        {valid && saveError && (
-          <div className="absolute bottom-4 left-4 rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700">
-            {saveError}
-          </div>
+        <div className={`${navOpen ? "fixed inset-y-0 right-0 z-50 max-w-full bg-white shadow-xl dark:bg-gray-950" : "hidden"} md:relative md:block`}>
+          <SchemaTaxonomy
+            model={model}
+            selectedId={classId ?? objectId}
+            onSelect={(id) => { goClass(id); setNavOpen(false); }}
+            onSelectObject={(id) => { goObject(id); setNavOpen(false); }}
+            onNewElement={(kind) => { setNewElement({ kind, id: "" }); setNavOpen(false); }}
+            expandedPaths={expandedPaths}
+            onExpand={onExpand}
+            docCounts={docCounts}
+            docHref={(id) => `${routeBase}/documents?type=${encodeURIComponent(id)}`}
+          />
+        </div>
+        {classId && model[classId] && (model[classId].type === "type" || model[classId].type === "trait") ? (
+          <ClassDetail
+            model={model}
+            classes={classes ?? []}
+            elementId={classId}
+            schemaPath={schemaPath}
+            docPath={docPath}
+            tab={tab}
+            onTabChange={(next) => goClassTab(classId, next)}
+            onNavigate={goClass}
+            onNavigateObject={goObject}
+            onNavigateTab={goClassTab}
+            onDeleted={goHome}
+            docCounts={docCounts}
+          />
+        ) : objectId === "@context" ? (
+          <ContextDetail classes={classes ?? []} schemaPath={schemaPath} tab={tab} onTabChange={(next) => goObjectTab("@context", next)} />
+        ) : objectId ? (
+          <ObjectDetail
+            model={model}
+            classes={classes ?? []}
+            elementId={objectId}
+            schemaPath={schemaPath}
+            docPath={docPath}
+            routeParams={routeParams}
+            tab={tab}
+            onTabChange={(next) => goObjectTab(objectId, next)}
+            onNavigate={(id) => (model[id]?.type === "type" || model[id]?.type === "trait" ? goClass(id) : goObject(id))}
+            onDeleted={goHome}
+          />
+        ) : (
+          <ModelOverview model={model} onSelect={goClass} onSelectObject={goObject} />
         )}
       </div>
+      {newElement && (
+        <ModelDialog open onClose={() => setNewElement(null)} widthClass="w-80" title={t("model.new.title", { kind: newElement.kind })}>
+            <input
+              className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-950"
+              placeholder={t("model.new.idPlaceholder")}
+              value={newElement.id}
+              onChange={(e) => setNewElement({ ...newElement, id: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && void createElement()}
+            />
+            {newElement.id && model[newElement.id] && <div className="mb-1 text-xs text-red-600">{t("model.new.idTaken")}</div>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800" onClick={() => setNewElement(null)}>
+                {t("common.cancel")}
+              </button>
+              <button type="button" className="rounded bg-sky-600 px-3 py-1 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50" disabled={!newElement.id.trim() || !!model[newElement.id]} onClick={() => void createElement()}>
+                {t("common.create")}
+              </button>
+            </div>
+        </ModelDialog>
+      )}
     </PageShell>
-    <ConfirmDialog
-      open={confirmState !== null}
-      title={confirmState?.title ?? ""}
-      message={confirmState?.message ?? ""}
-      confirmLabel={t("common.delete")}
-      destructive
-      onConfirm={() => confirmState?.onConfirm()}
-      onCancel={() => setConfirmState(null)}
-    />
-    </>
   );
 };

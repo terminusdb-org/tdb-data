@@ -10,12 +10,14 @@ export interface GetDocumentsParams {
   readonly graphType?: "instance" | "schema";
   readonly type?: string;
   readonly id?: string;
+  readonly ids?: readonly string[];
   readonly skip?: number;
   readonly count?: number;
   readonly asList?: boolean;
   readonly minimized?: boolean;
   readonly unfold?: boolean;
   readonly rawJson?: boolean;
+  readonly idPrefix?: string;
 }
 
 export const documentApi = baseApi.injectEndpoints({
@@ -31,6 +33,8 @@ export const documentApi = baseApi.injectEndpoints({
         if (params.minimized !== undefined) searchParams.set("minimized", String(params.minimized));
         if (params.unfold !== undefined) searchParams.set("unfold", String(params.unfold));
         if (params.rawJson) searchParams.set("raw_json", "true");
+        // ids is a JSON-encoded list on the wire — the engine parses it.
+        if (params.ids && params.ids.length > 0) searchParams.set("ids", JSON.stringify(params.ids));
         searchParams.set("compress_ids", "true");
         const qs = [searchParams.toString(), params.id ? `id=${normalizeDocId(params.id)}` : ""]
           .filter(Boolean)
@@ -44,6 +48,38 @@ export const documentApi = baseApi.injectEndpoints({
         }
         return [{ type: "Document" as const, id: result["@id"] }];
       },
+    }),
+
+    // Compressed ids only — format=ids. With idPrefix the engine streams the
+    // succinct-dictionary range for that IRI prefix; skip/count page it.
+    getDocumentIds: builder.query<string[], GetDocumentsParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("format", "ids");
+        if (params.graphType) searchParams.set("graph_type", params.graphType);
+        if (params.type) searchParams.set("type", params.type);
+        if (params.idPrefix) searchParams.set("id_prefix", params.idPrefix);
+        if (params.skip !== undefined) searchParams.set("skip", String(params.skip));
+        if (params.count !== undefined) searchParams.set("count", String(params.count));
+        if (params.asList) searchParams.set("as_list", "true");
+        searchParams.set("compress_ids", "true");
+        return `${params.path}?${searchParams.toString()}`;
+      },
+      providesTags: (_result, _error, params) => [{ type: "Document" as const, id: params.path }],
+    }),
+
+    // counted=true returns {"api:count": n} for the same selector set.
+    getDocumentCount: builder.query<number, GetDocumentsParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params.type) searchParams.set("type", params.type);
+        if (params.idPrefix) searchParams.set("id_prefix", params.idPrefix);
+        if (params.unfold !== undefined) searchParams.set("unfold", String(params.unfold));
+        searchParams.set("counted", "true");
+        return `${params.path}?${searchParams.toString()}`;
+      },
+      transformResponse: (response: { "api:count": number }) => response["api:count"],
+      providesTags: (_result, _error, params) => [{ type: "Document" as const, id: params.path }],
     }),
 
     getDocument: builder.query<TerminusDBDocument, { path: string; id: string; graphType?: "instance" | "schema" }>({
@@ -145,6 +181,8 @@ export const documentApi = baseApi.injectEndpoints({
 
 export const {
   useGetDocumentsQuery,
+  useGetDocumentIdsQuery,
+  useGetDocumentCountQuery,
   useGetDocumentQuery,
   useGetEmbeddingTextQuery,
   useGetMarkdownTextQuery,

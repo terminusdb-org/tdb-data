@@ -12,19 +12,16 @@ interface DoctypeTreeNode {
   readonly isSubdocument: boolean;
 }
 
-function buildTree(classes: SchemaClass[]): DoctypeTreeNode[] {
+export function buildTree(classes: SchemaClass[]): DoctypeTreeNode[] {
   const classMap = new Map<string, SchemaClass>();
   classes.forEach((cls) => classMap.set(cls["@id"], cls));
 
   const isSubdocument = (cls: SchemaClass): boolean => isSubdoc(cls);
 
-  const isAbstract = (cls: SchemaClass): boolean => {
-    const abs = cls["abstract"];
-    return abs === true || abs === "true";
-  };
+  const isAbstract = (cls: SchemaClass): boolean => Array.isArray(cls["@abstract"]);
 
   const getParents = (cls: SchemaClass): string[] => {
-    const parents = cls["inherits"];
+    const parents = cls["@inherits"];
     if (!parents) return [];
     if (Array.isArray(parents)) return parents as string[];
     return [parents as string];
@@ -34,6 +31,7 @@ function buildTree(classes: SchemaClass[]): DoctypeTreeNode[] {
   const roots: DoctypeTreeNode[] = [];
 
   for (const cls of classes) {
+    if (cls["@type"] !== "Class") continue;
     const parents = getParents(cls);
     const node: DoctypeTreeNode = {
       id: cls["@id"],
@@ -61,13 +59,15 @@ function buildTree(classes: SchemaClass[]): DoctypeTreeNode[] {
   };
   populateChildren(roots);
 
-  const filterNonSubdoc = (nodes: DoctypeTreeNode[]): DoctypeTreeNode[] => {
-    return nodes
-      .filter((n) => !n.isSubdocument)
-      .map((n) => ({ ...n, children: filterNonSubdoc(n.children) }));
+  // Keep a subdocument only when its subtree has a non-subdocument class —
+  // otherwise plain subdocuments are hidden but their subclasses stay reachable.
+  const keepSubtree = (node: DoctypeTreeNode): DoctypeTreeNode | null => {
+    const children = node.children.map(keepSubtree).filter((c): c is DoctypeTreeNode => c !== null);
+    if (node.isSubdocument && children.length === 0) return null;
+    return { ...node, children };
   };
 
-  return filterNonSubdoc(roots);
+  return roots.map(keepSubtree).filter((n): n is DoctypeTreeNode => n !== null);
 }
 
 interface TreeItemProps {
@@ -112,7 +112,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, level, onSelect, selectedType
             className="flex h-4 w-4 items-center justify-center text-gray-400 hover:text-gray-600"
             aria-label={expanded ? t("doctypeTree.collapse") : t("doctypeTree.expand")}
           >
-            <svg className="h-3 w-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} style={{ transform: expanded ? "rotate(90deg)" : "none" }}>
+            <svg aria-hidden="true" className="h-3 w-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} style={{ transform: expanded ? "rotate(90deg)" : "none" }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>

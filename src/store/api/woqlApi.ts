@@ -15,6 +15,7 @@ export const woqlApi = baseApi.injectEndpoints({
         body: { query: params.query },
       }),
     }),
+
   }),
 });
 

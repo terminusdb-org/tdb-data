@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useGetDocumentsQuery, useGetDocumentQuery, useReplaceDocumentMutation, useInsertDocumentMutation, useDeleteDocumentMutation, useGetSchemaQuery, useAppSelector, useAppDispatch, addToWorkingSet } from "@/store";
 import { DocumentEditor, PageShell, PageHeader, PageFooter, PagePlaceholder, btnPrimary, selectClass, useRouteParams, ConfirmDialog } from "@/components";
-import { buildApiPath } from "@/utils/routes";
+import { buildApiPath, buildRoutePath } from "@/utils/routes";
 import { isSubdocument, PAGE_SIZE_OPTIONS, type EditableDocument, type TerminusDBDocument, type PageSizes, type SchemaClass } from "@/types/terminusdb";
 import { displayId, normalizeDocId, truncate } from "@/utils/validation";
 
@@ -329,6 +329,14 @@ export const DocumentsPage: React.FC = () => {
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
+            {selectedType && routeParams && (
+              <Link
+                to={`${buildRoutePath(routeParams)}/schema/class/${encodeURIComponent(selectedType)}`}
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              >
+                {t("documents.schemaLink")}
+              </Link>
+            )}
             {selectedIds.size > 0 && (
               <>
                 <span className="text-sm text-gray-500">{t("documents.selected", { count: selectedIds.size })}</span>

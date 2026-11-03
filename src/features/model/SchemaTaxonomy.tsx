@@ -103,7 +103,7 @@ function TreeNode({
           }}
         >
           <span className="w-3 shrink-0 text-[10px] text-gray-400">{node.children.length > 0 ? (open ? "▾" : "▸") : ""}</span>
-          <span className={td?.isAbstract ? "italic" : ""}>{node.id}</span>
+          <span className={`min-w-0 truncate ${td?.isAbstract ? "italic" : ""}`} title={node.id}>{node.id}</span>
           <KindBadges model={model} id={node.id} />
         </button>
         {count !== undefined &&
@@ -241,8 +241,8 @@ export function SchemaTaxonomy({ model, selectedId, onSelect, onSelectObject, on
               }`}
               onClick={() => onSelectObject(id)}
             >
-              <span>{id}</span>
-              <span className="text-[10px] text-gray-400">
+              <span className="min-w-0 truncate" title={id}>{id}</span>
+              <span className="ml-1 shrink-0 text-[10px] text-gray-400">
                 {kindLabel(id)}
                 {model[id]?.typeDefinition.enumValues ? ` (${model[id].typeDefinition.enumValues!.length})` : ""}
               </span>

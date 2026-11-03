@@ -29,6 +29,7 @@ const PRIMITIVES: SupportedZebraTypes[] = [
   "positiveInteger", "nonNegativeInteger", "negativeInteger", "nonPositiveInteger",
   "hexBinary", "base64Binary",
   "anyURI", "language", "normalizedString", "token", "NMTOKEN", "Name", "NCName",
+  "QName", "SQName",
   "JSON",
   "url", "email", "html",
   "coordinate", "coordinatePolygon", "coordinatePolyline",

@@ -29,6 +29,13 @@ export function normalizeDocId(id: string): string {
   return prefix + rest.split("/").map(encodeURIComponent).join("/");
 }
 
+// WOQL NodeValue for a schema class: ids that already carry a prefix
+// ("prefix:Child") or are full IRIs ("http://external#Thing") resolve
+// verbatim; only schema-local names need the @schema: prefix.
+export function schemaNodeId(id: string): string {
+  return id.includes(":") ? id : `@schema:${id}`;
+}
+
 export function displayId(id: string): string {
   try {
     return decodeURIComponent(id);

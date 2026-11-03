@@ -119,7 +119,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, level, onSelect, selectedType
         ) : (
           <span className="w-4" />
         )}
-        <span className={`truncate ${node.isAbstract ? "italic" : ""}`}>
+        <span className={`min-w-0 truncate ${node.isAbstract ? "italic" : ""}`} title={node.label}>
           {node.label}
         </span>
       </div>

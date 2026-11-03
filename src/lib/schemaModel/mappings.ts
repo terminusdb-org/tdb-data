@@ -275,6 +275,18 @@ export const zebraToOthersMapping: ZebraToOthersMapping = {
     },
     tdb: "xsd:NCName",
   },
+  QName: {
+    jsonSchema: {
+      type: "string",
+    },
+    tdb: "xsd:QName",
+  },
+  SQName: {
+    jsonSchema: {
+      type: "string",
+    },
+    tdb: "xbrl:SQName",
+  },
   xddJson: {
     tdb: "xdd:json",
   },

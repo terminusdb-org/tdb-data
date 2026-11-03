@@ -2,12 +2,14 @@ interface AppConfig {
   readonly apiUrl: string;
   readonly tdbUser: string;
   readonly basePath: string;
+  readonly appVersion: string;
 }
 
 interface RuntimeEnv {
   readonly VITE_TDB_URL?: string;
   readonly VITE_TDB_USER?: string;
   readonly VITE_BASE_PATH?: string;
+  readonly VITE_APP_VERSION?: string;
 }
 
 declare global {
@@ -39,6 +41,8 @@ function loadConfig(): AppConfig {
     apiUrl: tdbUrl.length > 0 ? tdbUrl.replace(/\/$/, "") : "",
     tdbUser,
     basePath,
+    // Baked at release-build time by the release workflow (the release tag).
+    appVersion: getEnvVar("VITE_APP_VERSION") ?? "dev",
   };
 }
 

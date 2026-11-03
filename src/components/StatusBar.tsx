@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetIndexStatusQuery, useGetSchemaQuery, useGraphqlDocumentCountQuery } from "@/store";
+import { config } from "@/config";
 import { useIndexerDisabled } from "@/components/IndexerStatusPanel";
 import { buildApiPath, type RouteParams } from "@/utils/routes";
 import { isSubdocument, type SchemaClass } from "@/types/terminusdb";
@@ -59,6 +60,7 @@ export const StatusBar: React.FC = () => {
     return (
       <footer className="flex h-8 items-center border-t border-gray-200 bg-white px-4 text-xs text-gray-400">
         {t("statusBar.selectDataProduct")}
+        <span className="ml-auto font-data">{config.appVersion}</span>
       </footer>
     );
   }
@@ -105,6 +107,7 @@ export const StatusBar: React.FC = () => {
       <button type="button" onClick={handleClick("raw")} className="hidden hover:text-dfrntBlue-600 hover:underline md:inline">
         {t("nav.rawJson")}
       </button>
+      <span className="ml-auto font-data text-gray-400">{config.appVersion}</span>
     </footer>
   );
 };

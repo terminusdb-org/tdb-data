@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useGetSchemaQuery, useRunWoqlMutation } from "@/store";
 import { PageShell, PageHeader, PagePlaceholder, useRouteParams } from "@/components";
 import { buildApiPath, buildRoutePath } from "@/utils/routes";
+import { schemaNodeId } from "@/utils/validation";
 import { reduceZebraSchemaFromTerminusSchema } from "@/lib/schemaModel/schemaReducer";
 import type { TerminusSchemaObject } from "@/lib/schemaModel/terminusReducers";
 import { ops as migOps } from "@/lib/schemaModel/migrationOps";
@@ -67,7 +68,7 @@ export const SchemaPage: React.FC = () => {
         "@type": "TripleCount",
         subject: { "@type": "NodeValue", variable: `d${i}` },
         predicate: { "@type": "NodeValue", node: "rdf:type" },
-        object: { "@type": "NodeValue", node: `@schema:${id}` },
+        object: { "@type": "NodeValue", node: schemaNodeId(id) },
         count: { "@type": "Value", variable: `n${i}` },
       })),
     };

@@ -172,6 +172,17 @@ describe("getTerminusPropertyDefinition / getZebraPropertyDefinition", () => {
     const td = reduceTerminusSchemaToZebra({ a: terminusMyArray }, "a");
     expect(td.propertyDefinitions?.arrayTwoDimensions).toMatchObject({ multiplicity: "Array", dimensions: 2 });
   });
+  it("treats an inline embedded type definition as a Mandatory reference to its @id", () => {
+    const embedded = { "@id": "an-enum", "@type": "Enum", "@values": ["enum-one", "enum-two"] };
+    expect(getTerminusPropertyDefinition(embedded)).toEqual({ "@class": "an-enum", "@type": "Mandatory" });
+  });
+  it("unwraps an embedded type definition nested under @class", () => {
+    const wrapped = {
+      "@type": "Set",
+      "@class": { "@id": "Rocks", "@type": "Enum", "@values": ["Big", "Medium", "Small"] },
+    };
+    expect(getTerminusPropertyDefinition(wrapped)).toEqual({ "@class": "Rocks", "@type": "Set" });
+  });
 });
 
 describe("getCleanProperties", () => {
@@ -179,5 +190,22 @@ describe("getCleanProperties", () => {
     const clean = getCleanProperties(schema, terminusDocSchemaMyTestId);
     expect(Object.keys(clean).every((k) => !k.startsWith("@"))).toBe(true);
     expect(clean.label2).toEqual({ "@class": "xsd:string", "@type": "Mandatory" });
+  });
+
+  it("detects linkedEnum for an inline embedded enum definition", () => {
+    const inlineSchema = {
+      "an-enum": { "@id": "an-enum", "@type": "Enum", "@values": ["enum-one", "enum-two"] },
+      EnumPointer: {
+        "@id": "EnumPointer",
+        "@type": "Class",
+        pointer: { "@id": "an-enum", "@type": "Enum", "@values": ["enum-one", "enum-two"] },
+      },
+    } as unknown as TerminusSchemaObject;
+    const td = reduceTerminusSchemaToZebra(inlineSchema, "EnumPointer");
+    expect(td.propertyDefinitions?.pointer).toMatchObject({
+      type: "linkedEnum",
+      linkedEnum: "an-enum",
+      multiplicity: "Mandatory",
+    });
   });
 });

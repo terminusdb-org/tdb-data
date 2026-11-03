@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { normalizeDocId, displayId } from "./validation";
+import { normalizeDocId, displayId, schemaNodeId } from "./validation";
 
 describe("normalizeDocId", () => {
   it("keeps slashes literal and encodes segments", () => {
@@ -26,6 +26,17 @@ describe("normalizeDocId", () => {
 
   it("encodes stray percent signs", () => {
     expect(normalizeDocId("Person/100%")).toBe("Person/100%25");
+  });
+});
+
+describe("schemaNodeId", () => {
+  it("prefixes schema-local class ids with @schema:", () => {
+    expect(schemaNodeId("Person")).toBe("@schema:Person");
+  });
+
+  it("keeps prefixed and full-IRI class ids verbatim", () => {
+    expect(schemaNodeId("prefix:Child")).toBe("prefix:Child");
+    expect(schemaNodeId("http://external#Thing")).toBe("http://external#Thing");
   });
 });
 

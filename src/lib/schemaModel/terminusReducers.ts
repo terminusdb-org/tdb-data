@@ -6,11 +6,12 @@ import {
   TypePropertyDefinitions,
   TypePropertyDescription,
   SchemaElementKind,
+  TerminusResponseObject,
+  TypeMetadataAsObject,
+  TypeMetadataLoaded,
+  TypeMetadataParsed,
+  DfrntTypeMetadata,
 } from "./types";
-import { TerminusResponseObject } from "./types";
-
-import { TypeMetadataAsObject, TypeMetadataLoaded, TypeMetadataParsed } from "./types";
-import { DfrntTypeMetadata } from "./types";
 import { isStringsArray } from "./fn";
 import { tdbToJOthersMapping, zebraToOthersMapping } from "./mappings";
 
@@ -116,6 +117,9 @@ export type SupportedTerminusTypes =
   | "xsd:NMTOKEN"            //                               --> edit as strings
   | "xsd:Name"               //                               --> edit as strings
   | "xsd:NCName"             //                               --> edit as strings
+  // Expanded names (OIM §3.1): prefix:local lexical, {ns}local storage
+  | "xsd:QName"              //                               --> edit as strings (NCName localname)
+  | "xbrl:SQName"            //                               --> edit as strings (non-whitespace localname)
   // Miscellaneous XDD types (TerminusDB extended datatypes)
   | "xdd:url" //              --> edit as string (IRI)
   | "xdd:email" //            --> edit as string
@@ -181,6 +185,8 @@ export type SupportedZebraTypes =
   | "NMTOKEN"         
   | "Name"            
   | "NCName"          
+  | "QName"
+  | "SQName"
   | "JSON"
   // XDD extended datatypes (zebra names mirror the tdb suffix)
   | "url"
@@ -266,17 +272,34 @@ export interface TerminusPropertyDefinition {
   zebraLinkedClass?: string;
 }
 
+// "@class" may itself be an embedded type definition ({@id} or {@class});
+// unwrap it to the referenced type name.
+const unwrapClassRef = (rawClass: unknown): TerminusPropertyDefinition["@class"] =>
+  (rawClass && typeof rawClass === "object"
+    ? ((rawClass as Record<string, unknown>)["@class"] ?? (rawClass as Record<string, unknown>)["@id"])
+    : rawClass) as TerminusPropertyDefinition["@class"];
+
+// FIXME: This is due to Terminusdb issue #1932 too
+const collapseEqualCardinality = (def: TerminusPropertyDefinition): void => {
+  if (def["@min_cardinality"] && def["@min_cardinality"] === def["@max_cardinality"]) {
+    def["@cardinality"] = def["@min_cardinality"];
+    delete def["@min_cardinality"];
+    delete def["@max_cardinality"];
+  }
+};
+
 export const getTerminusPropertyDefinition = (prop: unknown): TerminusPropertyDefinition => {
   if (prop && typeof prop === "object" && "@class" in prop) {
     const definedProp = prop as TerminusPropertyDefinition;
+    const classRef = unwrapClassRef(definedProp["@class"]);
     if(definedProp["@type"] === "Foreign") {
       return {
-        "@class": definedProp["@class"],
+        "@class": classRef,
         "@type": "Foreign",
       };
     }
     const terminusdbPropertyDefinition = {
-      "@class": definedProp["@class"],
+      "@class": classRef,
       "@type": definedProp["@type"],
       ...(definedProp["@cardinality"] !== undefined && { "@cardinality": definedProp["@cardinality"] }),
       ...(definedProp["@min_cardinality"] !== undefined && { "@min_cardinality": definedProp["@min_cardinality"] }),
@@ -285,24 +308,22 @@ export const getTerminusPropertyDefinition = (prop: unknown): TerminusPropertyDe
       ...(definedProp["@max"] !== undefined && { "@max_cardinality": definedProp["@max"] }),
       ...(definedProp["@dimensions"] !== undefined && { "@dimensions": definedProp["@dimensions"] }),
     };
-    // FIXME: This is due to Terminusdb issue #1932 too
-    if (
-      terminusdbPropertyDefinition["@min_cardinality"] &&
-      terminusdbPropertyDefinition["@max_cardinality"] &&
-      terminusdbPropertyDefinition["@min_cardinality"] === terminusdbPropertyDefinition["@max_cardinality"]
-    ) {
-      terminusdbPropertyDefinition["@cardinality"] = terminusdbPropertyDefinition["@min_cardinality"];
-      delete terminusdbPropertyDefinition["@min_cardinality"];
-      delete terminusdbPropertyDefinition["@max_cardinality"];
-    }
+    collapseEqualCardinality(terminusdbPropertyDefinition);
     return terminusdbPropertyDefinition;
+  } else if (prop && typeof prop === "object" && typeof (prop as Record<string, unknown>)["@id"] === "string") {
+    // A bare embedded type definition ({@id, @type: Enum|Class|…}) used
+    // directly as a property value — a Mandatory reference to the named type.
+    return {
+      "@class": (prop as Record<string, unknown>)["@id"] as string,
+      "@type": "Mandatory",
+    };
   } else if (typeof prop === "string") {
     return {
       "@class": prop,
       "@type": "Mandatory",
     };
   } else {
-    throw new Error("Unknown response from TerminusDB");
+    throw new TypeError("Unknown response from TerminusDB");
   }
 };
 
@@ -390,6 +411,10 @@ export const getZebraPropertyDefinition = (
 };
 
 const getZebraPropertyValueType = (tdbPropertyType: SupportedTerminusTypes): SupportedZebraTypes => {
+  // A schema written without the global xbrl binding stores the expanded IRI.
+  if (tdbPropertyType === ("https://xbrl.org/2021SQName" as SupportedTerminusTypes)) {
+    tdbPropertyType = "xbrl:SQName";
+  }
   if (tdbToJOthersMapping[tdbPropertyType] !== undefined) {
     return tdbToJOthersMapping[tdbPropertyType].zebra;
   } else if (
